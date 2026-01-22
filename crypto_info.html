@@ -7,22 +7,20 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <!-- Библиотека для графиков -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
 
-<!-- Header -->
+<!-- Header (ВОЛНА ВЕРНУЛАСЬ) -->
 <div class="launch-header">
     <div class="top-nav">
         <button class="back-btn" onclick="window.history.back()">
             <svg class="icon" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
         </button>
-        <div style="font-weight: 700;">Token Details</div>
+        <div style="font-weight: 700; color: white;">Token Details</div>
         <div style="width: 24px;"></div>
     </div>
 
-    <!-- Dynamic Content -->
     <img id="tokenIcon" src="" class="token-avatar-big">
     <div class="token-name-header" id="tokenName">LOADING...</div>
     
@@ -45,7 +43,7 @@
     <div class="tab-link" onclick="switchTab('about', this)">About</div>
 </div>
 
-<!-- Content Sections -->
+<!-- Chart Section -->
 <div class="content-section" id="tab-chart">
     <div class="chart-controls">
         <div class="time-btn active">1D</div>
@@ -56,7 +54,6 @@
         <canvas id="priceChart"></canvas>
     </div>
     
-    <!-- My Position -->
     <div class="trans-summary">
         <div class="ts-item">
             <div class="ts-label">Your Balance</div>
@@ -84,7 +81,6 @@
     </div>
 </div>
 
-<!-- Bottom Action Bar -->
 <div class="fixed-action-container">
     <div style="display: flex; gap: 10px;">
         <button class="btn-buy-floating" style="background: #1c1c1c; color: white; border: 1px solid #333;" onclick="openTrade('sell')">
@@ -96,20 +92,17 @@
     </div>
 </div>
 
-<!-- Trade Overlay (Modal) -->
-<div id="tradeOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:9999; flex-direction:column; justify-content:center; padding: 20px;">
-    <h2 id="tradeTitle" style="text-align:center; margin-bottom:20px; font-size: 24px;">Buy</h2>
-    
+<!-- Trade Overlay -->
+<div id="tradeOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:9999; flex-direction:column; justify-content:center; padding: 20px;">
+    <h2 id="tradeTitle" style="text-align:center; margin-bottom:20px; font-size: 24px; color: white;">Buy</h2>
     <div class="input-wrapper">
         <input type="number" id="tradeInput" placeholder="Amount" oninput="calcTrade()">
         <div class="input-suffix" id="tradeSuffix">TOKEN</div>
     </div>
-    
     <div style="display:flex; justify-content:space-between; margin-bottom:20px; font-size:14px; color:#888;">
         <span>Balance: <span id="tradeBalance" style="color:white;">0</span></span>
         <span>Total: <span id="tradeTotal" style="color:white;">0</span> BLYX</span>
     </div>
-
     <button class="btn-white-large" onclick="executeTrade()">Confirm</button>
     <button class="btn-text" style="margin-top:10px; width:100%; text-align:center; color:#555;" onclick="closeTrade()">Cancel</button>
 </div>
@@ -123,42 +116,36 @@
     tg.expand();
     tg.setHeaderColor('#000000');
 
-    // Получаем ID токена из URL (например crypto_info.html?id=BTC)
     const urlParams = new URLSearchParams(window.location.search);
     const tokenId = urlParams.get('id');
 
     let currentTokenData = null;
     let currentUserData = null;
     let priceChart = null;
-    let tradeType = 'buy'; // 'buy' or 'sell'
+    let tradeType = 'buy';
 
-    // === TABS ===
     window.switchTab = function(tabName, el) {
         document.querySelectorAll('.tab-link').forEach(t => t.classList.remove('active'));
         el.classList.add('active');
-        
-        ['chart', 'tx', 'about'].forEach(id => {
-            document.getElementById('tab-' + id).classList.add('hidden');
-        });
+        ['chart', 'tx', 'about'].forEach(id => document.getElementById('tab-' + id).classList.add('hidden'));
         document.getElementById('tab-' + tabName).classList.remove('hidden');
     }
 
-    // === INIT ===
     async function initPage() {
-        if(!tokenId) { alert("No token specified"); return; }
-
+        if(!tokenId) { document.body.innerHTML = '<div style="color:white;text-align:center;padding:50px;">Token not found</div>'; return; }
+        
         await initUser();
 
-        // 1. Подписка на Токен
         onSnapshot(doc(db, "tokens", tokenId), (docSnap) => {
             if (docSnap.exists()) {
                 currentTokenData = docSnap.data();
                 renderTokenInfo();
                 updateChart(currentTokenData.price);
+            } else {
+                document.body.innerHTML = '<div style="color:white;text-align:center;padding:50px;">Token not found (might be deleted)</div>';
             }
         });
 
-        // 2. Подписка на Юзера (для балансов)
         subscribeToUser((user) => {
             currentUserData = user;
             renderUserPos();
@@ -171,11 +158,10 @@
         document.getElementById('tokenPrice').innerText = parseFloat(currentTokenData.price).toLocaleString();
         document.getElementById('tokenDesc').innerText = currentTokenData.description || "No info";
         
-        // Картинка (если Base64 или ссылка)
         if(currentTokenData.image) {
             document.getElementById('tokenIcon').src = currentTokenData.image;
         } else {
-            // Фолбэк, если нет картинки
+            // Если иконки нет, ставим заглушку буквой
             document.getElementById('tokenIcon').style.display = 'none';
         }
 
@@ -193,37 +179,31 @@
         document.getElementById('myTokenValue').innerText = "≈ " + val.toLocaleString();
     }
 
-    // === CHART LOGIC ===
     function updateChart(currentPrice) {
-        if(priceChart) return; // Не перерисовываем полностью, чтобы не моргал (в реальном проекте обновляем data)
-
-        const ctx = document.getElementById('priceChart').getContext('2d');
+        if(priceChart) return;
         
-        // Генерируем фейковую историю для красоты
-        const history = [];
-        let price = currentPrice;
-        for(let i=0; i<24; i++) {
-            history.unshift(price);
-            price = price * (1 + (Math.random() * 0.04 - 0.02)); // +/- 2%
-        }
-
+        const ctx = document.getElementById('priceChart').getContext('2d');
         // Градиент
         const gradient = ctx.createLinearGradient(0, 0, 0, 300);
-        gradient.addColorStop(0, 'rgba(204, 255, 0, 0.2)');
-        gradient.addColorStop(1, 'rgba(204, 255, 0, 0)');
+        gradient.addColorStop(0, 'rgba(255, 255, 255, 0.2)');
+        gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+        // Данные: рисуем просто прямую линию с текущей ценой, если нет истории
+        // Если хочешь "живой" график, нужно хранить историю цен в БД, но пока у нас MVP
+        const dataPoints = Array(12).fill(currentPrice);
 
         priceChart = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: Array(24).fill(''),
+                labels: Array(12).fill(''),
                 datasets: [{
-                    data: history,
-                    borderColor: '#CCFF00',
+                    data: dataPoints,
+                    borderColor: '#FFFFFF',
                     backgroundColor: gradient,
                     borderWidth: 2,
                     pointRadius: 0,
                     fill: true,
-                    tension: 0.4
+                    tension: 0.1
                 }]
             },
             options: {
@@ -232,18 +212,12 @@
                 plugins: { legend: { display: false } },
                 scales: {
                     x: { display: false },
-                    y: { 
-                        display: true, 
-                        position: 'right',
-                        grid: { color: '#222' },
-                        ticks: { color: '#555' }
-                    }
+                    y: { display: false } // Убрал оси для чистоты
                 }
             }
         });
     }
 
-    // === TRADING LOGIC ===
     window.openTrade = function(type) {
         tradeType = type;
         const overlay = document.getElementById('tradeOverlay');
@@ -289,7 +263,6 @@
                     tg.showAlert("Not enough BLYX!");
                     return;
                 }
-                // Списываем BLYX, добавляем Токен
                 await updateDoc(userRef, {
                     balance: increment(-totalCost),
                     [`portfolio.${tokenId}`]: increment(amount),
@@ -297,14 +270,13 @@
                         type: 'buy', token: tokenId, amount: amount, price: price, date: new Date().toISOString()
                     })
                 });
-                tg.showAlert("Bought successfully!");
+                tg.showAlert("Success!");
             } else {
                 const currentTokenBal = currentUserData.portfolio?.[tokenId] || 0;
                 if(currentTokenBal < amount) {
                     tg.showAlert(`Not enough ${tokenId}!`);
                     return;
                 }
-                // Списываем Токен, добавляем BLYX
                 await updateDoc(userRef, {
                     balance: increment(totalCost),
                     [`portfolio.${tokenId}`]: increment(-amount),
@@ -312,7 +284,7 @@
                         type: 'sell', token: tokenId, amount: amount, price: price, date: new Date().toISOString()
                     })
                 });
-                tg.showAlert("Sold successfully!");
+                tg.showAlert("Success!");
             }
             closeTrade();
         } catch(e) {
@@ -324,17 +296,16 @@
     function renderHistory() {
         const list = document.getElementById('txList');
         const txs = currentUserData.transactions || [];
-        // Фильтруем только для этого токена и сортируем по новизне
         const myTxs = txs.filter(t => t.token === tokenId).reverse();
 
         if(myTxs.length === 0) {
-            list.innerHTML = '<div style="text-align:center; color:#555; padding:20px;">No transactions</div>';
+            list.innerHTML = '<div style="text-align:center; color:#555; padding:20px;">No transactions yet</div>';
             return;
         }
 
         list.innerHTML = '';
         myTxs.forEach(tx => {
-            const isBuy = tx.type === 'buy';
+            const isBuy = tx.type === 'buy' || tx.type === 'create_buy';
             const color = isBuy ? 'var(--accent-green)' : 'var(--accent-red)';
             const sign = isBuy ? '+' : '-';
             const total = (tx.amount * tx.price).toFixed(2);
