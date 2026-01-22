@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Crypto Info</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+
+    <!-- Header with Rounded Bottom -->
+    <div class="launch-header">
+        <div class="top-nav">
+            <button class="back-btn" onclick="window.history.back()">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+            </button>
+            <div style="width: 24px;"></div>
+        </div>
+
+        <img src="https://cryptologos.cc/logos/bitcoin-btc-logo.png" alt="Token" class="token-avatar-big">
+        
+        <div class="token-name-header">BRIN</div>
+
+        <div class="token-stats-row">
+            <div class="stat-item">
+                <svg class="icon" style="width:16px; height:16px;" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                2K
+            </div>
+            <div style="width: 1px; height: 14px; background: #555;"></div>
+            <div class="stat-item">
+                <svg class="icon" style="width:16px; height:16px;" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                15K
+            </div>
+        </div>
+
+        <div class="market-cap-text">$640.4K</div>
+
+        <div class="progress-container">
+            <div class="p-bar-bg">
+                <div class="p-bar-fill" style="width: 80%;"></div>
+            </div>
+            <div class="p-labels">
+                <span>80% collected</span>
+                <span style="color: #888;">Trading Unlock</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs-scroll">
+        <div class="tab-link active" onclick="switchTab('trans')">Transactions</div>
+        <div class="tab-link" onclick="switchTab('chart')">Chart</div>
+        <!-- Renamed Info to Socials -->
+        <div class="tab-link" onclick="switchTab('socials')">Socials</div>
+    </div>
+
+    <!-- Content -->
+    <div class="content-section">
+        
+        <!-- TAB: TRANSACTIONS -->
+        <div id="tab-trans">
+            <div class="trans-summary">
+                <div class="ts-item">
+                    <div class="ts-label"><div class="ts-dot" style="background:var(--accent-green);"></div> Buys</div>
+                    <div class="ts-val">3</div>
+                </div>
+                <div class="ts-item">
+                    <div class="ts-label"><div class="ts-dot" style="background:var(--accent-pink);"></div> Sells</div>
+                    <div class="ts-val">3</div>
+                </div>
+                <div class="pie-chart-icon"></div>
+            </div>
+
+            <div class="trans-list">
+                <div class="trans-item">
+                    <div class="ti-left">
+                        <div class="ti-avatar bg-orange-soft">⚡</div>
+                        <div class="ti-info">
+                            <div class="ti-addr">UQAI...z_41</div>
+                            <div class="ti-action c-pink">Sell <span class="ti-time">42min ago</span></div>
+                        </div>
+                    </div>
+                    <div class="ti-right">
+                        <div class="ti-amount-row">16.01 <img src="Sprites/Blyx.png" class="icon-blyx-right"></div>
+                        <div class="ti-amount-token">33.8M BRIN</div>
+                    </div>
+                </div>
+                <div class="trans-item">
+                    <div class="ti-left">
+                        <div class="ti-avatar bg-pink-soft">🎈</div>
+                        <div class="ti-info">
+                            <div class="ti-addr">UQBD...-JLT</div>
+                            <div class="ti-action c-pink">Sell <span class="ti-time">49min ago</span></div>
+                        </div>
+                    </div>
+                    <div class="ti-right">
+                        <div class="ti-amount-row">51.9 <img src="Sprites/Blyx.png" class="icon-blyx-right"></div>
+                        <div class="ti-amount-token">96.1M BRIN</div>
+                    </div>
+                </div>
+                <div class="trans-item">
+                    <div class="ti-left">
+                        <div class="ti-avatar bg-orange-soft">🔥</div>
+                        <div class="ti-info">
+                            <div class="ti-addr">UQAI...z_41</div>
+                            <div class="ti-action c-green">Buy <span class="ti-time">49min ago</span></div>
+                        </div>
+                    </div>
+                    <div class="ti-right">
+                        <div class="ti-amount-row">19.8 <img src="Sprites/Blyx.png" class="icon-blyx-right"></div>
+                        <div class="ti-amount-token">33.8M BRIN</div>
+                    </div>
+                </div>
+            </div>
+            <div style="height: 180px;"></div>
+        </div>
+
+        <!-- TAB: CHART -->
+        <div id="tab-chart" class="hidden">
+            <!-- Time Selectors -->
+            <div class="chart-controls">
+                <div class="time-btn">1m</div>
+                <div class="time-btn active">5m</div>
+                <div class="time-btn">15m</div>
+                <div class="time-btn">1h</div>
+            </div>
+
+            <!-- Canvas Container -->
+            <div class="chart-area">
+                <canvas id="chartCanvas"></canvas>
+            </div>
+            <div style="height: 180px;"></div>
+        </div>
+
+        <!-- TAB: SOCIALS (NEW) -->
+        <div id="tab-socials" class="hidden">
+            <div class="social-list">
+                
+                <!-- Facebook -->
+                <div class="social-card" onclick="openLink('https://facebook.com')">
+                    <div class="sc-left">
+                        <div class="sc-title">Facebook</div>
+                        <div class="sc-sub">https://facebook.com/</div>
+                    </div>
+                    <img src="Sprites/facelogo.png" class="sc-icon">
+                </div>
+
+                <!-- Telegram -->
+                <div class="social-card" onclick="openLink('https://t.me')">
+                    <div class="sc-left">
+                        <div class="sc-title">Telegram</div>
+                        <div class="sc-sub">https://t.me/</div>
+                    </div>
+                    <img src="Sprites/tglogo.png" class="sc-icon">
+                </div>
+
+                <!-- Instagram -->
+                <div class="social-card" onclick="openLink('https://instagram.com')">
+                    <div class="sc-left">
+                        <div class="sc-title">Instagram</div>
+                        <div class="sc-sub">https://instagram.com/</div>
+                    </div>
+                    <img src="Sprites/instalogo.png" class="sc-icon">
+                </div>
+                
+                 <!-- X (Twitter) -->
+                 <div class="social-card" onclick="openLink('https://x.com')">
+                    <div class="sc-left">
+                        <div class="sc-title">X (Twitter)</div>
+                        <div class="sc-sub">https://x.com/</div>
+                    </div>
+                    <img src="Sprites/xlogo.png" class="sc-icon">
+                </div>
+
+            </div>
+            <div style="height: 180px;"></div>
+        </div>
+    </div>
+
+    <!-- Fixed Buttons -->
+    <div class="fixed-action-container">
+        <button class="btn-buy-floating" onclick="buyToken()">Buy</button>
+    </div>
+
+    <!-- Bottom Nav -->
+    <div class="bottom-nav">
+        <div class="nav-item" onclick="location.href='index.html'">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+        </div>
+        <div class="nav-item">
+            <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+        </div>
+        <div class="nav-trade-circle" onclick="location.href='crypto_info.html'">
+             <svg class="icon" style="color:black;" viewBox="0 0 24 24"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
+        </div>
+        <div class="nav-item">
+            <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+        </div>
+        <div class="nav-item" onclick="location.href='wallet.html'">
+            <svg class="icon" viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+        </div>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+
+        // Tabs Logic
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-link').forEach(el => el.classList.remove('active'));
+            const links = document.querySelectorAll('.tab-link');
+            
+            // Indexes correspond to HTML order: 0=Trans, 1=Chart, 2=Socials
+            if(tabName === 'trans') links[0].classList.add('active');
+            if(tabName === 'chart') links[1].classList.add('active');
+            if(tabName === 'socials') links[2].classList.add('active');
+
+            ['trans', 'chart', 'socials'].forEach(t => {
+                const el = document.getElementById('tab-'+t);
+                if(t === tabName) {
+                    el.classList.remove('hidden');
+                    if(t === 'chart') setTimeout(drawChart, 50);
+                } else {
+                    el.classList.add('hidden');
+                }
+            });
+        }
+
+        // Dummy Link Opener
+        function openLink(url) {
+            tg.openLink(url);
+        }
+
+        document.querySelectorAll('.time-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                drawChart();
+            });
+        });
+
+        function buyToken() {
+            tg.showConfirm("Buy BRIN?", (ok) => { if(ok) tg.showAlert("Done!"); });
+        }
+
+        // === CHART LOGIC ===
+        function drawChart() {
+            const canvas = document.getElementById('chartCanvas');
+            if(!canvas) return;
+            const parent = canvas.parentElement;
+            canvas.width = parent.offsetWidth;
+            canvas.height = parent.offsetHeight;
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width;
+            const h = canvas.height;
+
+            const paddingRight = 50; 
+            const paddingBottom = 20; 
+            const chartW = w - paddingRight;
+            const chartH = h - paddingBottom;
+
+            ctx.clearRect(0,0,w,h);
+
+            // 1. Grid Lines & Price (Right)
+            const minPrice = 0;
+            const maxPrice = 1.5; // 1.5K
+            const steps = 4;
+            
+            ctx.font = "600 10px Inter";
+            ctx.textAlign = "left";
+            ctx.lineWidth = 1;
+
+            for(let i=0; i<=steps; i++) {
+                const price = (maxPrice - (i * (maxPrice/steps))).toFixed(1);
+                const yPos = (i * (chartH/steps));
+                
+                // Line
+                ctx.strokeStyle = '#222';
+                ctx.beginPath(); ctx.moveTo(0, yPos); ctx.lineTo(chartW, yPos); ctx.stroke();
+
+                // Price Text
+                if(i < steps) {
+                    ctx.fillStyle = '#666';
+                    ctx.fillText(price + "K", chartW + 8, yPos + 4);
+                }
+            }
+
+            // 2. Vertical Lines & Time Labels (Bottom)
+            const timeSteps = 5;
+            const stepW = chartW / timeSteps;
+            let startHour = 10;
+            let startMin = 0;
+
+            for(let i=0; i<=timeSteps; i++) { 
+                const xPos = i * stepW;
+                
+                // Vertical Line
+                ctx.strokeStyle = '#222';
+                ctx.beginPath(); ctx.moveTo(xPos, 0); ctx.lineTo(xPos, chartH); ctx.stroke();
+
+                // Time Text
+                if(i < timeSteps) {
+                    ctx.fillStyle = '#666';
+                    ctx.textAlign = "center";
+                    let hStr = startHour < 10 ? '0'+startHour : startHour;
+                    let mStr = startMin < 10 ? '0'+startMin : startMin;
+                    ctx.fillText(`${hStr}:${mStr}`, xPos, h - 5);
+                    
+                    startMin += 15;
+                    if(startMin >= 60) { startMin = 0; startHour++; }
+                }
+            }
+
+            // 3. Candles
+            const candleWidth = 6;
+            const gap = 4;
+            let x = 10;
+            let y = chartH/2;
+            
+            for (x=10; x<chartW - 10; x+=(candleWidth+gap)) {
+                const change = (Math.random() - 0.5) * 30;
+                const height = Math.abs(change) + 2;
+                const isUp = change > 0;
+                
+                if (isUp) {
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.strokeStyle = '#FFFFFF';
+                    ctx.fillRect(x, y - height, candleWidth, height);
+                    ctx.beginPath(); ctx.moveTo(x+candleWidth/2, y-height); ctx.lineTo(x+candleWidth/2, y-height-4); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(x+candleWidth/2, y); ctx.lineTo(x+candleWidth/2, y+4); ctx.stroke();
+                } else {
+                    ctx.fillStyle = '#000000';
+                    ctx.strokeStyle = '#FFFFFF';
+                    ctx.lineWidth = 1.5;
+                    ctx.fillRect(x, y, candleWidth, height);
+                    ctx.strokeRect(x, y, candleWidth, height);
+                    ctx.beginPath(); ctx.moveTo(x+candleWidth/2, y); ctx.lineTo(x+candleWidth/2, y-4); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(x+candleWidth/2, y+height); ctx.lineTo(x+candleWidth/2, y+height+4); ctx.stroke();
+                }
+                
+                y -= change;
+                if(y < 20) y = 20;
+                if(y > chartH-20) y = chartH-20;
+            }
+        }
+
+        window.addEventListener('resize', drawChart);
+    </script>
+</body>
+</html>

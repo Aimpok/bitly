@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Home</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+
+    <div class="section-title" style="margin-top: 20px;">News</div>
+
+    <!-- Карусель -->
+    <div class="carousel-container" id="newsSlider"></div>
+
+    <!-- Баннер Launch -->
+    <div class="launch-card" onclick="location.href='wallet.html'">
+        <div class="launch-text">
+            <h3>Launch your token!</h3>
+            <p>Reach #1 on the leaderboard.</p>
+        </div>
+        <img src="Sprites/CoinIcon.png" class="coin-icon-3d" alt="coin">
+    </div>
+
+    <!-- Top Tokens -->
+    <div class="section-title">Top tokens</div>
+
+    <div class="token-list" style="padding-bottom: 120px;">
+        <!-- Item 1 -->
+        <div class="token-item" onclick="location.href='crypto_info.html'">
+            <div class="token-left">
+                <div class="token-icon-circle">U</div>
+                <div class="token-info-text"><span class="t-name">USDT</span><span class="t-sub">Tether</span></div>
+            </div>
+            <div class="token-right">
+                <div class="t-price" style="display: flex; align-items: center; justify-content: flex-end; gap: 4px;">
+                    0.9345 
+                    <img src="Sprites/Blyx.png" style="width: 16px; height: 16px; object-fit: contain;">
+                </div>
+                <div class="t-change">+26%</div>
+            </div>
+        </div>
+        <!-- Item 2 -->
+        <div class="token-item" onclick="location.href='crypto_info.html'">
+            <div class="token-left">
+                <div class="token-icon-circle">V</div>
+                <div class="token-info-text"><span class="t-name">Vall</span><span class="t-sub">Tether</span></div>
+            </div>
+            <div class="token-right">
+                <div class="t-price" style="display: flex; align-items: center; justify-content: flex-end; gap: 4px;">
+                    0.6787
+                    <img src="Sprites/Blyx.png" style="width: 16px; height: 16px; object-fit: contain;">
+                </div>
+                <div class="t-change">+26%</div>
+            </div>
+        </div>
+        <!-- Item 3 -->
+        <div class="token-item" onclick="location.href='crypto_info.html'">
+            <div class="token-left">
+                <div class="token-icon-circle">T</div>
+                <div class="token-info-text"><span class="t-name">TON</span><span class="t-sub">Toncoin</span></div>
+            </div>
+            <div class="token-right">
+                <div class="t-price" style="display: flex; align-items: center; justify-content: flex-end; gap: 4px;">
+                    5.40
+                    <img src="Sprites/Blyx.png" style="width: 16px; height: 16px; object-fit: contain;">
+                </div>
+                <div class="t-change">+5%</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Nav -->
+    <div class="bottom-nav">
+        <div class="nav-item active">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+        </div>
+        <div class="nav-item" onclick="location.href='markets.html'">
+            <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+        </div>
+        <div class="nav-trade-circle" onclick="location.href='crypto_info.html'">
+            <svg class="icon" style="color:black;" viewBox="0 0 24 24"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
+        </div>
+        <div class="nav-item">
+            <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+        </div>
+        <div class="nav-item" onclick="location.href='wallet.html'">
+            <svg class="icon" viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+        </div>
+    </div>
+
+    <script src="stocks.js"></script>
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        tg.setHeaderColor('#000000');
+
+        function openStockLink(link) {
+            if (!link || link === '#') return;
+            if (link.startsWith('http') || link.startsWith('https') || link.startsWith('tg://')) {
+                if (link.includes('t.me')) tg.openTelegramLink(link);
+                else tg.openLink(link);
+            } else location.href = link;
+        }
+
+        const slider = document.getElementById('newsSlider');
+        function renderStocks() {
+            if (!slider || !stocksData) return;
+            slider.innerHTML = ''; 
+            stocksData.forEach((stock, index) => {
+                const card = document.createElement('div');
+                card.className = 'news-card';
+                let dotsHtml = '<div class="carousel-dots">';
+                stocksData.forEach((_, i) => dotsHtml += `<div class="dot ${i === index ? 'active' : ''}"></div>`);
+                dotsHtml += '</div>';
+                card.innerHTML = `
+                    <img src="${stock.bgImage}" class="news-bg" alt="bg">
+                    <div class="news-content">
+                        <div class="news-title">${stock.title}</div>
+                        <div class="action-btn-small" onclick="openStockLink('${stock.btnLink}')">${stock.btnText}</div>
+                    </div>
+                    <img src="${stock.iconImage}" class="banner-icon" alt="icon">
+                    ${dotsHtml}
+                `;
+                slider.appendChild(card);
+            });
+        }
+        renderStocks();
+
+        let autoScrollTimer;
+        if(slider) {
+            const runAutoScroll = () => {
+                autoScrollTimer = setInterval(() => {
+                    const cardWidth = slider.offsetWidth;
+                    const scrollAmount = cardWidth + 20; 
+                    const maxScroll = slider.scrollWidth - slider.clientWidth;
+                    if (slider.scrollLeft >= maxScroll - 10) slider.scrollTo({ left: 0, behavior: 'smooth' });
+                    else slider.scrollTo({ left: slider.scrollLeft + scrollAmount, behavior: 'smooth' });
+                }, SLIDE_DURATION); 
+            };
+            runAutoScroll();
+            slider.addEventListener('touchstart', () => clearInterval(autoScrollTimer));
+            slider.addEventListener('touchend', () => runAutoScroll());
+            slider.addEventListener('scroll', () => {
+                const scrollLeft = slider.scrollLeft;
+                const cardWidth = slider.offsetWidth;
+                const index = Math.round(scrollLeft / cardWidth);
+                document.querySelectorAll('.news-card').forEach(card => {
+                    const dots = card.querySelectorAll('.dot');
+                    dots.forEach(d => d.classList.remove('active'));
+                    if(dots[index]) dots[index].classList.add('active');
+                });
+            });
+        }
+    </script>
+</body>
+</html>
