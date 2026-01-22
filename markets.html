@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Markets</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+
+<!-- Header: Кнопка ведет на launch.html -->
+<div class="market-header">
+    <div class="market-title-big">Market</div>
+    <button class="btn-launch-pill" onclick="location.href='launch.html'">Launch token</button>
+</div>
+
+<!-- Search Bar -->
+<div class="search-container">
+    <div class="search-input-box">
+        <svg class="search-icon icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <input type="text" class="search-input" id="searchInput" placeholder="Search">
+    </div>
+</div>
+
+<!-- Market List -->
+<div class="market-list" id="marketList">
+    <div style="text-align: center; padding: 20px; color: #555;">Loading markets...</div>
+</div>
+
+<!-- Bottom Navigation -->
+<div class="bottom-nav">
+    <div class="nav-item" onclick="location.href='index.html'">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+    </div>
+    <div class="nav-item active">
+        <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+    </div>
+    <div class="nav-trade-circle" onclick="location.href='markets.html'">
+        <svg class="icon" style="color:black;" viewBox="0 0 24 24"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
+    </div>
+    <div class="nav-item" onclick="location.href='transfer.html'">
+        <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+    </div>
+    <div class="nav-item" onclick="location.href='wallet.html'">
+        <svg class="icon" viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+    </div>
+</div>
+
+<script type="module">
+    import { initUser, subscribeToMarket, initMarketDataIfNeeded } from './user-service.js';
+
+    const tg = window.Telegram.WebApp;
+    tg.expand();
+    tg.setHeaderColor('#000000');
+
+    let allTokens = []; // Тут храним все токены для поиска
+
+    async function initMarkets() {
+        await initUser();
+        await initMarketDataIfNeeded(); // Убедимся что данные есть
+
+        subscribeToMarket((tokens) => {
+            allTokens = tokens; // Обновляем глобальный список
+            filterMarkets();    // Рендерим (с учетом текущего поиска)
+        });
+    }
+
+    const listContainer = document.getElementById('marketList');
+    const searchInput = document.getElementById('searchInput');
+
+    // Функция отрисовки списка
+    function renderList(items) {
+        listContainer.innerHTML = "";
+        
+        if(items.length === 0) {
+             listContainer.innerHTML = '<div style="text-align: center; color: #555; padding: 20px;">No tokens found</div>';
+             return;
+        }
+
+        items.forEach(coin => {
+            const isPositive = coin.change >= 0;
+            const changeClass = isPositive ? 'color-green' : 'color-red';
+            const sign = isPositive ? '+' : '';
+            
+            // Получаем первую букву ID, если иконка не загрузится (фолбэк логика)
+            const iconLetter = coin.id.charAt(0).toUpperCase();
+            
+            // Генерируем HTML (картинка берется из базы, если есть)
+            // Если image нет, можно показывать кружок с буквой (тут сделана логика: картинка есть -> показываем, нет -> буква)
+            let iconHtml = '';
+            if (coin.image) {
+                iconHtml = `<img src="${coin.image}" class="coin-img" alt="${coin.name}">`;
+            } else {
+                iconHtml = `<span class="coin-letter">${iconLetter}</span>`;
+            }
+
+            const html = `
+            <div class="market-item" onclick="location.href='crypto_info.html?id=${coin.id}'">
+                <div class="market-left">
+                    <div class="coin-avatar">
+                        ${iconHtml}
+                    </div>
+                    <div class="market-info">
+                        <div class="market-pair">${coin.id}</div>
+                        <div class="t-sub">${coin.name}</div>
+                    </div>
+                </div>
+                <div class="market-right">
+                    <div class="market-price-row">
+                        ${parseFloat(coin.price).toLocaleString()}
+                        <img src="Sprites/Blyx.png" style="width: 14px; height: 14px; object-fit: contain;">
+                    </div>
+                    <div class="market-change ${changeClass}">${sign}${coin.change}%</div>
+                </div>
+            </div>
+            `;
+            listContainer.innerHTML += html;
+        });
+    }
+
+    // Функция поиска
+    window.filterMarkets = function() {
+        const query = searchInput.value.toLowerCase();
+        const filtered = allTokens.filter(coin => 
+            coin.name.toLowerCase().includes(query) || 
+            coin.id.toLowerCase().includes(query)
+        );
+        renderList(filtered);
+    }
+
+    // Вешаем слушатель на инпут
+    searchInput.addEventListener('input', window.filterMarkets);
+
+    initMarkets();
+</script>
+</body>
+</html>
