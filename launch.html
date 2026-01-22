@@ -19,7 +19,6 @@
 </div>
 
 <div class="scroll-content">
-    
     <!-- STEP 1 -->
     <div id="step1" style="padding: 0 16px;">
         <div class="step-header">
@@ -59,7 +58,6 @@
         <div class="launch-input-box">
             <textarea id="tokenDesc" placeholder="Description..."></textarea>
         </div>
-
         <div style="height: 120px;"></div>
     </div>
 
@@ -69,18 +67,14 @@
             <div class="step-badge">2</div>
             <div class="step-title-text">Review</div>
         </div>
-
         <div class="review-label">Initial Buy (Optional)</div>
-
         <div class="big-price-container">
             <input type="number" class="big-price-input" id="shareInput" value="0" placeholder="0" oninput="updateCalc()" style="width: 100%;">
             <img src="Sprites/Blyx.png" class="big-icon" alt="icon">
         </div>
-
         <div class="token-calc-text" id="tokenCalcText">
             You will receive these tokens immediately.
         </div>
-
         <div style="height: 200px;"></div>
     </div>
 </div>
@@ -98,7 +92,7 @@
             Fee: <span class="cost-highlight">200</span> + Buy: <span class="cost-highlight" id="shareCostText">0</span>
         </span>
     </div>
-    <button class="btn-white-large" onclick="doPay()">
+    <button class="btn-white-large" id="payBtn" onclick="doPay()">
         Create for <span id="btnTotalText" style="margin-left:5px;">200</span>
         <img src="Sprites/Blyx.png" class="btn-icon">
     </button>
@@ -115,14 +109,10 @@
 
     const CREATION_FEE = 200;
     let currentUser = null;
-    let base64Image = null; // Тут храним картинку
+    let base64Image = null;
 
-    async function init() {
-        currentUser = await initUser();
-    }
-    init();
+    initUser().then(u => currentUser = u);
 
-    // --- FORM LOGIC ---
     window.checkForm = function() {
         const name = document.getElementById('tokenName').value.trim();
         const ticker = document.getElementById('tokenTicker').value.trim();
@@ -144,7 +134,6 @@
         }
     }
 
-    // --- NAVIGATION ---
     window.handleBack = function() {
         if(document.getElementById('step2').style.display === 'block') {
             document.getElementById('step2').style.display = 'none';
@@ -166,77 +155,79 @@
 
     window.updateCalc = function() {
         const buyAmount = parseFloat(document.getElementById('shareInput').value) || 0;
-        // Предполагаем стартовую цену 1 BLYX для создателя (упрощено)
-        // Либо 0.1, как настроишь. Допустим 1 к 1.
         const cost = buyAmount * 1; 
-
         document.getElementById('shareCostText').innerText = cost;
         document.getElementById('btnTotalText').innerText = (CREATION_FEE + cost);
     }
 
-    // --- CREATE LOGIC ---
     window.doPay = async function() {
+        const btn = document.getElementById('payBtn');
+        if(btn.disabled) return;
+        
         const name = document.getElementById('tokenName').value.trim();
         const ticker = document.getElementById('tokenTicker').value.trim().toUpperCase();
         const desc = document.getElementById('tokenDesc').value;
         const buyAmount = parseFloat(document.getElementById('shareInput').value) || 0;
         const totalCost = CREATION_FEE + buyAmount;
 
-        // Проверка тикера на уникальность
-        const tokenRef = doc(db, "tokens", ticker);
-        const tokenSnap = await getDoc(tokenRef);
-        if(tokenSnap.exists()) {
-            tg.showAlert("Ticker already exists! Choose another.");
-            return;
-        }
+        // Блокируем кнопку
+        btn.disabled = true;
+        btn.innerHTML = 'Creating...';
 
-        // Проверка баланса
-        const userRef = getUserRef();
-        const userSnap = await getDoc(userRef);
-        const balance = userSnap.data().balance || 0;
-
-        if(balance < totalCost) {
-            tg.showAlert(`Not enough BLYX. You need ${totalCost}.`);
-            return;
-        }
-
-        tg.showConfirm(`Create ${ticker} for ${totalCost} BLYX?`, async (ok) => {
-            if(ok) {
-                try {
-                    // 1. Создаем токен
-                    await setDoc(tokenRef, {
-                        id: ticker,
-                        name: name,
-                        description: desc,
-                        image: base64Image, // Сохраняем картинку
-                        price: 1.0, // Стартовая цена
-                        change: 0,
-                        ownerId: currentUser.id,
-                        createdAt: new Date().toISOString()
-                    });
-
-                    // 2. Списываем бабки и обновляем портфель
-                    const updates = {
-                        balance: increment(-totalCost)
-                    };
-                    if(buyAmount > 0) {
-                        updates[`portfolio.${ticker}`] = increment(buyAmount);
-                        updates.transactions = arrayUnion({
-                            type: 'create_buy', token: ticker, amount: buyAmount, price: 1.0, date: new Date().toISOString()
-                        });
-                    }
-
-                    await updateDoc(userRef, updates);
-
-                    tg.showAlert("Token Launched!");
-                    location.href = 'markets.html'; // Редирект на маркет
-
-                } catch(e) {
-                    console.error(e);
-                    tg.showAlert("Error: " + e.message);
-                }
+        try {
+            // 1. Проверка существования
+            const tokenRef = doc(db, "tokens", ticker);
+            const tokenSnap = await getDoc(tokenRef);
+            if(tokenSnap.exists()) {
+                tg.showAlert("Ticker already exists!");
+                btn.disabled = false;
+                btn.innerHTML = 'Try again';
+                return;
             }
-        });
+
+            // 2. Проверка баланса
+            const userRef = getUserRef();
+            const userSnap = await getDoc(userRef);
+            const balance = userSnap.data().balance || 0;
+
+            if(balance < totalCost) {
+                tg.showAlert(`Not enough BLYX. Need ${totalCost}.`);
+                btn.disabled = false;
+                btn.innerHTML = 'Insufficient funds';
+                return;
+            }
+
+            // 3. Создаем токен
+            await setDoc(tokenRef, {
+                id: ticker,
+                name: name,
+                description: desc,
+                image: base64Image,
+                price: 1.0,
+                change: 0,
+                ownerId: currentUser.id,
+                createdAt: new Date().toISOString()
+            });
+
+            // 4. Списываем средства
+            const updates = { balance: increment(-totalCost) };
+            if(buyAmount > 0) {
+                updates[`portfolio.${ticker}`] = increment(buyAmount);
+                updates.transactions = arrayUnion({
+                    type: 'create_buy', token: ticker, amount: buyAmount, price: 1.0, date: new Date().toISOString()
+                });
+            }
+            await updateDoc(userRef, updates);
+
+            // 5. Редирект на страницу токена
+            location.href = `crypto_info.html?id=${ticker}`;
+
+        } catch(e) {
+            console.error(e);
+            tg.showAlert("Error: " + e.message);
+            btn.disabled = false;
+            btn.innerHTML = 'Error';
+        }
     }
 </script>
 </body>
