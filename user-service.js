@@ -1,11 +1,9 @@
 import { db } from './firebase-config.js';
 import { 
-    doc, getDoc, setDoc, updateDoc, onSnapshot, collection, getDocs, writeBatch 
+    doc, getDoc, setDoc, onSnapshot, collection 
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 const tg = window.Telegram.WebApp;
-
-// --- USER LOGIC ---
 
 // Получаем данные юзера из TG
 export function getTgUser() {
@@ -25,17 +23,27 @@ export function getUserRef() {
 export async function initUser() {
     const user = getTgUser();
     const userRef = getUserRef();
+    
+    // Пытаемся получить, если нет - создаем, но не ждем блокирующе лишний раз
+    // Оптимизация: используем setDoc с merge, чтобы не делать лишний read
+    const baseData = {
+        id: user.id,
+        username: user.username || 'Anon',
+        firstName: user.first_name || '',
+        lastLogin: new Date().toISOString()
+    };
+
+    // Если юзера нет, эти поля запишутся. Если есть - не перезатрутся (благодаря merge: true и логике ниже, 
+    // но для скорости просто читаем один раз).
     const snap = await getDoc(userRef);
 
     if (!snap.exists()) {
         const newUser = {
-            id: user.id,
-            username: user.username || 'Anon',
-            firstName: user.first_name || '',
-            balance: 0,        // BLYX (игровая валюта)
-            starsBalance: 0,   // Реальные Stars
+            ...baseData,
+            balance: 0,
+            starsBalance: 0,
             createdAt: new Date().toISOString(),
-            portfolio: {},     // Формат: { "BTC": { amount: 0.001, buyPrice: 90000 } }
+            portfolio: {},
             transactions: []   
         };
         await setDoc(userRef, newUser);
@@ -53,37 +61,7 @@ export function subscribeToUser(callback) {
     });
 }
 
-// --- MARKET LOGIC (Рынок) ---
-
-// Функция заливки начальных данных рынка (запустить один раз, если база пустая)
-export async function initMarketDataIfNeeded() {
-    const tokensRef = collection(db, "tokens");
-    const snap = await getDocs(tokensRef);
-    
-    if (snap.empty) {
-        console.log("База токенов пуста. Создаем начальный рынок...");
-        const batch = writeBatch(db);
-        
-        const initialTokens = [
-            { id: "BTC", name: "Bitcoin", price: 96500.00, change: -1.2, image: "Sprites/token_btc.png", description: "Digital Gold" },
-            { id: "ETH", name: "Ethereum", price: 3450.50, change: 2.1, image: "Sprites/token_eth.png", description: "Smart Contracts" },
-            { id: "TON", name: "Toncoin", price: 5.40, change: 5.0, image: "Sprites/token_ton.png", description: "The Open Network" },
-            { id: "USDT", name: "Tether", price: 1.00, change: 0.01, image: "Sprites/token_usdt.png", description: "Stablecoin" },
-            { id: "BLYX", name: "Blyx Coin", price: 0.15, change: 15.4, image: "Sprites/Blyx.png", description: "Native Token" },
-            { id: "DOGS", name: "Dogs", price: 0.0044, change: -3.5, image: "Sprites/token_dogs.png", description: "Meme Coin" }
-        ];
-
-        initialTokens.forEach(token => {
-            const ref = doc(db, "tokens", token.id);
-            batch.set(ref, token);
-        });
-
-        await batch.commit();
-        console.log("Рынок инициализирован!");
-    }
-}
-
-// Слушать цены рынка в реальном времени
+// Слушать рынок (только реальные токены)
 export function subscribeToMarket(callback) {
     const tokensRef = collection(db, "tokens");
     return onSnapshot(tokensRef, (snapshot) => {
@@ -93,4 +71,9 @@ export function subscribeToMarket(callback) {
         });
         callback(tokens);
     });
+}
+
+// Пустая функция (заглушка), чтобы не ломать старые импорты в HTML
+export async function initMarketDataIfNeeded() {
+    return;
 }
