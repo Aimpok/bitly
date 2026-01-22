@@ -4,13 +4,13 @@ import { getFirestore } from "https://www.gstatic.com/firebasejs/10.7.1/firebase
 
 // ⚠️ ВСТАВЬ СЮДА ДАННЫЕ СО СВОЕГО СКРИНШОТА
 const firebaseConfig = {
-  apiKey: "ТВОЙ_API_KEY",
-  authDomain: "ТВОЙ_PROJECT_ID.firebaseapp.com",
-  projectId: "ТВОЙ_PROJECT_ID",
-  storageBucket: "ТВОЙ_PROJECT_ID.firebasestorage.app",
-  messagingSenderId: "ТВОЙ_SENDER_ID",
-  appId: "ТВОЙ_APP_ID",
-  measurementId: "ТВОЙ_MEASUREMENT_ID"
+  apiKey: "AIzaSyB9j-8rgCEkFM3XeMnV-XKiSrw8fmMc5GY",
+  authDomain: "bitylyyy.firebaseapp.com",
+  projectId: "bitylyyy",
+  storageBucket: "bitylyyy.firebasestorage.app",
+  messagingSenderId: "209004998916",
+  appId: "1:209004998916:web:adc08c60a8a6d8409b2051",
+  measurementId: "G-WYVKFLSX50"
 };
 
 // Инициализация
