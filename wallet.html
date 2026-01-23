@@ -114,14 +114,24 @@
             const tokenInfo = currentMarket.find(t => t.id === tokenId) || { 
                 name: tokenId, 
                 price: 0, 
-                image: 'Sprites/GiftIcon.png' // Заглушка, если иконки нет
+                image: null,
+                id: tokenId
             };
 
-            const imageSrc = tokenInfo.image || 'Sprites/GiftIcon.png';
-            // Форматируем цену (если цена очень маленькая, показываем больше знаков)
-            const displayPrice = parseFloat(tokenInfo.price) < 1 
-                ? parseFloat(tokenInfo.price).toFixed(4) 
-                : Math.floor(tokenInfo.price).toLocaleString();
+            // ФОРМАТИРОВАНИЕ ЦЕНЫ (Исправлено)
+            // Если цена меньше 0.01, показываем 6 знаков, иначе 2 знака
+            const displayPrice = parseFloat(tokenInfo.price) < 0.01 
+                ? parseFloat(tokenInfo.price).toFixed(6) 
+                : parseFloat(tokenInfo.price).toFixed(2);
+
+            // ЛОГИКА ИКОНКИ (Исправлено)
+            // Если нет картинки -> показываем букву
+            let iconHtml;
+            if (tokenInfo.image) {
+                iconHtml = `<img src="${tokenInfo.image}" class="card-icon-img" alt="${tokenId}">`;
+            } else {
+                iconHtml = `<div class="token-icon-fallback">${tokenInfo.id[0]}</div>`;
+            }
 
             const card = document.createElement('div');
             card.className = 'crypto-card';
@@ -129,7 +139,7 @@
             
             card.innerHTML = `
                 <div class="card-icon-area">
-                    <img src="${imageSrc}" class="card-icon-img" alt="${tokenId}">
+                    ${iconHtml}
                 </div>
                 <div class="card-info">
                     <span class="token-name">${tokenInfo.name}</span>
@@ -138,7 +148,7 @@
                             ${displayPrice}
                             <img src="Sprites/Blyx.png" style="width: 10px; height: 10px; object-fit: contain;">
                         </span>
-                        <span class="token-amount">x${amount.toLocaleString()}</span>
+                        <span class="token-amount">x${Math.floor(amount).toLocaleString()}</span>
                     </div>
                 </div>
             `;
