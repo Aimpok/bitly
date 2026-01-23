@@ -7,228 +7,466 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        /* Доп стили для счетчика и кроппера */
+        .label-row {
+            display: flex; 
+            justify-content: space-between; 
+            align-items: flex-end;
+            margin-bottom: 8px;
+            margin-top: 20px;
+        }
+        .char-counter {
+            font-size: 14px;
+            font-weight: 600;
+            color: #555;
+        }
+        
+        /* CROPPER STYLES */
+        .cropper-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: #000; z-index: 10000;
+            display: none; flex-direction: column;
+        }
+        .cropper-body {
+            flex: 1; position: relative; overflow: hidden;
+            display: flex; align-items: center; justify-content: center;
+        }
+        #cropperImg {
+            position: absolute;
+            transform-origin: center;
+            will-change: transform;
+        }
+        /* Маска затемнения с прозрачным кругом посередине */
+        .cropper-mask {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            background: radial-gradient(circle 120px at center, transparent 120px, rgba(0,0,0,0.7) 122px);
+            pointer-events: none; /* Пропускаем клики сквозь маску к картинке */
+            border: 2px solid rgba(255,255,255,0.1);
+        }
+        /* Круг-ориентир */
+        .cropper-circle-guide {
+            position: absolute;
+            width: 240px; height: 240px;
+            border: 2px solid #fff;
+            border-radius: 50%;
+            pointer-events: none;
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.7); /* Альтернативный способ затемнения */
+        }
+        .cropper-footer {
+            height: 80px; background: #111;
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 0 24px; z-index: 10001;
+        }
+    </style>
 </head>
 <body>
 
-<!-- Header -->
-<div class="header-nav" id="mainHeader">
-    <button class="back-btn" onclick="handleBack()">
-        <svg class="icon" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-    </button>
-    <div class="header-title">Create Token</div>
-</div>
-
-<div class="scroll-content">
-    <!-- STEP 1 -->
-    <div id="step1" style="padding: 0 16px;">
-        <div class="step-header">
-            <div class="step-badge">1</div>
-            <div class="step-title-text">Token Info</div>
-        </div>
-
-        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 25px;">
-            <div class="upload-circle" onclick="document.getElementById('fileInput').click()">
-                <div id="previewContainer" class="upload-placeholder">+</div>
-                <img id="finalAvatar" src="" style="display: none;">
-            </div>
-            <div>
-                <div style="font-weight: 700;">Icon</div>
-                <div style="font-size: 12px; color: #888;">Tap to upload</div>
-            </div>
-            <input type="file" id="fileInput" hidden accept="image/*" onchange="handleFileSelect(this)">
-        </div>
-
-        <div style="display: flex; justify-content: space-between; align-items: baseline;">
-            <label class="launch-label">Name</label>
-        </div>
-        <div class="launch-input-box">
-            <input type="text" id="tokenName" placeholder="Bitcoin" oninput="checkForm()">
-        </div>
-
-        <div style="display: flex; justify-content: space-between; align-items: baseline;">
-            <label class="launch-label">Ticker (ID)</label>
-        </div>
-        <div class="launch-input-box">
-            <input type="text" id="tokenTicker" placeholder="BTC" oninput="checkForm()" style="text-transform: uppercase;">
-        </div>
-
-        <div style="display: flex; justify-content: space-between; align-items: baseline;">
-            <label class="launch-label">Description</label>
-        </div>
-        <div class="launch-input-box">
-            <textarea id="tokenDesc" placeholder="Description..."></textarea>
-        </div>
-        <div style="height: 120px;"></div>
+    <!-- Header -->
+    <div class="header-nav" id="mainHeader">
+        <button class="back-btn" onclick="handleBack()">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        </button>
+        <div class="header-title">Create Token</div>
     </div>
 
-    <!-- STEP 2 -->
-    <div id="step2" style="padding: 0 16px; display: none;">
-        <div class="step-header">
-            <div class="step-badge">2</div>
-            <div class="step-title-text">Review</div>
-        </div>
-        <div class="review-label">Initial Buy (Optional)</div>
-        <div class="big-price-container">
-            <input type="number" class="big-price-input" id="shareInput" value="0" placeholder="0" oninput="updateCalc()" style="width: 100%;">
-            <img src="Sprites/Blyx.png" class="big-icon" alt="icon">
-        </div>
-        <div class="token-calc-text" id="tokenCalcText">
-            You will receive these tokens immediately.
-        </div>
-        <div style="height: 200px;"></div>
-    </div>
-</div>
-
-<!-- Buttons -->
-<div class="fixed-bottom-bar" id="btnContainer">
-    <button class="btn-white-large btn-disabled" id="continueBtn" onclick="goToStep2()">
-        Continue
-    </button>
-</div>
-
-<div class="fixed-bottom-bar" id="payPanel" style="display: none;">
-    <div class="cost-info-row">
-        <span class="cost-text-left">
-            Fee: <span class="cost-highlight">200</span> + Buy: <span class="cost-highlight" id="shareCostText">0</span>
-        </span>
-    </div>
-    <button class="btn-white-large" id="payBtn" onclick="doPay()">
-        Create for <span id="btnTotalText" style="margin-left:5px;">200</span>
-        <img src="Sprites/Blyx.png" class="btn-icon">
-    </button>
-</div>
-
-<script type="module">
-    import { initUser, getUserRef } from './user-service.js';
-    import { db } from './firebase-config.js';
-    import { doc, setDoc, getDoc, updateDoc, increment, arrayUnion } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-
-    const tg = window.Telegram.WebApp;
-    tg.expand();
-    tg.setHeaderColor('#000000');
-
-    const CREATION_FEE = 200;
-    let currentUser = null;
-    let base64Image = null;
-
-    initUser().then(u => currentUser = u);
-
-    window.checkForm = function() {
-        const name = document.getElementById('tokenName').value.trim();
-        const ticker = document.getElementById('tokenTicker').value.trim();
-        const btn = document.getElementById('continueBtn');
-        if (name.length > 0 && ticker.length > 0) btn.classList.remove('btn-disabled'); 
-        else btn.classList.add('btn-disabled'); 
-    }
-
-    window.handleFileSelect = function(input) {
-        if (input.files && input.files[0]) {
-            const reader = new FileReader();
-            reader.onload = function (e) {
-                base64Image = e.target.result;
-                document.getElementById('finalAvatar').src = base64Image;
-                document.getElementById('finalAvatar').style.display = 'block';
-                document.getElementById('previewContainer').style.display = 'none';
-            }
-            reader.readAsDataURL(input.files[0]);
-        }
-    }
-
-    window.handleBack = function() {
-        if(document.getElementById('step2').style.display === 'block') {
-            document.getElementById('step2').style.display = 'none';
-            document.getElementById('step1').style.display = 'block';
-            document.getElementById('btnContainer').style.display = 'block';
-            document.getElementById('payPanel').style.display = 'none';
-        } else {
-            window.history.back();
-        }
-    }
-
-    window.goToStep2 = function() {
-        document.getElementById('step1').style.display = 'none';
-        document.getElementById('step2').style.display = 'block';
-        document.getElementById('btnContainer').style.display = 'none';
-        document.getElementById('payPanel').style.display = 'block';
-        window.updateCalc();
-    }
-
-    window.updateCalc = function() {
-        const buyAmount = parseFloat(document.getElementById('shareInput').value) || 0;
-        const cost = buyAmount * 1; 
-        document.getElementById('shareCostText').innerText = cost;
-        document.getElementById('btnTotalText').innerText = (CREATION_FEE + cost);
-    }
-
-    window.doPay = async function() {
-        const btn = document.getElementById('payBtn');
-        if(btn.disabled) return;
+    <!-- Scroll Content -->
+    <div class="scroll-content">
         
-        const name = document.getElementById('tokenName').value.trim();
-        const ticker = document.getElementById('tokenTicker').value.trim().toUpperCase();
-        const desc = document.getElementById('tokenDesc').value;
-        const buyAmount = parseFloat(document.getElementById('shareInput').value) || 0;
-        const totalCost = CREATION_FEE + buyAmount;
+        <!-- STEP 1 -->
+        <div id="step1" style="padding: 0 16px;">
+            <div class="step-header">
+                <div class="step-badge">1</div>
+                <div class="step-title-text">Token Info</div>
+            </div>
 
-        // Блокируем кнопку
-        btn.disabled = true;
-        btn.innerHTML = 'Creating...';
+            <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 25px;">
+                <div class="upload-circle" onclick="document.getElementById('fileInput').click()">
+                    <div id="previewContainer" class="upload-placeholder">+</div>
+                    <img id="finalAvatar" src="" style="display: none; width:100%; height:100%; border-radius:50%; object-fit:cover;">
+                </div>
+                <div>
+                    <div style="font-weight: 700;">Icon</div>
+                    <div style="font-size: 12px; color: #888;">Tap to upload</div>
+                </div>
+                <input type="file" id="fileInput" hidden accept="image/*" onchange="initCropper(this)">
+            </div>
 
-        try {
-            // 1. Проверка существования
+            <!-- NAME INPUT -->
+            <div class="label-row">
+                <label class="launch-label" style="margin:0;">Name</label>
+                <span class="char-counter" id="nameCount">20</span>
+            </div>
+            <div class="launch-input-box">
+                <input type="text" id="tokenName" placeholder="Bitcoin" maxlength="20" oninput="handleInput('name')">
+            </div>
+
+            <!-- TICKER INPUT -->
+            <div class="label-row">
+                <label class="launch-label" style="margin:0;">Ticker</label>
+                <span class="char-counter" id="tickerCount">10</span>
+            </div>
+            <div class="launch-input-box">
+                <input type="text" id="tokenTicker" placeholder="BTC" maxlength="10" oninput="handleInput('ticker')" style="text-transform: uppercase;">
+            </div>
+
+            <div class="label-row">
+                <label class="launch-label" style="margin:0;">Description</label>
+            </div>
+            <div class="launch-input-box">
+                <textarea id="tokenDesc" placeholder="Description..."></textarea>
+            </div>
+
+            <div style="height: 120px;"></div>
+        </div>
+
+        <!-- STEP 2 -->
+        <div id="step2" style="padding: 0 16px; display: none;">
+            <div class="step-header">
+                <div class="step-badge">2</div>
+                <div class="step-title-text">Review</div>
+            </div>
+
+            <div class="review-label">Initial Buy (Optional)</div>
+            <div class="big-price-container">
+                <input type="number" class="big-price-input" id="shareInput" value="0" placeholder="0" oninput="updateCalc()" style="width: 100%;">
+                <img src="Sprites/Blyx.png" class="big-icon" alt="icon">
+            </div>
+
+            <div class="token-calc-text">
+                You receive: <span id="tokensRecieveText" style="color: white; font-weight: 700;">0</span> tokens
+            </div>
+            <div class="token-calc-text" id="limitWarning" style="color: #FF3B30; display:none;">
+                Max buy is 30% of supply!
+            </div>
+
+            <div style="height: 200px;"></div>
+        </div>
+    </div>
+
+    <!-- Buttons -->
+    <div class="fixed-bottom-bar" id="btnContainer">
+        <button class="btn-white-large btn-disabled" id="continueBtn" onclick="goToStep2()">
+            Continue
+        </button>
+    </div>
+
+    <div class="fixed-bottom-bar" id="payPanel" style="display: none;">
+        <div class="cost-info-row">
+            <span class="cost-text-left">
+                Fee: <span class="cost-highlight">200</span> + Buy: <span class="cost-highlight" id="shareCostText">0</span>
+            </span>
+        </div>
+        <button class="btn-white-large" onclick="doPay()" id="createBtn">
+            Create for <span id="btnTotalText" style="margin-left:5px;">200</span>
+            <img src="Sprites/Blyx.png" class="btn-icon">
+        </button>
+    </div>
+
+    <!-- REAL CROPPER OVERLAY -->
+    <div id="cropperOverlay" class="cropper-overlay">
+        <div class="cropper-body" id="cropperBody">
+            <img id="cropperImg" src="">
+            <div class="cropper-circle-guide"></div> 
+        </div>
+        <div class="cropper-footer">
+            <button class="btn-text" onclick="closeCropper()">Cancel</button>
+            <button class="btn-white-large" style="width: auto; height: 40px; font-size: 14px; padding: 0 24px;" onclick="cropImage()">Done</button>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initUser, getUserRef } from './user-service.js';
+        import { db } from './firebase-config.js';
+        import { doc, setDoc, getDoc, updateDoc, increment, arrayUnion } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        tg.setHeaderColor('#000000');
+
+        const CREATION_FEE = 200;
+        const INITIAL_PRICE = 0.00002;
+        const TOTAL_SUPPLY = 1000000000;
+        
+        let base64Image = null; // Итоговая обрезанная картинка
+        let currentUser = null;
+
+        async function init() {
+            currentUser = await initUser();
+        }
+        init();
+
+        // --- INPUT LOGIC (English only & Counters) ---
+        window.handleInput = function(type) {
+            const el = type === 'name' ? document.getElementById('tokenName') : document.getElementById('tokenTicker');
+            const counter = type === 'name' ? document.getElementById('nameCount') : document.getElementById('tickerCount');
+            const max = type === 'name' ? 20 : 10;
+
+            let val = el.value;
+
+            if(type === 'ticker') {
+                // Оставляем только Английские буквы
+                val = val.replace(/[^a-zA-Z]/g, '').toUpperCase();
+                el.value = val;
+            }
+
+            // Обновляем счетчик (сколько осталось)
+            counter.innerText = max - val.length;
+
+            checkForm();
+        }
+
+        window.checkForm = function() {
+            const name = document.getElementById('tokenName').value.trim();
+            const ticker = document.getElementById('tokenTicker').value.trim();
+            const btn = document.getElementById('continueBtn');
+            if (name.length > 0 && ticker.length > 0) btn.classList.remove('btn-disabled'); 
+            else btn.classList.add('btn-disabled'); 
+        }
+
+        // --- REAL CROPPER LOGIC ---
+        let cropperState = { x: 0, y: 0, scale: 1 };
+        let startDist = 0;
+        let startScale = 1;
+        let startX = 0, startY = 0;
+        let lastX = 0, lastY = 0;
+        const cropSize = 240; // Размер круга (должен совпадать с CSS .cropper-circle-guide)
+
+        window.initCropper = function(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    const img = document.getElementById('cropperImg');
+                    img.onload = () => {
+                        // Сброс состояния
+                        cropperState = { x: 0, y: 0, scale: 1 };
+                        
+                        // Подгоняем начальный масштаб, чтобы картинка заполнила экран по ширине
+                        const screenW = window.innerWidth;
+                        cropperState.scale = screenW / img.naturalWidth;
+                        if(cropperState.scale < 0.5) cropperState.scale = 0.5;
+
+                        updateTransform();
+                        document.getElementById('cropperOverlay').style.display = 'flex';
+                        document.getElementById('btnContainer').style.display = 'none';
+                    };
+                    img.src = e.target.result;
+                }
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        function updateTransform() {
+            const img = document.getElementById('cropperImg');
+            img.style.transform = `translate(${cropperState.x}px, ${cropperState.y}px) scale(${cropperState.scale})`;
+        }
+
+        // Жесты
+        const area = document.getElementById('cropperBody');
+        area.addEventListener('touchstart', (e) => {
+            if(e.touches.length === 1) {
+                startX = e.touches[0].clientX;
+                startY = e.touches[0].clientY;
+                lastX = cropperState.x;
+                lastY = cropperState.y;
+            } else if(e.touches.length === 2) {
+                startDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+                startScale = cropperState.scale;
+            }
+        });
+
+        area.addEventListener('touchmove', (e) => {
+            e.preventDefault(); // Блокируем скролл страницы
+            if(e.touches.length === 1) {
+                const dx = e.touches[0].clientX - startX;
+                const dy = e.touches[0].clientY - startY;
+                cropperState.x = lastX + dx;
+                cropperState.y = lastY + dy;
+                updateTransform();
+            } else if(e.touches.length === 2) {
+                const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+                cropperState.scale = Math.max(0.1, startScale * (dist / startDist));
+                updateTransform();
+            }
+        });
+
+        window.closeCropper = function() {
+            document.getElementById('cropperOverlay').style.display = 'none';
+            document.getElementById('fileInput').value = ''; // сброс
+            document.getElementById('btnContainer').style.display = 'block';
+        }
+
+        window.cropImage = function() {
+            const img = document.getElementById('cropperImg');
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+
+            // Размер итоговой иконки
+            const size = 300; 
+            canvas.width = size;
+            canvas.height = size;
+
+            // Вычисляем координаты
+            // Центр экрана (где находится круг) относительно картинки
+            const rect = area.getBoundingClientRect();
+            const centerX = rect.width / 2;
+            const centerY = rect.height / 2;
+
+            // Позиция картинки (центр картинки смещен на x, y)
+            // Но transform-origin: center, значит x,y это смещение от центра контейнера
+            // Нам нужно найти, какая часть картинки находится под кругом 240x240 в центре экрана
+            
+            // Математика обратного проецирования
+            // 1. Сдвигаем канвас в центр
+            // 2. Рисуем картинку с учетом текущего scale и translate
+            
+            // Простой способ: нарисовать картинку так же как на экране, но в канвас размером с круг? 
+            // Нет, лучше вычислить source координаты.
+            
+            // Эффективный способ: 
+            // Изображение сдвинуто на (state.x, state.y) и масштабировано (state.scale)
+            // Центр круга (точка 0,0 относительно кропа) находится в центре экрана.
+            
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, size, size);
+
+            // Сохраняем контекст, перемещаем в центр канваса
+            ctx.save();
+            ctx.translate(size/2, size/2);
+            
+            // Применяем те же трансформации, что и на экране, но:
+            // На экране x,y двигают картинку.
+            // Нам нужно "сдвинуть" картинку так, чтобы центр круга попал в центр канваса.
+            // Так как мы рендерим КУСОК картинки, нам нужно понять масштаб.
+            // Визуальный круг = 240px. Итоговый = 300px.
+            // Коэффициент = 300 / 240 = 1.25.
+            const ratio = size / cropSize; 
+
+            ctx.scale(cropperState.scale * ratio, cropperState.scale * ratio);
+            ctx.translate(cropperState.x / cropperState.scale, cropperState.y / cropperState.scale);
+            
+            // Рисуем картинку с центром в точке 0,0
+            ctx.drawImage(img, -img.naturalWidth/2, -img.naturalHeight/2);
+            
+            ctx.restore();
+
+            base64Image = canvas.toDataURL('image/jpeg', 0.8);
+            
+            // Показываем результат
+            const preview = document.getElementById('finalAvatar');
+            preview.src = base64Image;
+            preview.style.display = 'block';
+            document.getElementById('previewContainer').style.display = 'none';
+            
+            closeCropper();
+        }
+
+        // --- NAVIGATION & CALCULATION ---
+        window.handleBack = function() {
+            if(document.getElementById('step2').style.display === 'block') {
+                document.getElementById('step2').style.display = 'none';
+                document.getElementById('step1').style.display = 'block';
+                document.getElementById('btnContainer').style.display = 'block';
+                document.getElementById('payPanel').style.display = 'none';
+            } else {
+                window.history.back();
+            }
+        }
+
+        window.goToStep2 = function() {
+            document.getElementById('step1').style.display = 'none';
+            document.getElementById('step2').style.display = 'block';
+            document.getElementById('btnContainer').style.display = 'none';
+            document.getElementById('payPanel').style.display = 'block';
+            window.updateCalc();
+        }
+
+        window.updateCalc = function() {
+            const buyBlyx = parseFloat(document.getElementById('shareInput').value) || 0;
+            const tokensToReceive = buyBlyx / INITIAL_PRICE;
+            const maxBuy = TOTAL_SUPPLY * 0.30;
+            const warning = document.getElementById('limitWarning');
+            const createBtn = document.getElementById('createBtn');
+
+            document.getElementById('tokensRecieveText').innerText = Math.floor(tokensToReceive).toLocaleString();
+            document.getElementById('shareCostText').innerText = buyBlyx;
+            document.getElementById('btnTotalText').innerText = (CREATION_FEE + buyBlyx);
+
+            if (tokensToReceive > maxBuy) {
+                warning.style.display = 'block';
+                createBtn.classList.add('btn-disabled');
+            } else {
+                warning.style.display = 'none';
+                createBtn.classList.remove('btn-disabled');
+            }
+        }
+
+        window.doPay = async function() {
+            const name = document.getElementById('tokenName').value.trim();
+            const ticker = document.getElementById('tokenTicker').value.trim().toUpperCase();
+            const desc = document.getElementById('tokenDesc').value;
+            const buyBlyx = parseFloat(document.getElementById('shareInput').value) || 0;
+            const totalCost = CREATION_FEE + buyBlyx;
+            const tokensToReceive = buyBlyx / INITIAL_PRICE;
+
+            if(tokensToReceive > TOTAL_SUPPLY * 0.3) {
+                tg.showAlert("Reduce buy amount (Max 30%)");
+                return;
+            }
+
             const tokenRef = doc(db, "tokens", ticker);
             const tokenSnap = await getDoc(tokenRef);
             if(tokenSnap.exists()) {
                 tg.showAlert("Ticker already exists!");
-                btn.disabled = false;
-                btn.innerHTML = 'Try again';
                 return;
             }
 
-            // 2. Проверка баланса
             const userRef = getUserRef();
             const userSnap = await getDoc(userRef);
             const balance = userSnap.data().balance || 0;
 
             if(balance < totalCost) {
                 tg.showAlert(`Not enough BLYX. Need ${totalCost}.`);
-                btn.disabled = false;
-                btn.innerHTML = 'Insufficient funds';
                 return;
             }
 
-            // 3. Создаем токен
-            await setDoc(tokenRef, {
-                id: ticker,
-                name: name,
-                description: desc,
-                image: base64Image,
-                price: 1.0,
-                change: 0,
-                ownerId: currentUser.id,
-                createdAt: new Date().toISOString()
+            tg.showConfirm(`Launch ${ticker}?`, async (ok) => {
+                if(ok) {
+                    try {
+                        await setDoc(tokenRef, {
+                            id: ticker,
+                            name: name,
+                            description: desc,
+                            image: base64Image,
+                            price: INITIAL_PRICE,
+                            change: 0,
+                            ownerId: currentUser.id,
+                            createdAt: new Date().toISOString(),
+                            maxSupply: TOTAL_SUPPLY,
+                            sold: tokensToReceive, 
+                            marketCap: tokensToReceive * INITIAL_PRICE
+                        });
+
+                        const updates = {
+                            balance: increment(-totalCost)
+                        };
+                        if(tokensToReceive > 0) {
+                            updates[`portfolio.${ticker}`] = increment(tokensToReceive);
+                            updates.transactions = arrayUnion({
+                                type: 'create_buy', token: ticker, amount: tokensToReceive, price: INITIAL_PRICE, date: new Date().toISOString()
+                            });
+                        }
+
+                        await updateDoc(userRef, updates);
+                        tg.showAlert("Token Launched!");
+                        location.href = 'markets.html';
+                    } catch(e) {
+                        console.error(e);
+                        tg.showAlert("Error: " + e.message);
+                    }
+                }
             });
-
-            // 4. Списываем средства
-            const updates = { balance: increment(-totalCost) };
-            if(buyAmount > 0) {
-                updates[`portfolio.${ticker}`] = increment(buyAmount);
-                updates.transactions = arrayUnion({
-                    type: 'create_buy', token: ticker, amount: buyAmount, price: 1.0, date: new Date().toISOString()
-                });
-            }
-            await updateDoc(userRef, updates);
-
-            // 5. Редирект на страницу токена
-            location.href = `crypto_info.html?id=${ticker}`;
-
-        } catch(e) {
-            console.error(e);
-            tg.showAlert("Error: " + e.message);
-            btn.disabled = false;
-            btn.innerHTML = 'Error';
         }
-    }
-</script>
+    </script>
 </body>
 </html>
