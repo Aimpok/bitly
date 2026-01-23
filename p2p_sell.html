@@ -16,11 +16,13 @@
     </div>
 
     <div style="padding: 0 16px;">
+        <!-- Price Input -->
         <label class="launch-label">Price per 1 token (BLYX)</label>
         <div class="input-wrapper">
             <input type="number" id="priceInput" placeholder="0.00004" oninput="validateForm()">
         </div>
 
+        <!-- Amount Input -->
         <label class="launch-label">Amount to sell</label>
         <div class="input-wrapper">
             <input type="number" id="amountInput" placeholder="Amount" oninput="validateForm()">
@@ -29,18 +31,17 @@
             Available: <span id="availBal">0</span>
         </div>
 
-        <div class="row-inputs">
-            <div>
-                <label class="launch-label">Min Limit (BLYX)</label>
-                <div class="input-wrapper"><input type="number" id="minInput" value="100" oninput="validateForm()"></div>
-            </div>
-            <div>
-                <label class="launch-label">Max Limit (BLYX)</label>
-                <div class="input-wrapper"><input type="number" id="maxInput" placeholder="All" oninput="validateForm()"></div>
-            </div>
+        <!-- Min Limit Only (Max is Auto) -->
+        <label class="launch-label">Min Limit (BLYX)</label>
+        <div class="input-wrapper">
+            <input type="number" id="minInput" value="100" placeholder="Min BLYX" oninput="validateForm()">
+        </div>
+        
+        <div style="font-size:12px; color:#666; margin-bottom:5px;">
+            Max Limit: <span id="maxLimitText">Auto (All)</span>
         </div>
 
-        <!-- Сообщение об ошибке -->
+        <!-- Error Text -->
         <div id="errorText" class="error-text"></div>
     </div>
 
@@ -66,6 +67,7 @@
             myBalance = currentUser.portfolio?.[tokenId] || 0;
             document.getElementById('availBal').innerText = Math.floor(myBalance).toLocaleString();
             
+            // Подставляем текущую рыночную цену как подсказку
             const tSnap = await getDoc(doc(db, "tokens", tokenId));
             if(tSnap.exists()) {
                 document.getElementById('priceInput').value = tSnap.data().price.toFixed(6);
@@ -78,9 +80,11 @@
             const amount = parseFloat(document.getElementById('amountInput').value) || 0;
             const min = parseFloat(document.getElementById('minInput').value) || 0;
             
+            // Максимальный лимит = Общая стоимость всех продаваемых токенов
             const totalValue = price * amount;
-            let max = parseFloat(document.getElementById('maxInput').value);
-            if(isNaN(max) || max === 0) max = totalValue;
+            
+            // Обновляем текст Max Limit для наглядности
+            document.getElementById('maxLimitText').innerText = totalValue > 0 ? `${totalValue.toFixed(2)} BLYX` : "Auto";
 
             const btn = document.getElementById('publishBtn');
             const err = document.getElementById('errorText');
@@ -104,17 +108,12 @@
                 return;
             }
 
-            if(max > totalValue + 0.001) { // +0.001 for float errors
-                err.innerText = `Max limit cannot exceed total value (${totalValue.toFixed(2)} BLYX)`;
+            if(min > totalValue) {
+                err.innerText = `Min limit (${min}) cannot exceed total value (${totalValue.toFixed(2)})`;
                 return;
             }
 
-            if(min > max) {
-                err.innerText = "Min limit cannot be greater than Max limit";
-                return;
-            }
-
-            // All good
+            // Всё ок
             btn.classList.remove('btn-disabled');
         }
 
@@ -122,30 +121,32 @@
             const price = parseFloat(document.getElementById('priceInput').value);
             const amount = parseFloat(document.getElementById('amountInput').value);
             const min = parseFloat(document.getElementById('minInput').value);
-            let max = parseFloat(document.getElementById('maxInput').value);
             
-            const totalValue = price * amount;
-            if(!max) max = totalValue;
+            // Max Limit = Все токены * Цена
+            const max = price * amount;
 
             tg.showConfirm(`Sell ${amount} ${tokenId}?\nTokens will be locked.`, async (ok) => {
                 if(ok) {
                     try {
                         const userRef = doc(db, "users", currentUser.id.toString());
                         
+                        // Списываем (блокируем) токены
                         await updateDoc(userRef, {
                             [`portfolio.${tokenId}`]: increment(-amount)
                         });
 
+                        // Создаем ордер
                         await addDoc(collection(db, "orders"), {
                             tokenId: tokenId,
                             sellerId: currentUser.id.toString(),
                             sellerName: currentUser.username || "Anon",
-                            sellerAvatar: currentUser.photoUrl || "", // Сохраняем аватарку!
+                            sellerAvatar: currentUser.photoUrl || "", 
                             price: price,
                             amount: amount,
                             minLimit: min,
-                            maxLimit: max,
-                            createdAt: new Date().toISOString()
+                            maxLimit: max, // Автоматический макс лимит
+                            createdAt: new Date().toISOString(),
+                            sellerRep: 100 
                         });
 
                         tg.showAlert("Order created!");
