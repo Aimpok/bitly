@@ -7,13 +7,6 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <style>
-        .chart-controls { display: flex; gap: 8px; margin-bottom: 10px; align-items: center; padding-left: 4px; overflow-x: auto; scrollbar-width: none; }
-        .time-btn { font-size: 13px; font-weight: 700; color: #555; padding: 6px 12px; border-radius: 8px; cursor: pointer; transition: 0.2s; background: #111; white-space: nowrap; }
-        .time-btn.active { color: #000; background: #FFF; }
-        .chart-area { height: 340px; width: 100%; background: transparent; position: relative; overflow: hidden; margin-bottom: 20px; }
-        .chart-area canvas { display: block; width: 100%; height: 100%; }
-    </style>
 </head>
 <body>
 
@@ -29,7 +22,7 @@
 
     <img id="tokenIcon" src="" class="token-avatar-big" style="display:none;">
     <div id="tokenLetter" class="token-avatar-big" style="display:none; background:#333; display:flex; align-items:center; justify-content:center; font-size:32px; font-weight:700;">?</div>
-    
+
     <div class="token-name-header" id="tokenName">LOADING...</div>
 
     <div class="stats-split-row">
@@ -51,11 +44,6 @@
         <div class="p-bar-bg"><div class="p-bar-fill" id="bondingBar" style="width: 0%;"></div></div>
         <div class="p-labels"><span id="bondingText">0% collected</span><span style="color: #888;">Unlock at 100%</span></div>
     </div>
-    
-    <!-- Live Status -->
-    <div id="tradingLive" style="display: none; text-align: center;">
-        <div class="market-live-badge" style="color: var(--accent-green); font-weight: 800; font-size: 14px;">⚡ LIVE P2P MARKET</div>
-    </div>
 </div>
 
 <!-- Tabs -->
@@ -69,19 +57,14 @@
     <!-- CHART -->
     <div id="tab-chart">
         <div class="chart-controls">
-            <div class="time-btn active" onclick="setFrame('5m')">5m</div> 
-            <div class="time-btn" onclick="setFrame('1h')">1h</div>
-            <div class="time-btn" onclick="setFrame('1d')">1d</div>
-            <div class="time-btn" onclick="setFrame('1w')">1w</div>
-            <div class="time-btn" onclick="setFrame('1m')">1m</div>
-            <div class="time-btn" onclick="setFrame('1y')">1y</div>
+            <div class="time-btn active" onclick="setFrame(5, '5m')">5m</div> 
+            <div class="time-btn" onclick="setFrame(60, '1h')">1h</div>
+            <div class="time-btn" onclick="setFrame(1440, '1d')">1d</div>
+            <div class="time-btn" onclick="setFrame(10080, '1w')">1w</div>
+            <div class="time-btn" onclick="setFrame(43200, '1m')">1M</div>
+            <div class="time-btn" onclick="setFrame(525600, '1y')">1Y</div>
         </div>
         <div class="chart-area"><canvas id="chartCanvas"></canvas></div>
-        
-        <div class="trans-summary">
-            <div class="ts-item"><div class="ts-label">Your Balance</div><div class="ts-val" id="myTokenBalance">0</div></div>
-            <div class="ts-item" style="text-align: right;"><div class="ts-label">Value (BLYX)</div><div class="ts-val" style="color: var(--accent-green);" id="myTokenValue">≈ 0</div></div>
-        </div>
         <div style="height: 120px;"></div>
     </div>
 
@@ -140,15 +123,14 @@
 
     const tokenId = new URLSearchParams(window.location.search).get('id');
     const TOTAL_SUPPLY = 1000000000;
-    const MAX_HOLDING_PERCENT = 0.30; // 30%
-    const MAX_HOLDING_AMOUNT = TOTAL_SUPPLY * MAX_HOLDING_PERCENT;
     
     let currentTokenData = null;
     let currentUserData = null;
     let isP2P = false;
-    let currentFrame = '5m';
+    let currentTimeframe = 5; // minutes
+    let timeLabel = '5m';
 
-    // UTILS
+    // FORMATTERS
     function formatPrice(val) {
         if(!val || val === 0) return "0";
         return val < 0.01 ? val.toFixed(8).replace(/\.?0+$/, "") : val.toFixed(4);
@@ -157,11 +139,11 @@
         if (!num) return "0";
         return Intl.NumberFormat('en-US', { notation: "compact", maximumFractionDigits: 2 }).format(num);
     }
-    function formatDateX(ts, frame) {
-        const d = new Date(ts);
-        if(frame === '5m' || frame === '1h') return d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
-        if(frame === '1d' || frame === '1w') return d.getDate() + '/' + (d.getMonth()+1);
-        return (d.getMonth()+1) + '/' + d.getFullYear().toString().slice(2);
+    function formatTime(timestamp, mode) {
+        const d = new Date(timestamp);
+        if(mode === '5m' || mode === '1h') return d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
+        if(mode === '1d' || mode === '1w') return d.getDate() + ' ' + d.toLocaleString('en', {month:'short'});
+        return d.toLocaleString('en', {month:'short'}) + " '" + d.getFullYear().toString().substr(2,2);
     }
 
     window.switchTab = function(tabName, el) {
@@ -186,7 +168,6 @@
         
         subscribeToUser((user) => {
             currentUserData = user;
-            renderUserPos();
             renderHistory();
         });
         window.addEventListener('resize', drawRealChart);
@@ -219,28 +200,22 @@
         if(progress >= 99.99) {
             isP2P = true;
             document.getElementById('bondingContainer').style.display = 'none';
-            document.getElementById('tradingLive').style.display = 'block';
             btn.innerText = "Go to P2P Market";
-            btn.style.background = "#fff"; btn.style.color = "#000";
+            btn.style.background = "#fff";
+            btn.style.color = "#000";
         } else {
             isP2P = false;
             document.getElementById('bondingContainer').style.display = 'block';
-            document.getElementById('tradingLive').style.display = 'none';
             btn.innerText = "Buy (Bonding Curve)";
-            btn.style.background = "#CCFF00"; btn.style.color = "#000";
+            btn.style.background = "#CCFF00";
+            btn.style.color = "#000";
         }
     }
 
-    function renderUserPos() {
-        if(!currentUserData || !currentTokenData) return;
-        const bal = currentUserData.portfolio?.[tokenId] || 0;
-        document.getElementById('myTokenBalance').innerText = formatCompact(bal);
-        document.getElementById('myTokenValue').innerText = "≈ " + (bal * currentTokenData.price).toFixed(2);
-    }
-
     window.handleAction = function() {
-        if(isP2P) { location.href = `p2p_market.html?id=${tokenId}`; } 
-        else {
+        if(isP2P) {
+            location.href = `p2p_market.html?id=${tokenId}`;
+        } else {
             document.getElementById('tradeOverlay').style.display = 'flex';
             document.getElementById('tradeBalance').innerText = formatCompact(currentUserData.balance) + " BLYX";
         }
@@ -262,15 +237,18 @@
         const currentPrice = currentTokenData.price;
         const tokensToGet = inputVal / currentPrice;
 
-        // 30% LIMIT CHECK
-        const currentHeld = currentUserData.portfolio?.[tokenId] || 0;
-        if ((currentHeld + tokensToGet) > MAX_HOLDING_AMOUNT) {
-            tg.showAlert(`Limit Reached! You can only hold 30% of supply (300M).`);
+        // Check Max Supply Ownership (30%) if not creator
+        const myBal = currentUserData.portfolio?.[tokenId] || 0;
+        const maxAllowed = TOTAL_SUPPLY * 0.30;
+        const isCreator = currentTokenData.creatorId === currentUserData.id.toString();
+
+        if (!isCreator && (myBal + tokensToGet) > maxAllowed) {
+            tg.showAlert(`Limit Reached! You can only hold 30% of supply (${formatCompact(maxAllowed)}).`);
             return;
         }
-
+        
         const newCap = (currentTokenData.marketCap || 0) + inputVal;
-        const newPrice = newCap / TOTAL_SUPPLY; // Simple linear model
+        const newPrice = newCap / TOTAL_SUPPLY;
 
         const userRef = doc(db, "users", currentUserData.id.toString());
         const tokenRef = doc(db, "tokens", tokenId);
@@ -279,7 +257,7 @@
             await updateDoc(userRef, {
                 balance: increment(-inputVal),
                 [`portfolio.${tokenId}`]: increment(tokensToGet),
-                transactions: arrayUnion({ type: 'buy', token: tokenId, amount: tokensToGet, price: currentPrice, date: new Date().toISOString() })
+                transactions: arrayUnion({ type: 'buy', token: tokenId, amount: tokensToGet, cost: inputVal, price: currentPrice, date: new Date().toISOString() })
             });
             await updateDoc(tokenRef, {
                 marketCap: increment(inputVal),
@@ -295,14 +273,41 @@
         }
     }
 
-    // --- REAL DATE CHART ---
-    window.setFrame = function(frame) {
-        currentFrame = frame;
+    // --- CHART DRAWING (REAL TIME AXIS) ---
+    window.setFrame = function(min, label) {
+        currentTimeframe = min;
+        timeLabel = label;
         document.querySelectorAll('.time-btn').forEach(b => {
             b.classList.remove('active');
-            if(b.innerText === frame) b.classList.add('active');
+            if(b.innerText === (min >= 525600 ? '1Y' : (min >= 43200 ? '1M' : (min >= 10080 ? '1w' : (min >= 1440 ? '1d' : (min >= 60 ? '1h' : '5m')))))) b.classList.add('active');
         });
         drawRealChart();
+    }
+
+    function generateCandles(transactions, timeframeMinutes) {
+        if(!transactions || transactions.length === 0) return [];
+        const candles = [];
+        const sorted = [...transactions].sort((a,b) => new Date(a.date) - new Date(b.date));
+        const intervalMs = timeframeMinutes * 60 * 1000;
+        let currentCandle = null;
+        let bucketStart = 0;
+
+        sorted.forEach(tx => {
+            const time = new Date(tx.date).getTime();
+            const bucket = Math.floor(time / intervalMs) * intervalMs;
+            if (!currentCandle || bucket !== bucketStart) {
+                if (currentCandle) candles.push(currentCandle);
+                const prevClose = candles.length > 0 ? candles[candles.length-1].c : tx.price;
+                bucketStart = bucket;
+                currentCandle = { t: bucket, o: prevClose, h: tx.price, l: tx.price, c: tx.price };
+            } else {
+                if (tx.price > currentCandle.h) currentCandle.h = tx.price;
+                if (tx.price < currentCandle.l) currentCandle.l = tx.price;
+                currentCandle.c = tx.price;
+            }
+        });
+        if (currentCandle) candles.push(currentCandle);
+        return candles;
     }
 
     function drawRealChart() {
@@ -314,99 +319,84 @@
         canvas.height = parent.offsetHeight;
         const w = canvas.width;
         const h = canvas.height;
+        
         ctx.clearRect(0,0,w,h);
 
         const txs = currentTokenData.transactions || [];
         if(txs.length === 0) return;
 
-        // Determine Time Cutoff
-        const now = Date.now();
-        let cutoff = now;
-        switch(currentFrame) {
-            case '5m': cutoff -= 5 * 60 * 1000; break;
-            case '1h': cutoff -= 60 * 60 * 1000; break;
-            case '1d': cutoff -= 24 * 60 * 60 * 1000; break;
-            case '1w': cutoff -= 7 * 24 * 60 * 60 * 1000; break;
-            case '1m': cutoff -= 30 * 24 * 60 * 60 * 1000; break;
-            case '1y': cutoff -= 365 * 24 * 60 * 60 * 1000; break;
+        const candles = generateCandles(txs, currentTimeframe);
+        
+        // Grid Params
+        const chartW = w - 40;
+        const chartH = h - 30; // space for time labels
+        const bottomY = chartH;
+
+        if(candles.length === 0) {
+             const price = txs[txs.length-1].price;
+             ctx.strokeStyle = '#CCFF00'; ctx.beginPath(); ctx.moveTo(0, h/2); ctx.lineTo(w, h/2); ctx.stroke();
+             return;
         }
 
-        // Filter Transactions
-        const activeTxs = txs.filter(t => new Date(t.date).getTime() >= cutoff);
-        // If not enough data in frame, show last few or all
-        const dataPoints = activeTxs.length > 1 ? activeTxs : txs.slice(-20);
-        
-        if(dataPoints.length === 0) return;
-
-        // Find Range
         let minP = Infinity, maxP = -Infinity;
-        let minT = Infinity, maxT = -Infinity;
-
-        dataPoints.forEach(t => {
-            const time = new Date(t.date).getTime();
-            if(t.price < minP) minP = t.price;
-            if(t.price > maxP) maxP = t.price;
-            if(time < minT) minT = time;
-            if(time > maxT) maxT = time;
-        });
-        
-        // Pad ranges
+        candles.forEach(c => { if(c.l < minP) minP = c.l; if(c.h > maxP) maxP = c.h; });
         if(minP === maxP) { minP *= 0.95; maxP *= 1.05; }
-        if(minT === maxT) { minT -= 60000; maxT += 60000; }
-
-        const chartW = w - 40; // Right margin for price
-        const chartH = h - 30; // Bottom margin for date
-
         const scaleY = chartH / (maxP - minP);
-        const scaleX = chartW / (maxT - minT);
 
-        // 1. Draw Vertical Time Grid & Labels
+        // --- GRID (Horizontal & Vertical) ---
         ctx.strokeStyle = '#222';
-        ctx.fillStyle = '#666';
+        ctx.lineWidth = 1;
         ctx.font = "600 10px Inter";
-        ctx.textAlign = "center";
-        
-        const timeSteps = 5;
-        for(let i=0; i<=timeSteps; i++) {
-            const x = i * (chartW / timeSteps);
-            const tVal = minT + (i * ((maxT - minT)/timeSteps));
-            
-            ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, chartH); ctx.stroke();
-            ctx.fillText(formatDateX(tVal, currentFrame), x, h - 10);
-        }
+        ctx.fillStyle = '#666';
 
-        // 2. Draw Price Grid
-        ctx.textAlign = "left";
+        // Horiz lines
         for(let i=0; i<=5; i++) {
             const y = i * (chartH/5);
             const val = maxP - (i * ((maxP - minP)/5));
-            ctx.strokeStyle = '#222';
             ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(chartW, y); ctx.stroke();
+            ctx.textAlign = "left";
             ctx.fillText(formatPrice(val), chartW + 5, y + 3);
         }
 
-        // 3. Draw Line Chart
-        ctx.strokeStyle = '#CCFF00';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
+        // --- CANDLES ---
+        const candleW = Math.max(2, Math.min(20, (chartW / candles.length) * 0.7));
+        const spacing = (chartW / candles.length);
         
-        dataPoints.forEach((t, i) => {
-            const time = new Date(t.date).getTime();
-            const x = (time - minT) * scaleX;
-            const y = (maxP - t.price) * scaleY; // Invert Y
-            if(i === 0) ctx.moveTo(x, y);
-            else ctx.lineTo(x, y);
-        });
-        ctx.stroke();
+        // Vert lines & Labels (Time)
+        // Show max 5 time labels
+        const labelStep = Math.max(1, Math.floor(candles.length / 4));
+        
+        candles.forEach((c, i) => {
+            const x = i * spacing + (spacing/2);
+            
+            // Draw time grid
+            if(i % labelStep === 0) {
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, bottomY); ctx.stroke();
+                ctx.textAlign = "center";
+                ctx.fillText(formatTime(c.t, timeLabel), x, bottomY + 15);
+            }
 
-        // Gradient under fill
-        const grad = ctx.createLinearGradient(0, 0, 0, chartH);
-        grad.addColorStop(0, 'rgba(204, 255, 0, 0.2)');
-        grad.addColorStop(1, 'rgba(204, 255, 0, 0)');
-        ctx.lineTo((new Date(dataPoints[dataPoints.length-1].date).getTime() - minT)*scaleX, chartH);
-        ctx.lineTo((new Date(dataPoints[0].date).getTime() - minT)*scaleX, chartH);
-        ctx.fillStyle = grad;
-        ctx.fill();
+            const isUp = c.c >= c.o;
+            const color = isUp ? '#FFF' : '#000'; // Black/White style
+            const stroke = '#FFF';
+
+            const yH = (maxP - c.h) * scaleY;
+            const yL = (maxP - c.l) * scaleY;
+            const yO = (maxP - c.o) * scaleY;
+            const yC = (maxP - c.c) * scaleY;
+            
+            const bTop = Math.min(yO, yC);
+            const bH = Math.max(1, Math.abs(yC - yO));
+
+            // Wick
+            ctx.strokeStyle = stroke;
+            ctx.beginPath(); ctx.moveTo(x, yH); ctx.lineTo(x, yL); ctx.stroke();
+            
+            // Body
+            ctx.fillStyle = color;
+            ctx.fillRect(x - candleW/2, bTop, candleW, bH);
+            ctx.strokeRect(x - candleW/2, bTop, candleW, bH);
+        });
     }
 
     function renderHistory() {
@@ -414,23 +404,15 @@
         const txs = (currentUserData.transactions || []).filter(t => t.token === tokenId).reverse();
         list.innerHTML = '';
         if(txs.length === 0) { list.innerHTML = '<div style="text-align:center; padding:20px; color:#555;">No transactions</div>'; return; }
-        
         txs.forEach(tx => {
             const isBuy = tx.type.includes('buy');
             const action = isBuy ? 'Buy' : 'Sell';
             const color = isBuy ? '#CCFF00' : '#FF3B30';
-            const icon = isBuy ? 'Sprites/Purchase.png' : 'Sprites/Replenishment.png';
-            
             const html = `
             <div class="trans-item">
-                <div class="ti-left">
-                    <img src="${icon}" style="width:36px; height:36px;">
-                    <div class="ti-info"><div class="ti-addr">You</div><div class="ti-action" style="color:${color}">${action}</div></div>
-                </div>
-                <div class="ti-right">
-                    <div class="ti-amount-row">${(tx.amount * tx.price).toFixed(2)} <img src="Sprites/Blyx.png" class="icon-blyx-right"></div>
-                    <div class="ti-amount-token">${formatCompact(tx.amount)} ${tokenId}</div>
-                </div>
+                <div class="ti-left"><div class="ti-avatar" style="color:${color};background:#222;">${isBuy?'B':'S'}</div>
+                <div class="ti-info"><div class="ti-addr">You</div><div class="ti-action" style="color:${color}">${action}</div></div></div>
+                <div class="ti-right"><div class="ti-amount-row">${(tx.amount).toFixed(2)} ${tokenId}</div></div>
             </div>`;
             list.innerHTML += html;
         });
