@@ -23,7 +23,7 @@
 
         <label class="launch-label">Amount to sell</label>
         <div class="input-wrapper">
-            <input type="number" id="amountInput" placeholder="Amount">
+            <input type="number" id="amountInput" placeholder="Amount" oninput="updateMaxHint()">
         </div>
         <div style="font-size:12px; color:#666; text-align:right; margin-bottom:15px;">
             Available: <span id="availBal">0</span>
@@ -31,11 +31,11 @@
 
         <div style="display:flex; gap:10px;">
             <div style="flex:1;">
-                <label class="launch-label">Min Limit</label>
+                <label class="launch-label">Min Limit (BLYX)</label>
                 <div class="input-wrapper"><input type="number" id="minInput" value="100"></div>
             </div>
             <div style="flex:1;">
-                <label class="launch-label">Max Limit</label>
+                <label class="launch-label">Max Limit (BLYX)</label>
                 <div class="input-wrapper"><input type="number" id="maxInput" placeholder="All"></div>
             </div>
         </div>
@@ -69,36 +69,49 @@
             }
         }
 
+        window.updateMaxHint = function() {
+            // Optional: You can calculate max possible BLYX here to show user
+        }
+
         window.createOrder = async function() {
             const price = parseFloat(document.getElementById('priceInput').value);
             const amount = parseFloat(document.getElementById('amountInput').value);
+            
+            // Total Order Value in BLYX
+            const totalValue = price * amount;
+
             const min = parseFloat(document.getElementById('minInput').value) || 100;
-            const max = parseFloat(document.getElementById('maxInput').value) || amount;
+            const maxInput = document.getElementById('maxInput').value;
+            const max = maxInput ? parseFloat(maxInput) : totalValue;
 
             if(!price || !amount) return;
             const myBal = currentUser.portfolio?.[tokenId] || 0;
+            
+            // Checks
             if(amount > myBal) { tg.showAlert("Not enough tokens"); return; }
+            if(min > totalValue) { tg.showAlert("Min limit cannot exceed total order value"); return; }
+            if(max > totalValue) { tg.showAlert(`Max limit cannot exceed ${totalValue.toFixed(2)} BLYX`); return; }
+            if(min > max) { tg.showAlert("Min cannot be greater than Max"); return; }
 
-            tg.showConfirm(`Sell ${amount} ${tokenId}?\nTokens will be locked.`, async (ok) => {
+            tg.showConfirm(`Sell ${amount} ${tokenId}?\nMin purchase: ${min} BLYX`, async (ok) => {
                 if(ok) {
                     try {
                         const userRef = doc(db, "users", currentUser.id.toString());
                         
-                        // Lock tokens (deduct from portfolio)
                         await updateDoc(userRef, {
                             [`portfolio.${tokenId}`]: increment(-amount)
                         });
 
-                        // Create Order Doc
                         await addDoc(collection(db, "orders"), {
                             tokenId: tokenId,
                             sellerId: currentUser.id.toString(),
                             sellerName: currentUser.username || "Anon",
                             price: price,
                             amount: amount,
-                            minLimit: min,
-                            maxLimit: max,
-                            createdAt: new Date().toISOString()
+                            minLimit: min, // Saved in BLYX
+                            maxLimit: max, // Saved in BLYX
+                            createdAt: new Date().toISOString(),
+                            sellerRep: 100 
                         });
 
                         tg.showAlert("Order created!");
