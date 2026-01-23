@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Sell P2P</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+
+    <div class="header-nav">
+        <button class="back-btn" onclick="window.history.back()"><svg class="icon" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
+        <div class="header-title">Create Order</div>
+    </div>
+
+    <div style="padding: 0 16px;">
+        <label class="launch-label">Price per 1 token (BLYX)</label>
+        <div class="input-wrapper">
+            <input type="number" id="priceInput" placeholder="0.00004">
+        </div>
+
+        <label class="launch-label">Amount to sell</label>
+        <div class="input-wrapper">
+            <input type="number" id="amountInput" placeholder="Amount">
+        </div>
+        <div style="font-size:12px; color:#666; text-align:right; margin-bottom:15px;">
+            Available: <span id="availBal">0</span>
+        </div>
+
+        <div style="display:flex; gap:10px;">
+            <div style="flex:1;">
+                <label class="launch-label">Min Limit</label>
+                <div class="input-wrapper"><input type="number" id="minInput" value="100"></div>
+            </div>
+            <div style="flex:1;">
+                <label class="launch-label">Max Limit</label>
+                <div class="input-wrapper"><input type="number" id="maxInput" placeholder="All"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="fixed-bottom-bar">
+        <button class="btn-white-large" onclick="createOrder()">Publish Order</button>
+    </div>
+
+    <script type="module">
+        import { initUser } from './user-service.js';
+        import { db } from './firebase-config.js';
+        import { doc, getDoc, updateDoc, addDoc, collection, increment } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        tg.setHeaderColor('#000000');
+
+        const tokenId = new URLSearchParams(window.location.search).get('id');
+        let currentUser = null;
+
+        async function init() {
+            currentUser = await initUser();
+            const bal = currentUser.portfolio?.[tokenId] || 0;
+            document.getElementById('availBal').innerText = Math.floor(bal).toLocaleString();
+            
+            // Get current price hint
+            const tSnap = await getDoc(doc(db, "tokens", tokenId));
+            if(tSnap.exists()) {
+                document.getElementById('priceInput').value = tSnap.data().price.toFixed(6);
+            }
+        }
+
+        window.createOrder = async function() {
+            const price = parseFloat(document.getElementById('priceInput').value);
+            const amount = parseFloat(document.getElementById('amountInput').value);
+            const min = parseFloat(document.getElementById('minInput').value) || 100;
+            const max = parseFloat(document.getElementById('maxInput').value) || amount;
+
+            if(!price || !amount) return;
+            const myBal = currentUser.portfolio?.[tokenId] || 0;
+            if(amount > myBal) { tg.showAlert("Not enough tokens"); return; }
+
+            tg.showConfirm(`Sell ${amount} ${tokenId}?\nTokens will be locked.`, async (ok) => {
+                if(ok) {
+                    try {
+                        const userRef = doc(db, "users", currentUser.id.toString());
+                        
+                        // Lock tokens (deduct from portfolio)
+                        await updateDoc(userRef, {
+                            [`portfolio.${tokenId}`]: increment(-amount)
+                        });
+
+                        // Create Order Doc
+                        await addDoc(collection(db, "orders"), {
+                            tokenId: tokenId,
+                            sellerId: currentUser.id.toString(),
+                            sellerName: currentUser.username || "Anon",
+                            price: price,
+                            amount: amount,
+                            minLimit: min,
+                            maxLimit: max,
+                            createdAt: new Date().toISOString()
+                        });
+
+                        tg.showAlert("Order created!");
+                        window.history.back();
+                    } catch(e) {
+                        tg.showAlert("Error: " + e.message);
+                    }
+                }
+            });
+        }
+
+        init();
+    </script>
+</body>
+</html>
