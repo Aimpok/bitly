@@ -15,7 +15,9 @@
         </button>
         <div class="header-title">Transfer</div>
     </div>
+
     <div style="padding: 0 16px;">
+        <!-- Amount Input -->
         <div class="input-wrapper">
             <input type="number" id="amountInput" placeholder="Amount" oninput="updateButton()">
             <div class="input-suffix">
@@ -23,32 +25,194 @@
                 <img src="Sprites/Blyx.png" class="star-icon-small" alt="blyx">
             </div>
         </div>
-        <div class="input-wrapper">
-            <input type="text" placeholder="@username">
+
+        <!-- Username Input with Avatar -->
+        <div class="input-wrapper input-with-avatar" id="userWrapper">
+            <!-- Сюда будет подставляться картинка -->
+            <img id="receiverAvatar" src="" class="avatar-preview">
+            
+            <input type="text" id="usernameInput" placeholder="@username" oninput="handleUsernameInput(this)" autocomplete="off">
+            
+            <!-- Индикатор загрузки/поиска -->
+            <div id="searchLoader" style="display:none; color: #888; font-size: 12px; margin-right: 10px;">
+                Searching...
+            </div>
+        </div>
+        
+        <!-- Info Text -->
+        <div id="receiverInfo" style="font-size: 12px; color: #666; margin-top: -8px; margin-bottom: 15px; margin-left: 10px; height: 14px;">
+            <!-- Сюда выводится имя найденного юзера -->
         </div>
     </div>
+
     <div class="bottom-cost-panel">
-        <div class="cost-label">Cost</div>
-        <button class="btn-white-large" onclick="doAction()">
+        <div class="cost-label">Total Send</div>
+        <button class="btn-white-large btn-disabled" id="sendBtn" onclick="doTransfer()">
             <span id="btnAmount">0</span>
             <img src="Sprites/Blyx.png" class="star-icon-small" alt="blyx">
         </button>
     </div>
-    <script>
+
+    <script type="module">
+        import { initUser, getUserRef } from './user-service.js';
+        import { db } from './firebase-config.js';
+        import { collection, query, where, getDocs, runTransaction, doc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
         const tg = window.Telegram.WebApp;
         tg.expand();
         tg.setHeaderColor('#000000');
-        function updateButton() {
-            const val = document.getElementById('amountInput').value;
-            document.getElementById('btnAmount').innerText = val ? val : '0';
+
+        let currentUser = null;
+        let receiverData = null; // Данные получателя
+        let searchTimer = null;
+
+        async function init() {
+            currentUser = await initUser();
         }
-        function doAction() {
-            const val = document.getElementById('amountInput').value;
-            if(!val || val <= 0) return;
-            tg.showConfirm(`Send ${val} BLYX?`, (ok) => {
-                if(ok) { tg.showAlert("Sent!"); window.history.back(); }
+        init();
+
+        // Обновление кнопки и проверка валидации
+        window.updateButton = function() {
+            const val = parseFloat(document.getElementById('amountInput').value);
+            const btn = document.getElementById('sendBtn');
+            const displayVal = val ? val : '0';
+            
+            document.getElementById('btnAmount').innerText = displayVal;
+
+            // Кнопка активна только если есть сумма > 0 и найден получатель
+            if (val > 0 && receiverData) {
+                btn.classList.remove('btn-disabled');
+            } else {
+                btn.classList.add('btn-disabled');
+            }
+        }
+
+        // Логика поиска юзера (Debounce)
+        window.handleUsernameInput = function(el) {
+            clearTimeout(searchTimer);
+            const rawVal = el.value.trim();
+            const username = rawVal.replace('@', ''); // Убираем собачку для поиска
+            
+            // Сброс UI
+            receiverData = null;
+            document.getElementById('receiverAvatar').classList.remove('avatar-visible');
+            document.getElementById('receiverInfo').innerText = "";
+            document.getElementById('receiverInfo').style.color = "#666";
+            updateButton();
+
+            if(username.length < 3) return;
+
+            document.getElementById('searchLoader').style.display = 'block';
+
+            // Задержка поиска 500мс, чтобы не спамить в базу
+            searchTimer = setTimeout(() => searchUser(username), 500);
+        }
+
+        async function searchUser(username) {
+            try {
+                // Ищем в коллекции users по полю username (оно должно быть в базе!)
+                const q = query(collection(db, "users"), where("username", "==", username));
+                const querySnapshot = await getDocs(q);
+
+                document.getElementById('searchLoader').style.display = 'none';
+
+                if (!querySnapshot.empty) {
+                    const userDoc = querySnapshot.docs[0];
+                    const data = userDoc.data();
+
+                    // Нельзя отправить самому себе
+                    if(data.id === currentUser.id) {
+                        document.getElementById('receiverInfo').innerText = "You cannot send to yourself";
+                        document.getElementById('receiverInfo').style.color = "#FF3B30";
+                        return;
+                    }
+
+                    receiverData = { ...data, docId: userDoc.id }; // Сохраняем получателя
+                    
+                    // 1. Показываем Аватарку
+                    const avatarEl = document.getElementById('receiverAvatar');
+                    // Если у юзера есть фото в базе - ставим его, иначе заглушку
+                    avatarEl.src = data.photoUrl || 'https://upload.wikimedia.org/wikipedia/commons/2/2c/Default_pfp.svg'; 
+                    avatarEl.classList.add('avatar-visible');
+
+                    // 2. Показываем Имя
+                    document.getElementById('receiverInfo').innerText = `Found: ${data.first_name} ${data.last_name || ''}`;
+                    document.getElementById('receiverInfo').style.color = "#CCFF00"; // Зеленый цвет успеха
+
+                    updateButton();
+                } else {
+                    document.getElementById('receiverInfo').innerText = "User not found in database";
+                    document.getElementById('receiverInfo').style.color = "#FF3B30";
+                }
+            } catch (e) {
+                console.error(e);
+                document.getElementById('searchLoader').style.display = 'none';
+            }
+        }
+
+        // Выполнение перевода (Транзакция)
+        window.doTransfer = async function() {
+            const amount = parseFloat(document.getElementById('amountInput').value);
+            
+            if(!amount || amount <= 0) return;
+            if(!receiverData) { tg.showAlert("Select a receiver"); return; }
+            if(amount > currentUser.balance) { tg.showAlert("Insufficient funds!"); return; }
+
+            tg.showConfirm(`Send ${amount} BLYX to @${receiverData.username}?`, async (ok) => {
+                if(ok) {
+                    try {
+                        const senderRef = getUserRef(); // Ссылка на нас
+                        const receiverRef = doc(db, "users", receiverData.docId); // Ссылка на получателя
+
+                        // Атомарная транзакция (гарантирует, что деньги не исчезнут)
+                        await runTransaction(db, async (transaction) => {
+                            const senderDoc = await transaction.get(senderRef);
+                            if (!senderDoc.exists()) throw "Sender does not exist!";
+
+                            const newSenderBalance = senderDoc.data().balance - amount;
+                            if (newSenderBalance < 0) throw "Not enough money!";
+
+                            const receiverDoc = await transaction.get(receiverRef);
+                            if (!receiverDoc.exists()) throw "Receiver does not exist!";
+                            
+                            const newReceiverBalance = (receiverDoc.data().balance || 0) + amount;
+
+                            // 1. Списываем у нас
+                            transaction.update(senderRef, { 
+                                balance: newSenderBalance,
+                                transactions: arrayUnion({
+                                    type: 'send', 
+                                    to: receiverData.username, 
+                                    amount: amount, 
+                                    date: new Date().toISOString()
+                                })
+                            });
+
+                            // 2. Начисляем ему
+                            transaction.update(receiverRef, { 
+                                balance: newReceiverBalance,
+                                transactions: arrayUnion({
+                                    type: 'receive', 
+                                    from: currentUser.username || 'Hidden', 
+                                    amount: amount, 
+                                    date: new Date().toISOString()
+                                })
+                            });
+                        });
+
+                        tg.showAlert("Success! Funds sent.");
+                        window.history.back();
+
+                    } catch (e) {
+                        console.error(e);
+                        tg.showAlert("Error: " + e); // Показывает, если нет денег и т.д.
+                    }
+                }
             });
         }
+        
+        // Вспомогательная функция для arrayUnion (нужна для модулей)
+        import { arrayUnion } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
     </script>
 </body>
 </html>
