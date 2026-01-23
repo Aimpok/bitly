@@ -8,7 +8,6 @@
     <link rel="stylesheet" href="style.css">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        /* Стили для графика, которые ты скинул */
         .chart-controls { display: flex; gap: 12px; margin-bottom: 10px; align-items: center; padding-left: 4px; }
         .time-btn { font-size: 13px; font-weight: 700; color: #555; padding: 4px 10px; border-radius: 8px; cursor: pointer; transition: 0.2s; background: #111; }
         .time-btn.active { color: #000; background: #FFF; }
@@ -59,10 +58,9 @@
     </div>
 
     <div class="content-section">
-        <!-- GRAPH CANVAS -->
+        <!-- CHART -->
         <div id="tab-chart">
             <div class="chart-controls">
-                <!-- В будущем можно сделать логику для 1h, 1d -->
                 <div class="time-btn active" onclick="setFrame(5)">5m</div> 
                 <div class="time-btn" onclick="setFrame(15)">15m</div>
                 <div class="time-btn" onclick="setFrame(60)">1h</div>
@@ -134,18 +132,26 @@
         let currentTokenData = null;
         let currentUserData = null;
         let tradeType = 'buy';
-        let currentTimeframe = 5; // minutes
+        let currentTimeframe = 5;
 
-        // Format Helper
+        // FORMATTER (Цена)
         function formatPrice(val) {
             if(!val || val === 0) return "0";
             return val < 0.01 ? val.toFixed(8).replace(/\.?0+$/, "") : val.toFixed(4);
         }
 
-        // --- CHART DRAWING LOGIC ---
+        // COMPACT FORMATTER (1.5k, 2M)
+        function formatCompact(num) {
+            if (!num) return "0";
+            return Intl.NumberFormat('en-US', {
+                notation: "compact",
+                maximumFractionDigits: 2
+            }).format(num);
+        }
+
+        // --- CHART DRAWING ---
         window.setFrame = function(min) {
             currentTimeframe = min;
-            // Обновляем UI кнопок
             document.querySelectorAll('.time-btn').forEach(b => {
                 b.classList.remove('active');
                 if(b.innerText.includes(min + 'm') || (min===60 && b.innerText==='1h')) b.classList.add('active');
@@ -155,168 +161,98 @@
 
         function generateCandles(transactions, timeframeMinutes) {
             if(!transactions || transactions.length === 0) return [];
-            
             const candles = [];
-            // Сортируем по дате
             const sorted = [...transactions].sort((a,b) => new Date(a.date) - new Date(b.date));
             const intervalMs = timeframeMinutes * 60 * 1000;
-
             let currentCandle = null;
             let bucketStart = 0;
 
             sorted.forEach(tx => {
                 const time = new Date(tx.date).getTime();
-                // Определяем к какому временному отрезку относится
                 const bucket = Math.floor(time / intervalMs) * intervalMs;
-
                 if (!currentCandle || bucket !== bucketStart) {
                     if (currentCandle) candles.push(currentCandle);
-                    
-                    // Start new candle
-                    // Open = prev close OR current price if first
                     const prevClose = candles.length > 0 ? candles[candles.length-1].c : tx.price;
-                    
                     bucketStart = bucket;
-                    currentCandle = {
-                        t: bucket, // time
-                        o: prevClose, // open
-                        h: tx.price, // high
-                        l: tx.price, // low
-                        c: tx.price  // close
-                    };
+                    currentCandle = { t: bucket, o: prevClose, h: tx.price, l: tx.price, c: tx.price };
                 } else {
-                    // Update existing candle
                     if (tx.price > currentCandle.h) currentCandle.h = tx.price;
                     if (tx.price < currentCandle.l) currentCandle.l = tx.price;
                     currentCandle.c = tx.price;
                 }
             });
             if (currentCandle) candles.push(currentCandle);
-
-            // Если мало свечей, продублируем последнюю для визуала
-            if(candles.length < 2 && candles.length > 0) {
-                 // просто заглушка, чтобы график не был пустым
-            }
             return candles;
         }
 
         function drawRealChart() {
             const canvas = document.getElementById('chartCanvas');
             if(!canvas || !currentTokenData) return;
+            const ctx = canvas.getContext('2d');
             const parent = canvas.parentElement;
             canvas.width = parent.offsetWidth;
             canvas.height = parent.offsetHeight;
-            const ctx = canvas.getContext('2d');
             const w = canvas.width;
             const h = canvas.height;
-            const paddingRight = 50; 
-            const paddingBottom = 20; 
-            const chartW = w - paddingRight;
-            const chartH = h - paddingBottom;
-
+            
             ctx.clearRect(0,0,w,h);
 
-            // 1. Prepare Data
             const txs = currentTokenData.transactions || [];
-            // Если транзакций нет или одна, создадим фейковую, чтобы отрисовалось хоть что-то
             if(txs.length === 0) return;
 
             const candles = generateCandles(txs, currentTimeframe);
             if(candles.length === 0) return;
 
-            // Find Min/Max for Y-Axis scaling
-            let minP = Infinity;
-            let maxP = -Infinity;
-            candles.forEach(c => {
-                if(c.l < minP) minP = c.l;
-                if(c.h > maxP) maxP = c.h;
-            });
-            // Add padding to chart vertically
-            if(minP === maxP) { minP *= 0.95; maxP *= 1.05; } // если цена не менялась
-            const range = maxP - minP;
-            const paddedMin = minP - (range * 0.1);
-            const paddedMax = maxP + (range * 0.1);
-            const scaleY = chartH / (paddedMax - paddedMin);
+            let minP = Infinity, maxP = -Infinity;
+            candles.forEach(c => { if(c.l < minP) minP = c.l; if(c.h > maxP) maxP = c.h; });
+            if(minP === maxP) { minP *= 0.95; maxP *= 1.05; }
+            
+            const chartW = w - 50;
+            const chartH = h - 20;
+            const scaleY = chartH / (maxP - minP);
 
-            // 2. Draw Grid & Prices (Right)
-            const steps = 5;
-            ctx.font = "600 10px Inter, sans-serif";
-            ctx.textAlign = "left";
-            ctx.lineWidth = 1;
-
-            for(let i=0; i<=steps; i++) {
-                const val = paddedMax - (i * ((paddedMax - paddedMin)/steps));
-                const yPos = (i * (chartH/steps));
-                // Grid line
-                ctx.strokeStyle = '#222';
-                ctx.beginPath(); ctx.moveTo(0, yPos); ctx.lineTo(chartW, yPos); ctx.stroke();
-                // Price Label
-                ctx.fillStyle = '#666';
-                ctx.fillText(formatPrice(val), chartW + 5, yPos + 3);
-            }
-
-            // 3. Draw Time Grid (Bottom) -- Simplified
+            // Grid
             ctx.strokeStyle = '#222';
-            const timeSteps = 5;
-            const stepW = chartW / timeSteps;
-            for(let i=0; i<=timeSteps; i++) {
-                const x = i * stepW;
-                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, chartH); ctx.stroke();
+            ctx.lineWidth = 1;
+            ctx.font = "600 10px Inter";
+            ctx.textAlign = "left";
+            for(let i=0; i<=5; i++) {
+                const y = i * (chartH/5);
+                const val = maxP - (i * ((maxP - minP)/5));
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(chartW, y); ctx.stroke();
+                ctx.fillStyle = '#666'; ctx.fillText(formatPrice(val), chartW + 5, y + 3);
             }
 
-            // 4. Draw Candles
-            // Width calc
-            // Чтобы график всегда был справа, если свечей мало
+            // Candles
             const candleW = 8;
-            const gap = 4;
-            const totalCandleW = candleW + gap;
-            
-            // Начинаем рисовать справа налево или слева направо?
-            // Обычно слева. Если свечей мало, они будут слева.
-            // Но в трейдинге свежие справа.
-            // Давай рисовать с конца массива (свежие) справа.
-            
-            // X координата для самой правой свечи
-            let currentX = chartW - totalCandleW; 
-            
-            // Рисуем с конца массива (последние транзакции)
+            let currentX = chartW - 10;
             for (let i = candles.length - 1; i >= 0; i--) {
+                if (currentX < 0) break;
                 const c = candles[i];
-                if (currentX < -10) break; // Ушли за левый край
-
                 const isUp = c.c >= c.o;
-                const color = isUp ? '#FFFFFF' : '#000000'; // Fill
-                const stroke = '#FFFFFF'; // Border
+                const color = isUp ? '#FFF' : '#000';
+                const stroke = '#FFF';
+                
+                const yH = (maxP - c.h) * scaleY;
+                const yL = (maxP - c.l) * scaleY;
+                const yO = (maxP - c.o) * scaleY;
+                const yC = (maxP - c.c) * scaleY;
+                
+                const bTop = Math.min(yO, yC);
+                const bH = Math.max(1, Math.abs(yC - yO));
 
-                // Y coordinates (flip coordinate system because 0 is top)
-                const yHigh = chartH - ((c.h - paddedMin) * scaleY);
-                const yLow = chartH - ((c.l - paddedMin) * scaleY);
-                const yOpen = chartH - ((c.o - paddedMin) * scaleY);
-                const yClose = chartH - ((c.c - paddedMin) * scaleY);
-
-                // Body coords
-                const bodyTop = Math.min(yOpen, yClose);
-                const bodyHeight = Math.max(1, Math.abs(yClose - yOpen)); // at least 1px
-
-                // Wick
                 ctx.strokeStyle = stroke;
-                ctx.beginPath();
-                ctx.moveTo(currentX + candleW/2, yHigh);
-                ctx.lineTo(currentX + candleW/2, yLow);
-                ctx.stroke();
-
-                // Body
+                ctx.beginPath(); ctx.moveTo(currentX + candleW/2, yH); ctx.lineTo(currentX + candleW/2, yL); ctx.stroke();
+                
                 ctx.fillStyle = color;
-                ctx.strokeStyle = stroke;
-                ctx.fillRect(currentX, bodyTop, candleW, bodyHeight);
-                ctx.strokeRect(currentX, bodyTop, candleW, bodyHeight);
-
-                currentX -= totalCandleW;
+                ctx.fillRect(currentX, bTop, candleW, bH);
+                ctx.strokeRect(currentX, bTop, candleW, bH);
+                
+                currentX -= (candleW + 4);
             }
         }
 
-        // --- INIT & LOGIC ---
-
+        // --- INIT ---
         window.switchTab = function(tabName, el) {
             document.querySelectorAll('.tab-link').forEach(t => t.classList.remove('active'));
             el.classList.add('active');
@@ -332,7 +268,7 @@
                 if (docSnap.exists()) {
                     currentTokenData = docSnap.data();
                     renderTokenInfo();
-                    drawRealChart(); // Draw on update
+                    drawRealChart();
                 }
             });
             subscribeToUser((user) => {
@@ -346,10 +282,10 @@
         function renderTokenInfo() {
             document.getElementById('tokenName').innerText = currentTokenData.name;
             document.getElementById('tokenDesc').innerText = currentTokenData.description || "No description.";
-            document.getElementById('holdersCount').innerText = currentTokenData.holdersCount || 1;
-            document.getElementById('txCount').innerText = currentTokenData.txCount || 0;
+            document.getElementById('holdersCount').innerText = formatCompact(currentTokenData.holdersCount || 1);
+            document.getElementById('txCount').innerText = formatCompact(currentTokenData.txCount || 0);
             
-            document.getElementById('marketCapVal').innerText = Math.floor(currentTokenData.marketCap || 0).toLocaleString();
+            document.getElementById('marketCapVal').innerText = formatCompact(currentTokenData.marketCap || 0);
             document.getElementById('tokenPriceDisplay').innerText = formatPrice(currentTokenData.price);
 
             if(currentTokenData.image) {
@@ -379,11 +315,11 @@
         function renderUserPos() {
             if(!currentUserData || !currentTokenData) return;
             const bal = currentUserData.portfolio?.[tokenId] || 0;
-            document.getElementById('myTokenBalance').innerText = Math.floor(bal).toLocaleString();
+            document.getElementById('myTokenBalance').innerText = formatCompact(bal);
             document.getElementById('myTokenValue').innerText = "≈ " + (bal * currentTokenData.price).toFixed(2);
         }
 
-        // Trade Functions
+        // TRADE LOGIC
         window.openTrade = function(type) {
             tradeType = type;
             const overlay = document.getElementById('tradeOverlay');
@@ -393,10 +329,10 @@
             document.getElementById('tradeInput').value = '';
             document.getElementById('tradeTotal').innerText = '0';
             
-            if(type === 'buy') document.getElementById('tradeBalance').innerText = Math.floor(currentUserData.balance) + " BLYX";
+            if(type === 'buy') document.getElementById('tradeBalance').innerText = formatCompact(currentUserData.balance) + " BLYX";
             else {
                 const bal = currentUserData.portfolio?.[tokenId] || 0;
-                document.getElementById('tradeBalance').innerText = Math.floor(bal) + " " + tokenId;
+                document.getElementById('tradeBalance').innerText = formatCompact(bal) + " " + tokenId;
             }
             overlay.style.display = 'flex';
         }
@@ -407,12 +343,12 @@
             const price = currentTokenData.price;
             if(tradeType === 'buy') {
                 const tokens = amt / price;
-                document.getElementById('tradeTotal').innerText = Math.floor(tokens).toLocaleString();
-                document.getElementById('receiveLabel').innerHTML = "Get: <span style='color:white'>" + Math.floor(tokens).toLocaleString() + "</span> TOKENS";
+                document.getElementById('tradeTotal').innerText = formatCompact(tokens);
+                document.getElementById('receiveLabel').innerHTML = "Get: <span style='color:white'>" + formatCompact(tokens) + "</span> TOKENS";
             } else {
                 const blyx = amt * price;
-                document.getElementById('tradeTotal').innerText = blyx.toFixed(4);
-                document.getElementById('receiveLabel').innerHTML = "Get: <span style='color:white'>" + blyx.toFixed(4) + "</span> BLYX";
+                document.getElementById('tradeTotal').innerText = blyx.toFixed(2);
+                document.getElementById('receiveLabel').innerHTML = "Get: <span style='color:white'>" + blyx.toFixed(2) + "</span> BLYX";
             }
         }
 
@@ -427,6 +363,8 @@
                 if(tradeType === 'buy') {
                     if(currentUserData.balance < inputVal) { tg.showAlert("Not enough BLYX"); return; }
                     const tokensToGet = inputVal / currentPrice;
+                    
+                    // Math Fix
                     const newCap = (currentTokenData.marketCap || 0) + inputVal;
                     const newPrice = newCap / TOTAL_SUPPLY;
 
@@ -440,7 +378,6 @@
                         sold: increment(tokensToGet),
                         txCount: increment(1),
                         price: newPrice,
-                        // Важно! Пишем транзакцию в историю токена для общего графика
                         transactions: arrayUnion({ price: newPrice, date: new Date().toISOString() })
                     });
                     tg.showAlert("Bought!");
@@ -449,6 +386,7 @@
                     const blyxToGet = tokensToSell * currentPrice;
                     const currentBal = currentUserData.portfolio?.[tokenId] || 0;
                     if(currentBal < tokensToSell) { tg.showAlert("Not enough tokens"); return; }
+
                     const newCap = Math.max(0, (currentTokenData.marketCap || 0) - blyxToGet);
                     const newPrice = newCap / TOTAL_SUPPLY;
 
@@ -461,7 +399,6 @@
                         marketCap: increment(-blyxToGet),
                         txCount: increment(1),
                         price: newPrice,
-                        // Важно! Пишем транзакцию в историю токена
                         transactions: arrayUnion({ price: newPrice, date: new Date().toISOString() })
                     });
                     tg.showAlert("Sold!");
@@ -483,7 +420,7 @@
                 const html = `
                 <div class="trans-item">
                     <div class="ti-left"><div class="ti-avatar" style="color:${color};background:#222;">${icon}</div><div class="ti-info"><div class="ti-addr">You</div><div class="ti-action" style="color:${color}">${action}</div></div></div>
-                    <div class="ti-right"><div class="ti-amount-row">${(tx.amount * tx.price).toFixed(2)} <img src="Sprites/Blyx.png" class="icon-blyx-right"></div><div class="ti-amount-token">${Math.floor(tx.amount).toLocaleString()} ${tokenId}</div></div>
+                    <div class="ti-right"><div class="ti-amount-row">${(tx.amount * tx.price).toFixed(2)} <img src="Sprites/Blyx.png" class="icon-blyx-right"></div><div class="ti-amount-token">${formatCompact(tx.amount)} ${tokenId}</div></div>
                 </div>`;
                 list.innerHTML += html;
             });
