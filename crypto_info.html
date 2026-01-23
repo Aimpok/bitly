@@ -8,430 +8,435 @@
     <link rel="stylesheet" href="style.css">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        .chart-controls { display: flex; gap: 12px; margin-bottom: 10px; align-items: center; padding-left: 4px; }
-        .time-btn { font-size: 13px; font-weight: 700; color: #555; padding: 4px 10px; border-radius: 8px; cursor: pointer; transition: 0.2s; background: #111; }
+        .chart-controls { display: flex; gap: 8px; margin-bottom: 10px; align-items: center; padding-left: 4px; overflow-x: auto; scrollbar-width: none; }
+        .time-btn { font-size: 13px; font-weight: 700; color: #555; padding: 6px 12px; border-radius: 8px; cursor: pointer; transition: 0.2s; background: #111; white-space: nowrap; }
         .time-btn.active { color: #000; background: #FFF; }
-        .chart-area { height: 320px; width: 100%; background: transparent; position: relative; overflow: hidden; margin-bottom: 20px; }
+        .chart-area { height: 340px; width: 100%; background: transparent; position: relative; overflow: hidden; margin-bottom: 20px; }
         .chart-area canvas { display: block; width: 100%; height: 100%; }
     </style>
 </head>
 <body>
 
-    <!-- Header -->
-    <div class="launch-header">
-        <div class="top-nav">
-            <button class="back-btn" onclick="window.history.back()">
-                <svg class="icon" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-            </button>
-            <div style="font-weight: 700;">Details</div>
-            <div style="width: 24px;"></div>
-        </div>
-
-        <img id="tokenIcon" src="" class="token-avatar-big" style="display:none;">
-        <div id="tokenLetter" class="token-avatar-big" style="display:none; background:#333; display:flex; align-items:center; justify-content:center; font-size:32px; font-weight:700;">?</div>
-        
-        <div class="token-name-header" id="tokenName">LOADING...</div>
-
-        <div class="stats-split-row">
-            <div class="stat-box"><span style="color:#888;">Holders:</span> <span class="stat-val" id="holdersCount">0</span></div>
-            <div class="divider-v"></div>
-            <div class="stat-box"><span style="color:#888;">Txs:</span> <span class="stat-val" id="txCount">0</span></div>
-        </div>
-
-        <div class="market-cap-row">
-            <span class="mc-val" id="marketCapVal">0</span>
-            <img src="Sprites/Blyx.png" class="mc-icon">
-        </div>
-        <div style="text-align: center; color: #888; font-size: 13px; margin-bottom: 15px;">
-            1 Token = <span id="tokenPriceDisplay" style="color: white; font-weight: 700;">...</span> BLYX
-        </div>
-
-        <!-- Bonding Curve Progress -->
-        <div class="progress-container" id="bondingContainer">
-            <div class="p-bar-bg"><div class="p-bar-fill" id="bondingBar" style="width: 0%;"></div></div>
-            <div class="p-labels"><span id="bondingText">0% collected</span><span style="color: #888;">Unlock at 100%</span></div>
-        </div>
-        
-        <!-- Live Status (Hidden by default) -->
-        <div id="tradingLive" style="display: none; text-align: center;">
-            <div class="market-live-badge">⚡ LIVE P2P MARKET</div>
-        </div>
-    </div>
-
-    <!-- Tabs -->
-    <div class="tabs-scroll">
-        <div class="tab-link active" onclick="switchTab('chart', this)">Chart</div>
-        <div class="tab-link" onclick="switchTab('tx', this)">Transactions</div>
-        <div class="tab-link" onclick="switchTab('socials', this)">Socials</div>
-    </div>
-
-    <div class="content-section">
-        <!-- CHART -->
-        <div id="tab-chart">
-            <div class="chart-controls">
-                <div class="time-btn active" onclick="setFrame(5)">5m</div> 
-                <div class="time-btn" onclick="setFrame(15)">15m</div>
-                <div class="time-btn" onclick="setFrame(60)">1h</div>
-            </div>
-            <div class="chart-area">
-                <canvas id="chartCanvas"></canvas>
-            </div>
-            
-            <div class="trans-summary">
-                <div class="ts-item"><div class="ts-label">Your Balance</div><div class="ts-val" id="myTokenBalance">0</div></div>
-                <div class="ts-item" style="text-align: right;"><div class="ts-label">Value (BLYX)</div><div class="ts-val" style="color: var(--accent-green);" id="myTokenValue">≈ 0</div></div>
-            </div>
-            <div style="height: 120px;"></div>
-        </div>
-
-        <!-- TRANSACTIONS -->
-        <div id="tab-tx" class="hidden">
-            <div class="trans-list" id="txList"><div style="text-align:center; padding:20px; color:#555;">Loading...</div></div>
-            <div style="height: 120px;"></div>
-        </div>
-
-        <!-- SOCIALS -->
-        <div id="tab-socials" class="hidden">
-            <div class="social-list"><div class="social-card"><div class="sc-left"><div class="sc-title">Description</div><div class="sc-sub" id="tokenDesc">No description.</div></div></div></div>
-            <div style="height: 120px;"></div>
-        </div>
-    </div>
-
-    <!-- MAIN BUTTON -->
-    <div class="fixed-action-container">
-        <!-- Кнопка меняется в зависимости от статуса (Curve / P2P) -->
-        <button class="btn-buy-floating" id="mainActionBtn" onclick="handleAction()">
-            Loading...
+<!-- Header -->
+<div class="launch-header">
+    <div class="top-nav">
+        <button class="back-btn" onclick="window.history.back()">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
         </button>
+        <div style="font-weight: 700;">Details</div>
+        <div style="width: 24px;"></div>
     </div>
 
-    <!-- ROBOT BUY OVERLAY (Only for Bonding Curve) -->
-    <div id="tradeOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:9999; flex-direction:column; justify-content:center; padding: 20px;">
-        <h2 style="text-align:center; margin-bottom:20px; font-size: 24px;">Buy (Curve)</h2>
-        <div class="input-wrapper">
-            <input type="number" id="tradeInput" placeholder="Amount BLYX" oninput="calcTrade()">
-            <div class="input-suffix">BLYX</div>
+    <img id="tokenIcon" src="" class="token-avatar-big" style="display:none;">
+    <div id="tokenLetter" class="token-avatar-big" style="display:none; background:#333; display:flex; align-items:center; justify-content:center; font-size:32px; font-weight:700;">?</div>
+    
+    <div class="token-name-header" id="tokenName">LOADING...</div>
+
+    <div class="stats-split-row">
+        <div class="stat-box"><span style="color:#888;">Holders:</span> <span class="stat-val" id="holdersCount">0</span></div>
+        <div class="divider-v"></div>
+        <div class="stat-box"><span style="color:#888;">Txs:</span> <span class="stat-val" id="txCount">0</span></div>
+    </div>
+
+    <div class="market-cap-row">
+        <span class="mc-val" id="marketCapVal">0</span>
+        <img src="Sprites/Blyx.png" class="mc-icon">
+    </div>
+    <div style="text-align: center; color: #888; font-size: 13px; margin-bottom: 15px;">
+        Price: <span id="tokenPriceDisplay" style="color: white; font-weight: 700;">...</span> BLYX
+    </div>
+
+    <!-- Bonding Curve Progress -->
+    <div class="progress-container" id="bondingContainer">
+        <div class="p-bar-bg"><div class="p-bar-fill" id="bondingBar" style="width: 0%;"></div></div>
+        <div class="p-labels"><span id="bondingText">0% collected</span><span style="color: #888;">Unlock at 100%</span></div>
+    </div>
+    
+    <!-- Live Status -->
+    <div id="tradingLive" style="display: none; text-align: center;">
+        <div class="market-live-badge" style="color: var(--accent-green); font-weight: 800; font-size: 14px;">⚡ LIVE P2P MARKET</div>
+    </div>
+</div>
+
+<!-- Tabs -->
+<div class="tabs-scroll">
+    <div class="tab-link active" onclick="switchTab('chart', this)">Chart</div>
+    <div class="tab-link" onclick="switchTab('tx', this)">Transactions</div>
+    <div class="tab-link" onclick="switchTab('socials', this)">Socials</div>
+</div>
+
+<div class="content-section">
+    <!-- CHART -->
+    <div id="tab-chart">
+        <div class="chart-controls">
+            <div class="time-btn active" onclick="setFrame('5m')">5m</div> 
+            <div class="time-btn" onclick="setFrame('1h')">1h</div>
+            <div class="time-btn" onclick="setFrame('1d')">1d</div>
+            <div class="time-btn" onclick="setFrame('1w')">1w</div>
+            <div class="time-btn" onclick="setFrame('1m')">1m</div>
+            <div class="time-btn" onclick="setFrame('1y')">1y</div>
         </div>
-        <div style="display:flex; justify-content:space-between; margin-bottom:20px; font-size:14px; color:#888;">
-            <span>Balance: <span id="tradeBalance">0</span></span>
-            <span id="receiveLabel">Get: <span id="tradeTotal" style="color:white;">0</span> TOKENS</span>
+        <div class="chart-area"><canvas id="chartCanvas"></canvas></div>
+        
+        <div class="trans-summary">
+            <div class="ts-item"><div class="ts-label">Your Balance</div><div class="ts-val" id="myTokenBalance">0</div></div>
+            <div class="ts-item" style="text-align: right;"><div class="ts-label">Value (BLYX)</div><div class="ts-val" style="color: var(--accent-green);" id="myTokenValue">≈ 0</div></div>
         </div>
-        <button class="btn-white-large" onclick="executeTrade()">Confirm</button>
-        <button class="btn-text" style="margin-top:10px; width:100%; text-align:center; color:#555;" onclick="closeTrade()">Cancel</button>
+        <div style="height: 120px;"></div>
     </div>
 
-    <!-- Bottom Nav -->
-    <div class="bottom-nav">
-        <div class="nav-item" onclick="location.href='index.html'"><svg class="icon" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg></div>
-        <div class="nav-item" onclick="location.href='markets.html'"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg></div>
-        <div class="nav-trade-circle" onclick="location.href='markets.html'"><svg class="icon" style="color:black;" viewBox="0 0 24 24"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg></div>
-        <div class="nav-item" onclick="location.href='transfer.html'"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg></div>
-        <div class="nav-item" onclick="location.href='wallet.html'"><svg class="icon" viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg></div>
+    <!-- TRANSACTIONS -->
+    <div id="tab-tx" class="hidden">
+        <div class="trans-list" id="txList"><div style="text-align:center; padding:20px; color:#555;">Loading...</div></div>
+        <div style="height: 120px;"></div>
     </div>
 
-    <script type="module">
-        import { initUser, subscribeToUser } from './user-service.js';
-        import { db } from './firebase-config.js';
-        import { doc, onSnapshot, updateDoc, arrayUnion, increment } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    <!-- SOCIALS -->
+    <div id="tab-socials" class="hidden">
+        <div class="social-list"><div class="social-card"><div class="sc-left"><div class="sc-title">Description</div><div class="sc-sub" id="tokenDesc">No description.</div></div></div></div>
+        <div style="height: 120px;"></div>
+    </div>
+</div>
 
-        const tg = window.Telegram.WebApp;
-        tg.expand();
-        tg.setHeaderColor('#000000');
+<!-- MAIN BUTTON -->
+<div class="fixed-action-container">
+    <button class="btn-buy-floating" id="mainActionBtn" onclick="handleAction()">
+        Loading...
+    </button>
+</div>
 
-        const tokenId = new URLSearchParams(window.location.search).get('id');
-        const TOTAL_SUPPLY = 1000000000;
-        const MAX_HOLD = TOTAL_SUPPLY * 0.3; // 30% LIMIT
+<!-- ROBOT BUY OVERLAY -->
+<div id="tradeOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:9999; flex-direction:column; justify-content:center; padding: 20px;">
+    <h2 style="text-align:center; margin-bottom:20px; font-size: 24px;">Buy (Curve)</h2>
+    <div class="input-wrapper">
+        <input type="number" id="tradeInput" placeholder="Amount BLYX" oninput="calcTrade()">
+        <div class="input-suffix">BLYX</div>
+    </div>
+    <div style="display:flex; justify-content:space-between; margin-bottom:20px; font-size:14px; color:#888;">
+        <span>Balance: <span id="tradeBalance">0</span></span>
+        <span id="receiveLabel">Get: <span id="tradeTotal" style="color:white;">0</span> TOKENS</span>
+    </div>
+    <button class="btn-white-large" onclick="executeTrade()">Confirm</button>
+    <button class="btn-text" style="margin-top:10px; width:100%; text-align:center; color:#555;" onclick="closeTrade()">Cancel</button>
+</div>
+
+<!-- Bottom Nav -->
+<div class="bottom-nav">
+    <div class="nav-item" onclick="location.href='index.html'"><svg class="icon" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg></div>
+    <div class="nav-item" onclick="location.href='markets.html'"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg></div>
+    <div class="nav-trade-circle" onclick="location.href='markets.html'"><svg class="icon" style="color:black;" viewBox="0 0 24 24"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg></div>
+    <div class="nav-item" onclick="location.href='transfer.html'"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg></div>
+    <div class="nav-item" onclick="location.href='wallet.html'"><svg class="icon" viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg></div>
+</div>
+
+<script type="module">
+    import { initUser, subscribeToUser } from './user-service.js';
+    import { db } from './firebase-config.js';
+    import { doc, onSnapshot, updateDoc, arrayUnion, increment } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    const tg = window.Telegram.WebApp;
+    tg.expand();
+    tg.setHeaderColor('#000000');
+
+    const tokenId = new URLSearchParams(window.location.search).get('id');
+    const TOTAL_SUPPLY = 1000000000;
+    const MAX_HOLDING_PERCENT = 0.30; // 30%
+    const MAX_HOLDING_AMOUNT = TOTAL_SUPPLY * MAX_HOLDING_PERCENT;
+    
+    let currentTokenData = null;
+    let currentUserData = null;
+    let isP2P = false;
+    let currentFrame = '5m';
+
+    // UTILS
+    function formatPrice(val) {
+        if(!val || val === 0) return "0";
+        return val < 0.01 ? val.toFixed(8).replace(/\.?0+$/, "") : val.toFixed(4);
+    }
+    function formatCompact(num) {
+        if (!num) return "0";
+        return Intl.NumberFormat('en-US', { notation: "compact", maximumFractionDigits: 2 }).format(num);
+    }
+    function formatDateX(ts, frame) {
+        const d = new Date(ts);
+        if(frame === '5m' || frame === '1h') return d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
+        if(frame === '1d' || frame === '1w') return d.getDate() + '/' + (d.getMonth()+1);
+        return (d.getMonth()+1) + '/' + d.getFullYear().toString().slice(2);
+    }
+
+    window.switchTab = function(tabName, el) {
+        document.querySelectorAll('.tab-link').forEach(t => t.classList.remove('active'));
+        el.classList.add('active');
+        ['chart', 'tx', 'socials'].forEach(id => document.getElementById('tab-' + id).classList.add('hidden'));
+        document.getElementById('tab-' + tabName).classList.remove('hidden');
+        if(tabName === 'chart') setTimeout(drawRealChart, 50);
+    }
+
+    async function initPage() {
+        if(!tokenId) return;
+        await initUser();
         
-        let currentTokenData = null;
-        let currentUserData = null;
-        let isP2P = false;
-        let currentTimeframe = 5;
-
-        // FORMATTERS
-        function formatPrice(val) {
-            if(!val || val === 0) return "0";
-            return val < 0.01 ? val.toFixed(8).replace(/\.?0+$/, "") : val.toFixed(4);
-        }
-        function formatCompact(num) {
-            if (!num) return "0";
-            return Intl.NumberFormat('en-US', { notation: "compact", maximumFractionDigits: 2 }).format(num);
-        }
-
-        window.switchTab = function(tabName, el) {
-            document.querySelectorAll('.tab-link').forEach(t => t.classList.remove('active'));
-            el.classList.add('active');
-            ['chart', 'tx', 'socials'].forEach(id => document.getElementById('tab-' + id).classList.add('hidden'));
-            document.getElementById('tab-' + tabName).classList.remove('hidden');
-            if(tabName === 'chart') setTimeout(drawRealChart, 50);
-        }
-
-        async function initPage() {
-            if(!tokenId) return;
-            await initUser();
-            
-            onSnapshot(doc(db, "tokens", tokenId), (docSnap) => {
-                if (docSnap.exists()) {
-                    currentTokenData = docSnap.data();
-                    renderUI();
-                    drawRealChart();
-                }
-            });
-            
-            subscribeToUser((user) => {
-                currentUserData = user;
-                renderUserPos();
-                renderHistory();
-            });
-            window.addEventListener('resize', drawRealChart);
-        }
-
-        function renderUI() {
-            // Basic Info
-            document.getElementById('tokenName').innerText = currentTokenData.name;
-            document.getElementById('tokenDesc').innerText = currentTokenData.description || "No description.";
-            document.getElementById('holdersCount').innerText = formatCompact(currentTokenData.holdersCount || 1);
-            document.getElementById('txCount').innerText = formatCompact(currentTokenData.txCount || 0);
-            document.getElementById('marketCapVal').innerText = formatCompact(currentTokenData.marketCap || 0);
-            document.getElementById('tokenPriceDisplay').innerText = formatPrice(currentTokenData.price);
-
-            // Icon
-            if(currentTokenData.image) {
-                document.getElementById('tokenIcon').src = currentTokenData.image;
-                document.getElementById('tokenIcon').style.display = 'block';
-                document.getElementById('tokenLetter').style.display = 'none';
-            } else {
-                document.getElementById('tokenIcon').style.display = 'none';
-                document.getElementById('tokenLetter').innerText = tokenId[0];
-                document.getElementById('tokenLetter').style.display = 'flex';
+        onSnapshot(doc(db, "tokens", tokenId), (docSnap) => {
+            if (docSnap.exists()) {
+                currentTokenData = docSnap.data();
+                renderUI();
+                drawRealChart();
             }
-
-            // Bonding Curve Progress
-            const sold = currentTokenData.sold || 0;
-            const progress = Math.min((sold / TOTAL_SUPPLY) * 100, 100);
-            
-            document.getElementById('bondingBar').style.width = progress + '%';
-            document.getElementById('bondingText').innerText = progress.toFixed(2) + '% collected';
-
-            const btn = document.getElementById('mainActionBtn');
-
-            // Logic Switch: Bonding Curve -> P2P Market
-            if(progress >= 99.99) {
-                isP2P = true;
-                document.getElementById('bondingContainer').style.display = 'none';
-                document.getElementById('tradingLive').style.display = 'block';
-                
-                btn.innerText = "Go to P2P Market";
-                btn.style.background = "#fff";
-                btn.style.color = "#000";
-            } else {
-                isP2P = false;
-                document.getElementById('bondingContainer').style.display = 'block';
-                document.getElementById('tradingLive').style.display = 'none';
-                
-                btn.innerText = "Buy (Bonding Curve)";
-                btn.style.background = "#CCFF00"; // Green
-                btn.style.color = "#000";
-            }
-        }
-
-        function renderUserPos() {
-            if(!currentUserData || !currentTokenData) return;
-            const bal = currentUserData.portfolio?.[tokenId] || 0;
-            document.getElementById('myTokenBalance').innerText = formatCompact(bal);
-            document.getElementById('myTokenValue').innerText = "≈ " + (bal * currentTokenData.price).toFixed(2);
-        }
-
-        // --- BUTTON ACTION ---
-        window.handleAction = function() {
-            if(isP2P) {
-                // Переход на страницу рынка
-                location.href = `p2p_market.html?id=${tokenId}`;
-            } else {
-                // Открытие модалки покупки у робота
-                document.getElementById('tradeOverlay').style.display = 'flex';
-                document.getElementById('tradeBalance').innerText = formatCompact(currentUserData.balance) + " BLYX";
-            }
-        }
-
-        // --- ROBOT BUY (Bonding Curve Logic) ---
-        window.closeTrade = function() { document.getElementById('tradeOverlay').style.display = 'none'; }
+        });
         
-        window.calcTrade = function() {
-            const amt = parseFloat(document.getElementById('tradeInput').value) || 0;
-            const tokens = amt / currentTokenData.price;
-            document.getElementById('tradeTotal').innerText = formatCompact(tokens);
+        subscribeToUser((user) => {
+            currentUserData = user;
+            renderUserPos();
+            renderHistory();
+        });
+        window.addEventListener('resize', drawRealChart);
+    }
+
+    function renderUI() {
+        document.getElementById('tokenName').innerText = currentTokenData.name;
+        document.getElementById('tokenDesc').innerText = currentTokenData.description || "No description.";
+        document.getElementById('holdersCount').innerText = formatCompact(currentTokenData.holdersCount || 1);
+        document.getElementById('txCount').innerText = formatCompact(currentTokenData.txCount || 0);
+        document.getElementById('marketCapVal').innerText = formatCompact(currentTokenData.marketCap || 0);
+        document.getElementById('tokenPriceDisplay').innerText = formatPrice(currentTokenData.price);
+
+        if(currentTokenData.image) {
+            document.getElementById('tokenIcon').src = currentTokenData.image;
+            document.getElementById('tokenIcon').style.display = 'block';
+            document.getElementById('tokenLetter').style.display = 'none';
+        } else {
+            document.getElementById('tokenIcon').style.display = 'none';
+            document.getElementById('tokenLetter').innerText = tokenId[0];
+            document.getElementById('tokenLetter').style.display = 'flex';
         }
 
-        window.executeTrade = async function() {
-            const inputVal = parseFloat(document.getElementById('tradeInput').value);
-            if(!inputVal) return;
-            if(currentUserData.balance < inputVal) { tg.showAlert("Not enough BLYX"); return; }
+        const sold = currentTokenData.sold || 0;
+        const progress = Math.min((sold / TOTAL_SUPPLY) * 100, 100);
+        document.getElementById('bondingBar').style.width = progress + '%';
+        document.getElementById('bondingText').innerText = progress.toFixed(2) + '% collected';
 
-            const currentPrice = currentTokenData.price;
-            const tokensToGet = inputVal / currentPrice;
-            
-            // Check 30% Limit
-            const currentHold = currentUserData.portfolio?.[tokenId] || 0;
-            if (currentHold + tokensToGet > MAX_HOLD) {
-                tg.showAlert(`Limit reached! Max 30% (${formatCompact(MAX_HOLD)})`);
-                return;
-            }
-            
-            // New Price Calc
-            const newCap = (currentTokenData.marketCap || 0) + inputVal;
-            const newPrice = newCap / TOTAL_SUPPLY;
+        const btn = document.getElementById('mainActionBtn');
+        if(progress >= 99.99) {
+            isP2P = true;
+            document.getElementById('bondingContainer').style.display = 'none';
+            document.getElementById('tradingLive').style.display = 'block';
+            btn.innerText = "Go to P2P Market";
+            btn.style.background = "#fff"; btn.style.color = "#000";
+        } else {
+            isP2P = false;
+            document.getElementById('bondingContainer').style.display = 'block';
+            document.getElementById('tradingLive').style.display = 'none';
+            btn.innerText = "Buy (Bonding Curve)";
+            btn.style.background = "#CCFF00"; btn.style.color = "#000";
+        }
+    }
 
-            const userRef = doc(db, "users", currentUserData.id.toString());
-            const tokenRef = doc(db, "tokens", tokenId);
+    function renderUserPos() {
+        if(!currentUserData || !currentTokenData) return;
+        const bal = currentUserData.portfolio?.[tokenId] || 0;
+        document.getElementById('myTokenBalance').innerText = formatCompact(bal);
+        document.getElementById('myTokenValue').innerText = "≈ " + (bal * currentTokenData.price).toFixed(2);
+    }
 
-            try {
-                await updateDoc(userRef, {
-                    balance: increment(-inputVal),
-                    [`portfolio.${tokenId}`]: increment(tokensToGet),
-                    transactions: arrayUnion({ type: 'buy', token: tokenId, amount: tokensToGet, price: currentPrice, date: new Date().toISOString() })
-                });
-                await updateDoc(tokenRef, {
-                    marketCap: increment(inputVal),
-                    sold: increment(tokensToGet),
-                    txCount: increment(1),
-                    price: newPrice,
-                    transactions: arrayUnion({ price: newPrice, date: new Date().toISOString() })
-                });
-                tg.showAlert("Bought successfully!");
-                closeTrade();
-            } catch(e) {
-                tg.showAlert("Error: " + e.message);
-            }
+    window.handleAction = function() {
+        if(isP2P) { location.href = `p2p_market.html?id=${tokenId}`; } 
+        else {
+            document.getElementById('tradeOverlay').style.display = 'flex';
+            document.getElementById('tradeBalance').innerText = formatCompact(currentUserData.balance) + " BLYX";
+        }
+    }
+
+    window.closeTrade = function() { document.getElementById('tradeOverlay').style.display = 'none'; }
+    
+    window.calcTrade = function() {
+        const amt = parseFloat(document.getElementById('tradeInput').value) || 0;
+        const tokens = amt / currentTokenData.price;
+        document.getElementById('tradeTotal').innerText = formatCompact(tokens);
+    }
+
+    window.executeTrade = async function() {
+        const inputVal = parseFloat(document.getElementById('tradeInput').value);
+        if(!inputVal) return;
+        if(currentUserData.balance < inputVal) { tg.showAlert("Not enough BLYX"); return; }
+
+        const currentPrice = currentTokenData.price;
+        const tokensToGet = inputVal / currentPrice;
+
+        // 30% LIMIT CHECK
+        const currentHeld = currentUserData.portfolio?.[tokenId] || 0;
+        if ((currentHeld + tokensToGet) > MAX_HOLDING_AMOUNT) {
+            tg.showAlert(`Limit Reached! You can only hold 30% of supply (300M).`);
+            return;
         }
 
-        // --- CHART DRAWING ---
-        window.setFrame = function(min) {
-            currentTimeframe = min;
-            document.querySelectorAll('.time-btn').forEach(b => {
-                b.classList.remove('active');
-                if(b.innerText.includes(min + 'm') || (min===60 && b.innerText==='1h')) b.classList.add('active');
+        const newCap = (currentTokenData.marketCap || 0) + inputVal;
+        const newPrice = newCap / TOTAL_SUPPLY; // Simple linear model
+
+        const userRef = doc(db, "users", currentUserData.id.toString());
+        const tokenRef = doc(db, "tokens", tokenId);
+
+        try {
+            await updateDoc(userRef, {
+                balance: increment(-inputVal),
+                [`portfolio.${tokenId}`]: increment(tokensToGet),
+                transactions: arrayUnion({ type: 'buy', token: tokenId, amount: tokensToGet, price: currentPrice, date: new Date().toISOString() })
             });
-            drawRealChart();
-        }
-
-        function generateCandles(transactions, timeframeMinutes) {
-            if(!transactions || transactions.length === 0) return [];
-            const candles = [];
-            const sorted = [...transactions].sort((a,b) => new Date(a.date) - new Date(b.date));
-            const intervalMs = timeframeMinutes * 60 * 1000;
-            let currentCandle = null;
-            let bucketStart = 0;
-
-            sorted.forEach(tx => {
-                const time = new Date(tx.date).getTime();
-                const bucket = Math.floor(time / intervalMs) * intervalMs;
-                if (!currentCandle || bucket !== bucketStart) {
-                    if (currentCandle) candles.push(currentCandle);
-                    const prevClose = candles.length > 0 ? candles[candles.length-1].c : tx.price;
-                    bucketStart = bucket;
-                    currentCandle = { t: bucket, o: prevClose, h: tx.price, l: tx.price, c: tx.price };
-                } else {
-                    if (tx.price > currentCandle.h) currentCandle.h = tx.price;
-                    if (tx.price < currentCandle.l) currentCandle.l = tx.price;
-                    currentCandle.c = tx.price;
-                }
+            await updateDoc(tokenRef, {
+                marketCap: increment(inputVal),
+                sold: increment(tokensToGet),
+                txCount: increment(1),
+                price: newPrice,
+                transactions: arrayUnion({ price: newPrice, date: new Date().toISOString() })
             });
-            if (currentCandle) candles.push(currentCandle);
-            return candles;
+            tg.showAlert("Bought successfully!");
+            closeTrade();
+        } catch(e) {
+            tg.showAlert("Error: " + e.message);
+        }
+    }
+
+    // --- REAL DATE CHART ---
+    window.setFrame = function(frame) {
+        currentFrame = frame;
+        document.querySelectorAll('.time-btn').forEach(b => {
+            b.classList.remove('active');
+            if(b.innerText === frame) b.classList.add('active');
+        });
+        drawRealChart();
+    }
+
+    function drawRealChart() {
+        const canvas = document.getElementById('chartCanvas');
+        if(!canvas || !currentTokenData) return;
+        const ctx = canvas.getContext('2d');
+        const parent = canvas.parentElement;
+        canvas.width = parent.offsetWidth;
+        canvas.height = parent.offsetHeight;
+        const w = canvas.width;
+        const h = canvas.height;
+        ctx.clearRect(0,0,w,h);
+
+        const txs = currentTokenData.transactions || [];
+        if(txs.length === 0) return;
+
+        // Determine Time Cutoff
+        const now = Date.now();
+        let cutoff = now;
+        switch(currentFrame) {
+            case '5m': cutoff -= 5 * 60 * 1000; break;
+            case '1h': cutoff -= 60 * 60 * 1000; break;
+            case '1d': cutoff -= 24 * 60 * 60 * 1000; break;
+            case '1w': cutoff -= 7 * 24 * 60 * 60 * 1000; break;
+            case '1m': cutoff -= 30 * 24 * 60 * 60 * 1000; break;
+            case '1y': cutoff -= 365 * 24 * 60 * 60 * 1000; break;
         }
 
-        function drawRealChart() {
-            const canvas = document.getElementById('chartCanvas');
-            if(!canvas || !currentTokenData) return;
-            const ctx = canvas.getContext('2d');
-            const parent = canvas.parentElement;
-            canvas.width = parent.offsetWidth;
-            canvas.height = parent.offsetHeight;
-            const w = canvas.width;
-            const h = canvas.height;
+        // Filter Transactions
+        const activeTxs = txs.filter(t => new Date(t.date).getTime() >= cutoff);
+        // If not enough data in frame, show last few or all
+        const dataPoints = activeTxs.length > 1 ? activeTxs : txs.slice(-20);
+        
+        if(dataPoints.length === 0) return;
+
+        // Find Range
+        let minP = Infinity, maxP = -Infinity;
+        let minT = Infinity, maxT = -Infinity;
+
+        dataPoints.forEach(t => {
+            const time = new Date(t.date).getTime();
+            if(t.price < minP) minP = t.price;
+            if(t.price > maxP) maxP = t.price;
+            if(time < minT) minT = time;
+            if(time > maxT) maxT = time;
+        });
+        
+        // Pad ranges
+        if(minP === maxP) { minP *= 0.95; maxP *= 1.05; }
+        if(minT === maxT) { minT -= 60000; maxT += 60000; }
+
+        const chartW = w - 40; // Right margin for price
+        const chartH = h - 30; // Bottom margin for date
+
+        const scaleY = chartH / (maxP - minP);
+        const scaleX = chartW / (maxT - minT);
+
+        // 1. Draw Vertical Time Grid & Labels
+        ctx.strokeStyle = '#222';
+        ctx.fillStyle = '#666';
+        ctx.font = "600 10px Inter";
+        ctx.textAlign = "center";
+        
+        const timeSteps = 5;
+        for(let i=0; i<=timeSteps; i++) {
+            const x = i * (chartW / timeSteps);
+            const tVal = minT + (i * ((maxT - minT)/timeSteps));
             
-            ctx.clearRect(0,0,w,h);
+            ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, chartH); ctx.stroke();
+            ctx.fillText(formatDateX(tVal, currentFrame), x, h - 10);
+        }
 
-            const txs = currentTokenData.transactions || [];
-            if(txs.length === 0) return;
-
-            const candles = generateCandles(txs, currentTimeframe);
-            // Если транзакций мало для свечей, рисуем линию последней цены
-            if(candles.length === 0 && txs.length > 0) {
-                const price = txs[txs.length-1].price;
-                ctx.strokeStyle = '#CCFF00'; ctx.beginPath(); ctx.moveTo(0, h/2); ctx.lineTo(w, h/2); ctx.stroke();
-                return;
-            }
-
-            let minP = Infinity, maxP = -Infinity;
-            candles.forEach(c => { if(c.l < minP) minP = c.l; if(c.h > maxP) maxP = c.h; });
-            if(minP === maxP) { minP *= 0.95; maxP *= 1.05; }
-            
-            const chartW = w - 50;
-            const chartH = h - 20;
-            const scaleY = chartH / (maxP - minP);
-
-            // Grid
+        // 2. Draw Price Grid
+        ctx.textAlign = "left";
+        for(let i=0; i<=5; i++) {
+            const y = i * (chartH/5);
+            const val = maxP - (i * ((maxP - minP)/5));
             ctx.strokeStyle = '#222';
-            ctx.lineWidth = 1;
-            ctx.font = "600 10px Inter";
-            ctx.textAlign = "left";
-            for(let i=0; i<=5; i++) {
-                const y = i * (chartH/5);
-                const val = maxP - (i * ((maxP - minP)/5));
-                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(chartW, y); ctx.stroke();
-                ctx.fillStyle = '#666'; ctx.fillText(formatPrice(val), chartW + 5, y + 3);
-            }
-
-            // Candles
-            const candleW = 8;
-            let currentX = chartW - 10;
-            for (let i = candles.length - 1; i >= 0; i--) {
-                if (currentX < 0) break;
-                const c = candles[i];
-                const isUp = c.c >= c.o;
-                const color = isUp ? '#FFF' : '#000';
-                const stroke = '#FFF';
-                
-                const yH = (maxP - c.h) * scaleY;
-                const yL = (maxP - c.l) * scaleY;
-                const yO = (maxP - c.o) * scaleY;
-                const yC = (maxP - c.c) * scaleY;
-                
-                const bTop = Math.min(yO, yC);
-                const bH = Math.max(1, Math.abs(yC - yO));
-
-                ctx.strokeStyle = stroke;
-                ctx.beginPath(); ctx.moveTo(currentX + candleW/2, yH); ctx.lineTo(currentX + candleW/2, yL); ctx.stroke();
-                
-                ctx.fillStyle = color;
-                ctx.fillRect(currentX, bTop, candleW, bH);
-                ctx.strokeRect(currentX, bTop, candleW, bH);
-                
-                currentX -= (candleW + 4);
-            }
+            ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(chartW, y); ctx.stroke();
+            ctx.fillText(formatPrice(val), chartW + 5, y + 3);
         }
 
-        function renderHistory() {
-            const list = document.getElementById('txList');
-            const txs = (currentUserData.transactions || []).filter(t => t.token === tokenId).reverse();
-            list.innerHTML = '';
-            if(txs.length === 0) { list.innerHTML = '<div style="text-align:center; padding:20px; color:#555;">No transactions</div>'; return; }
-            txs.forEach(tx => {
-                const isBuy = tx.type.includes('buy');
-                const action = isBuy ? 'Buy' : 'Sell';
-                const color = isBuy ? '#CCFF00' : '#FF3B30';
-                const icon = isBuy ? '🔥' : '⚡';
-                const html = `
-                <div class="trans-item">
-                    <div class="ti-left"><div class="ti-avatar" style="color:${color};background:#222;">${icon}</div><div class="ti-info"><div class="ti-addr">You</div><div class="ti-action" style="color:${color}">${action}</div></div></div>
-                    <div class="ti-right"><div class="ti-amount-row">${(tx.amount * tx.price).toFixed(2)} <img src="Sprites/Blyx.png" class="icon-blyx-right"></div><div class="ti-amount-token">${formatCompact(tx.amount)} ${tokenId}</div></div>
-                </div>`;
-                list.innerHTML += html;
-            });
-        }
+        // 3. Draw Line Chart
+        ctx.strokeStyle = '#CCFF00';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        
+        dataPoints.forEach((t, i) => {
+            const time = new Date(t.date).getTime();
+            const x = (time - minT) * scaleX;
+            const y = (maxP - t.price) * scaleY; // Invert Y
+            if(i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
 
-        initPage();
-    </script>
+        // Gradient under fill
+        const grad = ctx.createLinearGradient(0, 0, 0, chartH);
+        grad.addColorStop(0, 'rgba(204, 255, 0, 0.2)');
+        grad.addColorStop(1, 'rgba(204, 255, 0, 0)');
+        ctx.lineTo((new Date(dataPoints[dataPoints.length-1].date).getTime() - minT)*scaleX, chartH);
+        ctx.lineTo((new Date(dataPoints[0].date).getTime() - minT)*scaleX, chartH);
+        ctx.fillStyle = grad;
+        ctx.fill();
+    }
+
+    function renderHistory() {
+        const list = document.getElementById('txList');
+        const txs = (currentUserData.transactions || []).filter(t => t.token === tokenId).reverse();
+        list.innerHTML = '';
+        if(txs.length === 0) { list.innerHTML = '<div style="text-align:center; padding:20px; color:#555;">No transactions</div>'; return; }
+        
+        txs.forEach(tx => {
+            const isBuy = tx.type.includes('buy');
+            const action = isBuy ? 'Buy' : 'Sell';
+            const color = isBuy ? '#CCFF00' : '#FF3B30';
+            const icon = isBuy ? 'Sprites/Purchase.png' : 'Sprites/Replenishment.png';
+            
+            const html = `
+            <div class="trans-item">
+                <div class="ti-left">
+                    <img src="${icon}" style="width:36px; height:36px;">
+                    <div class="ti-info"><div class="ti-addr">You</div><div class="ti-action" style="color:${color}">${action}</div></div>
+                </div>
+                <div class="ti-right">
+                    <div class="ti-amount-row">${(tx.amount * tx.price).toFixed(2)} <img src="Sprites/Blyx.png" class="icon-blyx-right"></div>
+                    <div class="ti-amount-token">${formatCompact(tx.amount)} ${tokenId}</div>
+                </div>
+            </div>`;
+            list.innerHTML += html;
+        });
+    }
+
+    initPage();
+</script>
 </body>
 </html>
