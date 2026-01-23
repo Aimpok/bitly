@@ -43,7 +43,7 @@
             <img src="Sprites/Blyx.png" class="mc-icon">
         </div>
         <div style="text-align: center; color: #888; font-size: 13px; margin-bottom: 15px;">
-            Price: <span id="tokenPriceDisplay" style="color: white; font-weight: 700;">...</span> BLYX
+            1 Token = <span id="tokenPriceDisplay" style="color: white; font-weight: 700;">...</span> BLYX
         </div>
 
         <!-- Bonding Curve Progress -->
@@ -73,7 +73,9 @@
                 <div class="time-btn" onclick="setFrame(15)">15m</div>
                 <div class="time-btn" onclick="setFrame(60)">1h</div>
             </div>
-            <div class="chart-area"><canvas id="chartCanvas"></canvas></div>
+            <div class="chart-area">
+                <canvas id="chartCanvas"></canvas>
+            </div>
             
             <div class="trans-summary">
                 <div class="ts-item"><div class="ts-label">Your Balance</div><div class="ts-val" id="myTokenBalance">0</div></div>
@@ -138,6 +140,7 @@
 
         const tokenId = new URLSearchParams(window.location.search).get('id');
         const TOTAL_SUPPLY = 1000000000;
+        const MAX_HOLD = TOTAL_SUPPLY * 0.3; // 30% LIMIT
         
         let currentTokenData = null;
         let currentUserData = null;
@@ -266,6 +269,13 @@
 
             const currentPrice = currentTokenData.price;
             const tokensToGet = inputVal / currentPrice;
+            
+            // Check 30% Limit
+            const currentHold = currentUserData.portfolio?.[tokenId] || 0;
+            if (currentHold + tokensToGet > MAX_HOLD) {
+                tg.showAlert(`Limit reached! Max 30% (${formatCompact(MAX_HOLD)})`);
+                return;
+            }
             
             // New Price Calc
             const newCap = (currentTokenData.marketCap || 0) + inputVal;
