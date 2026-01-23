@@ -531,3 +531,24 @@ button { border: none; }
     display: inline-block;
     margin-bottom: 10px;
 }
+
+/* Кнопка главного действия в Crypto Info */
+#mainActionBtn {
+    transition: all 0.3s ease;
+    font-weight: 800;
+    font-size: 16px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+}
+
+/* Бейдж статуса рынка */
+.market-live-badge {
+    color: #CCFF00;
+    font-weight: 700;
+    font-size: 14px;
+    border: 1px solid rgba(204, 255, 0, 0.3);
+    padding: 6px 16px;
+    border-radius: 20px;
+    background: rgba(204, 255, 0, 0.1);
+    display: inline-block;
+    margin-bottom: 10px;
+}
