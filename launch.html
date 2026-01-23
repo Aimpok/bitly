@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="style.css">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        /* Доп стили для счетчика и кроппера */
+        /* Доп стили */
         .label-row {
             display: flex; 
             justify-content: space-between; 
@@ -37,18 +37,15 @@
             position: absolute;
             transform-origin: center;
             will-change: transform;
-            /* Убираем дефолтное поведение перетаскивания */
             user-select: none;
             -webkit-user-drag: none;
         }
-        /* Маска затемнения */
         .cropper-mask {
             position: absolute; top: 0; left: 0; right: 0; bottom: 0;
             background: radial-gradient(circle 120px at center, transparent 120px, rgba(0,0,0,0.8) 121px);
             pointer-events: none;
             border: 1px solid rgba(255,255,255,0.05);
         }
-        /* Круг-ориентир (240x240) */
         .cropper-circle-guide {
             position: absolute;
             width: 240px; height: 240px;
@@ -172,7 +169,7 @@
         </button>
     </div>
 
-    <!-- REAL CROPPER OVERLAY -->
+    <!-- CROPPER OVERLAY -->
     <div id="cropperOverlay" class="cropper-overlay">
         <div class="cropper-body" id="cropperBody">
             <img id="cropperImg" src="">
@@ -195,11 +192,13 @@
 
         const CREATION_FEE = 200;
         const TOTAL_SUPPLY = 1000000000;
+        // ВАЖНО: 40000 виртуальной ликвидности поднимают цену старта, чтобы она была адекватной
+        const VIRTUAL_LIQUIDITY = 40000; 
         
-        let base64Image = null; 
+        let base64Image = null;
         let currentUser = null;
 
-        // --- GLOBAL FORMATTER ---
+        // FORMATTER
         window.formatPrice = function(val) {
             if(!val || val === 0) return "0";
             return val < 0.01 ? val.toFixed(8).replace(/\.?0+$/, "") : val.toFixed(4);
@@ -210,20 +209,13 @@
         }
         init();
 
-        // --- INPUT LOGIC ---
+        // Input Logic
         window.handleInput = function(type) {
             const el = type === 'name' ? document.getElementById('tokenName') : document.getElementById('tokenTicker');
             const counter = type === 'name' ? document.getElementById('nameCount') : document.getElementById('tickerCount');
             const max = type === 'name' ? 20 : 10;
-
-            let val = el.value;
-
-            if(type === 'ticker') {
-                val = val.replace(/[^a-zA-Z]/g, '').toUpperCase();
-                el.value = val;
-            }
-
-            counter.innerText = max - val.length;
+            if(type === 'ticker') el.value = el.value.replace(/[^a-zA-Z]/g, '').toUpperCase();
+            counter.innerText = max - el.value.length;
             checkForm();
         }
 
@@ -235,65 +227,52 @@
             else btn.classList.add('btn-disabled'); 
         }
 
-        // --- REAL CROPPER LOGIC WITH BOUNDARIES ---
-        let cs = { x: 0, y: 0, s: 1 }; // current state
+        // --- CROPPER WITH BOUNDARIES ---
+        let cs = { x: 0, y: 0, s: 1 };
         let startDist = 0, startScale = 1;
         let startX = 0, startY = 0;
         let lastX = 0, lastY = 0;
-        const CROP_SIZE = 240; // Размер круга
+        const CROP_SIZE = 240;
 
-        window.initCropper = function(input) {
-            if (input.files && input.files[0]) {
-                const reader = new FileReader();
-                reader.onload = function (e) {
+        window.initCropper = function(inp) {
+            if (inp.files && inp.files[0]) {
+                const r = new FileReader();
+                r.onload = function (e) {
                     const img = document.getElementById('cropperImg');
                     img.onload = () => {
-                        // Сброс и центрирование
                         cs = { x: 0, y: 0, s: 1 };
-                        
-                        // 1. Рассчитываем минимальный зум, чтобы картинка покрывала круг 240px
-                        const minScaleW = CROP_SIZE / img.naturalWidth;
-                        const minScaleH = CROP_SIZE / img.naturalHeight;
-                        const minScale = Math.max(minScaleW, minScaleH);
-                        
-                        // Ставим начальный зум чуть больше минимума для удобства
-                        cs.s = minScale * 1.2; 
-                        
+                        // Min scale to fill circle
+                        const minScale = Math.max(CROP_SIZE / img.naturalWidth, CROP_SIZE / img.naturalHeight);
+                        cs.s = minScale * 1.2;
                         updateTransform();
                         document.getElementById('cropperOverlay').style.display = 'flex';
                         document.getElementById('btnContainer').style.display = 'none';
                     };
                     img.src = e.target.result;
                 }
-                reader.readAsDataURL(input.files[0]);
+                r.readAsDataURL(inp.files[0]);
             }
         }
 
         function updateTransform() {
-            // --- BOUNDARY LOGIC (ГРАНИЦЫ) ---
             const img = document.getElementById('cropperImg');
             if (!img.naturalWidth) return;
-
-            // 1. Ограничение зума (не меньше размера круга)
+            
+            // 1. Boundary Zoom
             const minScale = Math.max(CROP_SIZE / img.naturalWidth, CROP_SIZE / img.naturalHeight);
             if (cs.s < minScale) cs.s = minScale;
-
-            // 2. Ограничение перемещения (X/Y)
-            // Картинка трансформируется от центра. 
-            // Максимальное смещение = (РеальнаяШирина - ШиринаКропа) / 2
+            
+            // 2. Boundary Pan
             const maxDistX = (img.naturalWidth * cs.s - CROP_SIZE) / 2;
             const maxDistY = (img.naturalHeight * cs.s - CROP_SIZE) / 2;
-
             if (cs.x > maxDistX) cs.x = maxDistX;
             if (cs.x < -maxDistX) cs.x = -maxDistX;
             if (cs.y > maxDistY) cs.y = maxDistY;
             if (cs.y < -maxDistY) cs.y = -maxDistY;
 
-            // Применяем
             img.style.transform = `translate(${cs.x}px, ${cs.y}px) scale(${cs.s})`;
         }
 
-        // Жесты
         const area = document.getElementById('cropperBody');
         area.addEventListener('touchstart', (e) => {
             if(e.touches.length === 1) {
@@ -306,9 +285,8 @@
                 startScale = cs.s;
             }
         });
-
         area.addEventListener('touchmove', (e) => {
-            e.preventDefault(); 
+            e.preventDefault();
             if(e.touches.length === 1) {
                 const dx = e.touches[0].clientX - startX;
                 const dy = e.touches[0].clientY - startY;
@@ -318,63 +296,38 @@
                 const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
                 cs.s = Math.max(0.1, startScale * (dist / startDist));
             }
-            updateTransform(); // Проверка границ внутри
+            updateTransform();
         });
-
         window.closeCropper = function() {
             document.getElementById('cropperOverlay').style.display = 'none';
             document.getElementById('fileInput').value = ''; 
             document.getElementById('btnContainer').style.display = 'block';
         }
-
         window.cropImage = function() {
             const img = document.getElementById('cropperImg');
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-
-            // Итоговый размер 300x300
-            const size = 300; 
-            canvas.width = size;
-            canvas.height = size;
-
-            ctx.fillStyle = '#000';
-            ctx.fillRect(0, 0, size, size);
-
-            ctx.save();
-            // Центрируем контекст
-            ctx.translate(size/2, size/2);
-            
-            // Масштабируем с учетом разницы размеров (Круг 240 -> Канвас 300)
-            const ratio = size / CROP_SIZE; 
-            ctx.scale(cs.s * ratio, cs.s * ratio);
-            
-            // Смещаем картинку
+            const cvs = document.createElement('canvas'); cvs.width = 300; cvs.height = 300;
+            const ctx = cvs.getContext('2d');
+            ctx.fillStyle = '#000'; ctx.fillRect(0,0,300,300);
+            ctx.translate(150, 150);
+            const r = 300/CROP_SIZE; 
+            ctx.scale(cs.s * r, cs.s * r);
             ctx.translate(cs.x / cs.s, cs.y / cs.s);
-            
-            // Рисуем (центр картинки в 0,0)
             ctx.drawImage(img, -img.naturalWidth/2, -img.naturalHeight/2);
-            ctx.restore();
-
-            base64Image = canvas.toDataURL('image/jpeg', 0.8);
-            
-            const preview = document.getElementById('finalAvatar');
-            preview.src = base64Image;
-            preview.style.display = 'block';
+            base64Image = cvs.toDataURL('image/jpeg', 0.8);
+            document.getElementById('finalAvatar').src = base64Image;
+            document.getElementById('finalAvatar').style.display = 'block';
             document.getElementById('previewContainer').style.display = 'none';
-            
             closeCropper();
         }
 
-        // --- MATH & PAYMENT ---
+        // --- CALCULATION LOGIC (FIXED) ---
         window.handleBack = function() {
             if(document.getElementById('step2').style.display === 'block') {
                 document.getElementById('step2').style.display = 'none';
                 document.getElementById('step1').style.display = 'block';
                 document.getElementById('btnContainer').style.display = 'block';
                 document.getElementById('payPanel').style.display = 'none';
-            } else {
-                window.history.back();
-            }
+            } else window.history.back();
         }
 
         window.goToStep2 = function() {
@@ -388,9 +341,11 @@
         window.updateCalc = function() {
             const buyBlyx = parseFloat(document.getElementById('shareInput').value) || 0;
             
-            // Цена формируется от вклада + комиссии
-            const initialMarketCap = CREATION_FEE + buyBlyx;
+            // Formula: Cap = Virtual + Fee + Buy
+            const initialMarketCap = VIRTUAL_LIQUIDITY + CREATION_FEE + buyBlyx;
             const startPrice = initialMarketCap / TOTAL_SUPPLY;
+            
+            // Tokens Recv = Buy / Price
             const tokensToReceive = buyBlyx > 0 ? (buyBlyx / startPrice) : 0;
             
             document.getElementById('tokensRecieveText').innerText = Math.floor(tokensToReceive).toLocaleString();
@@ -417,7 +372,8 @@
             const desc = document.getElementById('tokenDesc').value;
             const buyBlyx = parseFloat(document.getElementById('shareInput').value) || 0;
             
-            const initialMarketCap = CREATION_FEE + buyBlyx;
+            // Final Calculation
+            const initialMarketCap = VIRTUAL_LIQUIDITY + CREATION_FEE + buyBlyx;
             const startPrice = initialMarketCap / TOTAL_SUPPLY;
             const tokensToReceive = buyBlyx > 0 ? (buyBlyx / startPrice) : 0;
             const totalCost = CREATION_FEE + buyBlyx;
@@ -428,16 +384,13 @@
             }
 
             const tokenRef = doc(db, "tokens", ticker);
-            const tokenSnap = await getDoc(tokenRef);
-            if(tokenSnap.exists()) {
+            if((await getDoc(tokenRef)).exists()) {
                 tg.showAlert("Ticker already exists!");
                 return;
             }
 
             const userRef = getUserRef();
-            const userSnap = await getDoc(userRef);
-            const balance = userSnap.data().balance || 0;
-
+            const balance = (await getDoc(userRef)).data().balance || 0;
             if(balance < totalCost) {
                 tg.showAlert(`Not enough BLYX. Need ${totalCost}.`);
                 return;
@@ -451,24 +404,22 @@
                             name: name,
                             description: desc,
                             image: base64Image,
-                            price: startPrice,
-                            change: 0,
                             ownerId: currentUser.id,
                             createdAt: new Date().toISOString(),
+                            
+                            // Math Data
                             maxSupply: TOTAL_SUPPLY,
-                            sold: tokensToReceive, 
-                            marketCap: initialMarketCap,
+                            marketCap: initialMarketCap, 
+                            price: startPrice,           
+                            sold: tokensToReceive,       
                             txCount: 1,
                             holdersCount: 1,
-                            // Инициализация истории для графика
                             transactions: [
                                 { type: 'create_buy', price: startPrice, date: new Date().toISOString() }
                             ]
                         });
 
-                        const updates = {
-                            balance: increment(-totalCost)
-                        };
+                        const updates = { balance: increment(-totalCost) };
                         if(tokensToReceive > 0) {
                             updates[`portfolio.${ticker}`] = increment(tokensToReceive);
                             updates.transactions = arrayUnion({
