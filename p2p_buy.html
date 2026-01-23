@@ -12,19 +12,17 @@
 
     <div class="header-nav">
         <button class="back-btn" onclick="window.history.back()"><svg class="icon" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
-        <div class="header-title">Buy Token</div>
+        <!-- Динамический заголовок -->
+        <div class="header-title" id="pageTitle">Buy</div>
     </div>
 
     <div style="padding: 0 16px;">
-        <!-- Order Info Card -->
         <div style="background:#111; border:1px solid #333; border-radius:16px; padding:16px; margin-bottom:20px;">
             <div style="font-size:12px; color:#888; margin-bottom:4px;">Price</div>
             <div style="font-size:24px; font-weight:700; color:white; display:flex; align-items:center; gap:6px;">
                 <span id="priceVal">0</span> <img src="Sprites/Blyx.png" style="width:20px;">
             </div>
-            
             <div style="width:100%; height:1px; background:#222; margin:12px 0;"></div>
-            
             <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
                 <span style="color:#888; font-size:13px;">Seller</span>
                 <span style="color:white; font-weight:600; font-size:13px;" id="sellerName">...</span>
@@ -34,24 +32,24 @@
                 <span style="color:white; font-weight:600; font-size:13px;" id="availVal">0</span>
             </div>
             <div style="display:flex; justify-content:space-between;">
-                <span style="color:#888; font-size:13px;">Limits</span>
+                <span style="color:#888; font-size:13px;">Limits (BLYX)</span>
                 <span style="color:white; font-weight:600; font-size:13px;" id="limitsVal">0 - 0</span>
             </div>
         </div>
 
         <div class="input-wrapper">
-            <input type="number" id="amountInput" placeholder="Amount to buy" oninput="calcTotal()">
-            <div class="input-suffix">TOKEN</div>
+            <input type="number" id="amountInput" placeholder="Amount" oninput="updateButton()">
+            <div class="input-suffix" id="tokenSuffix">TOKEN</div>
         </div>
 
-        <div style="display:flex; justify-content:space-between; margin-top:10px; font-size:14px;">
-            <span style="color:#888;">Total Cost:</span>
-            <span style="color:white; font-weight:700;" id="totalCost">0 BLYX</span>
-        </div>
+        <!-- Ошибка -->
+        <div id="errorText" class="error-text"></div>
     </div>
 
     <div class="fixed-bottom-bar">
-        <button class="btn-white-large" onclick="doBuy()">Confirm Buy</button>
+        <button class="btn-white-large btn-disabled" id="confirmBtn" onclick="doBuy()">
+            Pay <span id="btnCost" style="margin-left:5px;">0</span> <img src="Sprites/Blyx.png" style="width:16px; margin-left:4px; margin-bottom:-2px;">
+        </button>
     </div>
 
     <script type="module">
@@ -80,37 +78,58 @@
         }
 
         function render() {
+            document.getElementById('pageTitle').innerText = `Buy ${orderData.tokenId}`;
+            document.getElementById('tokenSuffix').innerText = orderData.tokenId;
             document.getElementById('priceVal').innerText = parseFloat(orderData.price).toFixed(6);
             document.getElementById('sellerName').innerText = orderData.sellerName;
             document.getElementById('availVal').innerText = Math.floor(orderData.amount).toLocaleString();
             
-            const max = orderData.maxLimit ? Math.min(orderData.maxLimit, orderData.amount) : orderData.amount;
+            const max = orderData.maxLimit || (orderData.amount * orderData.price);
             document.getElementById('limitsVal').innerText = `${Math.floor(orderData.minLimit)} - ${Math.floor(max)}`;
         }
 
-        window.calcTotal = function() {
-            const amt = parseFloat(document.getElementById('amountInput').value) || 0;
-            const cost = amt * orderData.price;
-            document.getElementById('totalCost').innerText = cost.toFixed(2) + " BLYX";
+        window.updateButton = function() {
+            const amount = parseFloat(document.getElementById('amountInput').value) || 0;
+            const cost = amount * orderData.price;
+            
+            const btn = document.getElementById('confirmBtn');
+            const err = document.getElementById('errorText');
+            document.getElementById('btnCost').innerText = cost > 0 ? cost.toFixed(2) : "0";
+            
+            btn.classList.add('btn-disabled');
+            err.innerText = "";
+
+            if(amount <= 0) return;
+
+            // VALIDATION
+            const maxLimit = orderData.maxLimit || (orderData.amount * orderData.price);
+            
+            if(cost < orderData.minLimit) {
+                err.innerText = `Minimum purchase is ${orderData.minLimit} BLYX`;
+                return;
+            }
+            if(cost > maxLimit) {
+                err.innerText = `Maximum purchase is ${maxLimit.toFixed(2)} BLYX`;
+                return;
+            }
+            if(amount > orderData.amount) {
+                err.innerText = "Not enough tokens available";
+                return;
+            }
+            if(currentUser.balance < cost) {
+                err.innerText = "Insufficient BLYX balance";
+                return;
+            }
+
+            btn.classList.remove('btn-disabled');
         }
 
         window.doBuy = async function() {
             const amount = parseFloat(document.getElementById('amountInput').value);
             if(!amount) return;
-
-            // Checks
-            const max = orderData.maxLimit ? Math.min(orderData.maxLimit, orderData.amount) : orderData.amount;
-            if(amount < orderData.minLimit || amount > max) {
-                tg.showAlert(`Limits: ${orderData.minLimit} - ${max}`);
-                return;
-            }
             const cost = amount * orderData.price;
-            if(currentUser.balance < cost) {
-                tg.showAlert("Insufficient BLYX");
-                return;
-            }
 
-            tg.showConfirm(`Buy ${amount} tokens for ${cost.toFixed(2)} BLYX?`, async (ok) => {
+            tg.showConfirm(`Pay ${cost.toFixed(2)} BLYX for ${amount} ${orderData.tokenId}?`, async (ok) => {
                 if(ok) {
                     try {
                         await runTransaction(db, async (t) => {
@@ -119,18 +138,17 @@
                             const sellerRef = doc(db, "users", orderData.sellerId);
                             const tokenRef = doc(db, "tokens", orderData.tokenId);
 
-                            // Re-read order inside transaction
+                            // Re-check
                             const oSnap = await t.get(orderRef);
-                            if(!oSnap.exists()) throw "Order gone";
+                            if(!oSnap.exists()) throw "Order expired";
                             const currentOrder = oSnap.data();
-                            if(currentOrder.amount < amount) throw "Not enough tokens left";
+                            if(currentOrder.amount < amount) throw "Not enough tokens";
 
-                            // Logic
+                            // Move
                             const newAmount = currentOrder.amount - amount;
                             if(newAmount < 0.000001) t.delete(orderRef);
                             else t.update(orderRef, { amount: newAmount });
 
-                            // Money & Tokens
                             t.update(buyerRef, {
                                 balance: increment(-cost),
                                 [`portfolio.${orderData.tokenId}`]: increment(amount),
@@ -140,7 +158,6 @@
                                 balance: increment(cost),
                                 transactions: arrayUnion({ type: 'p2p_sold', price: orderData.price, amount: amount, date: new Date().toISOString() })
                             });
-                            // Update Chart Price
                             t.update(tokenRef, {
                                 price: orderData.price,
                                 txCount: increment(1),
