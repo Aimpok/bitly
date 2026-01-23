@@ -36,6 +36,7 @@
     <h3 class="portfolio-title">Portfolio</h3>
     
     <div class="portfolio-grid" id="portfolioGrid">
+        <!-- Сюда скрипт вставит карточки -->
         <div style="color: #666; font-size: 14px;">Loading...</div>
     </div>
 </div>
@@ -68,25 +69,41 @@
 
     let currentMarket = []; 
 
-    // Форматтер цены (такой же как везде)
+    // --- ФОРМАТТЕРЫ ---
+
+    // 1. Для цены (0.00002345 или 1.25)
     function formatPrice(val) {
         if(!val || val === 0) return "0";
-        return val < 0.01 ? val.toFixed(8).replace(/\.?0+$/, "") : val.toFixed(4);
+        return val < 0.01 ? val.toFixed(8).replace(/\.?0+$/, "") : val.toFixed(2);
+    }
+
+    // 2. Для количества (1.5k, 2M)
+    function formatCompact(num) {
+        if (!num) return "0";
+        return Intl.NumberFormat('en-US', {
+            notation: "compact",
+            maximumFractionDigits: 2
+        }).format(num);
     }
 
     async function initWallet() {
         await initUser();
 
+        // 1. Подписываемся на рынок
         subscribeToMarket((tokens) => {
             currentMarket = tokens;
             const userData = window.currentUserData; 
             if(userData) renderPortfolio(userData);
         });
 
+        // 2. Подписываемся на юзера
         subscribeToUser((user) => {
-            window.currentUserData = user; 
+            window.currentUserData = user;
+            
+            // Обновляем общий баланс (сокращенно: 10k, 1M)
             const balance = user.balance !== undefined ? user.balance : 0;
-            document.getElementById('mainBalance').innerText = Math.floor(balance).toLocaleString();
+            document.getElementById('mainBalance').innerText = formatCompact(balance);
+
             renderPortfolio(user);
         });
     }
@@ -107,9 +124,9 @@
 
         keys.forEach(tokenId => {
             const amount = portfolio[tokenId];
-            if(amount <= 0) return; 
+            if(amount <= 0) return; // Скрываем нулевые
 
-            // Ищем токен
+            // Данные токена
             const tokenInfo = currentMarket.find(t => t.id === tokenId) || { 
                 name: tokenId, 
                 price: 0, 
@@ -117,8 +134,10 @@
                 id: tokenId
             };
 
+            // Форматирование цены токена
             const displayPrice = formatPrice(tokenInfo.price);
 
+            // Логика иконки (Картинка или Буква)
             let iconHtml;
             if (tokenInfo.image) {
                 iconHtml = `<img src="${tokenInfo.image}" class="card-icon-img" alt="${tokenId}">`;
@@ -141,7 +160,8 @@
                             ${displayPrice}
                             <img src="Sprites/Blyx.png" style="width: 10px; height: 10px; object-fit: contain;">
                         </span>
-                        <span class="token-amount">x${Math.floor(amount).toLocaleString()}</span>
+                        <!-- ЗДЕСЬ СОКРАЩЕНИЕ КОЛИЧЕСТВА (x1.5k) -->
+                        <span class="token-amount">x${formatCompact(amount)}</span>
                     </div>
                 </div>
             `;
