@@ -10,7 +10,7 @@
 </head>
 <body>
 
-<!-- Header: Кнопка ведет на launch.html -->
+<!-- Header -->
 <div class="market-header">
     <div class="market-title-big">Market</div>
     <button class="btn-launch-pill" onclick="location.href='launch.html'">Launch token</button>
@@ -55,22 +55,27 @@
     tg.expand();
     tg.setHeaderColor('#000000');
 
-    let allTokens = []; // Тут храним все токены для поиска
+    let allTokens = []; 
+
+    // FORMATTER
+    function formatPrice(val) {
+        if(!val || val === 0) return "0";
+        return val < 0.01 ? val.toFixed(8).replace(/\.?0+$/, "") : val.toFixed(4);
+    }
 
     async function initMarkets() {
         await initUser();
-        await initMarketDataIfNeeded(); // Убедимся что данные есть
+        await initMarketDataIfNeeded(); 
 
         subscribeToMarket((tokens) => {
-            allTokens = tokens; // Обновляем глобальный список
-            filterMarkets();    // Рендерим (с учетом текущего поиска)
+            allTokens = tokens; 
+            filterMarkets();    
         });
     }
 
     const listContainer = document.getElementById('marketList');
     const searchInput = document.getElementById('searchInput');
 
-    // Функция отрисовки списка
     function renderList(items) {
         listContainer.innerHTML = "";
         
@@ -84,24 +89,22 @@
             const changeClass = isPositive ? 'color-green' : 'color-red';
             const sign = isPositive ? '+' : '';
             
-            // Получаем первую букву ID, если иконка не загрузится (фолбэк логика)
-            const iconLetter = coin.id.charAt(0).toUpperCase();
-            
-            // Генерируем HTML (картинка берется из базы, если есть)
-            // Если image нет, можно показывать кружок с буквой (тут сделана логика: картинка есть -> показываем, нет -> буква)
+            // Иконка или Буква
             let iconHtml = '';
             if (coin.image) {
                 iconHtml = `<img src="${coin.image}" class="coin-img" alt="${coin.name}">`;
             } else {
+                const iconLetter = coin.id.charAt(0).toUpperCase();
                 iconHtml = `<span class="coin-letter">${iconLetter}</span>`;
             }
+
+            // Формат цены
+            const displayPrice = formatPrice(coin.price);
 
             const html = `
             <div class="market-item" onclick="location.href='crypto_info.html?id=${coin.id}'">
                 <div class="market-left">
-                    <div class="coin-avatar">
-                        ${iconHtml}
-                    </div>
+                    <div class="coin-avatar">${iconHtml}</div>
                     <div class="market-info">
                         <div class="market-pair">${coin.id}</div>
                         <div class="t-sub">${coin.name}</div>
@@ -109,7 +112,7 @@
                 </div>
                 <div class="market-right">
                     <div class="market-price-row">
-                        ${parseFloat(coin.price).toLocaleString()}
+                        ${displayPrice}
                         <img src="Sprites/Blyx.png" style="width: 14px; height: 14px; object-fit: contain;">
                     </div>
                     <div class="market-change ${changeClass}">${sign}${coin.change}%</div>
@@ -120,7 +123,6 @@
         });
     }
 
-    // Функция поиска
     window.filterMarkets = function() {
         const query = searchInput.value.toLowerCase();
         const filtered = allTokens.filter(coin => 
@@ -130,9 +132,7 @@
         renderList(filtered);
     }
 
-    // Вешаем слушатель на инпут
     searchInput.addEventListener('input', window.filterMarkets);
-
     initMarkets();
 </script>
 </body>
