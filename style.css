@@ -12,6 +12,7 @@
     --accent-red: #FF3B30;
     --accent-pink: #FF66C4;
     --accent-orange: #FFA500;
+    --accent-blue: #0088CC;
 }
 
 /* =========================================
@@ -57,7 +58,8 @@ button, a, input, textarea, .action-btn, .action-btn-small,
 .card-icon-area, .nav-item, .nav-trade-circle, .token-item, 
 .launch-card, .crypto-card, .btn-white-large, .back-btn, 
 .market-item, .btn-launch-pill, .upload-circle, .time-btn, 
-.social-card, .filter-chip, .oc-buy-btn, .m-filter-btn {
+.social-card, .filter-chip, .oc-buy-btn, .m-filter-btn, 
+.p-tab, .hist-card, .goods-item {
     pointer-events: auto;
     cursor: pointer;
 }
@@ -107,6 +109,7 @@ button { border: none; }
     border-radius: 16px; border: none; font-size: 18px; font-weight: 800;
     cursor: pointer; box-shadow: 0 5px 20px rgba(0,0,0,0.5);
     display: flex; justify-content: center; align-items: center; gap: 8px;
+    transition: all 0.2s;
 }
 .btn-text { background: none; border: none; color: white; font-weight: 600; font-size: 16px; padding: 10px; }
 
@@ -321,6 +324,7 @@ button { border: none; }
 .tabs-scroll {
     display: flex; gap: 20px; padding: 0 20px; margin-bottom: 15px;
     overflow-x: auto; scrollbar-width: none;
+    border-bottom: 1px solid #222;
 }
 .tab-link {
     padding: 10px 0; font-size: 15px; font-weight: 600; color: #777;
@@ -334,15 +338,18 @@ button { border: none; }
 
 .content-section { padding: 0 16px; }
 
-/* Chart */
-.chart-controls { display: flex; gap: 12px; margin-bottom: 10px; align-items: center; padding-left: 4px; }
+/* Chart Controls (UPDATED for Scrolling) */
+.chart-controls { 
+    display: flex; gap: 8px; margin-bottom: 10px; align-items: center; padding-left: 4px; 
+    overflow-x: auto; scrollbar-width: none; 
+}
 .time-btn {
     font-size: 13px; font-weight: 700; color: #555;
-    padding: 4px 10px; border-radius: 8px; cursor: pointer;
-    transition: 0.2s; background: #111;
+    padding: 6px 12px; border-radius: 8px; cursor: pointer;
+    transition: 0.2s; background: #111; white-space: nowrap;
 }
 .time-btn.active { color: #000; background: #FFF; }
-.chart-area { height: 300px; width: 100%; background: transparent; position: relative; overflow: hidden; margin-bottom: 20px; }
+.chart-area { height: 320px; width: 100%; background: transparent; position: relative; overflow: hidden; margin-bottom: 20px; }
 .chart-area canvas { display: block; width: 100%; height: 100%; }
 
 /* Transactions List */
@@ -509,7 +516,6 @@ button { border: none; }
 }
 
 /* === P2P MARKET FIXES === */
-
 .market-filters {
     display: flex;
     gap: 8px;
@@ -624,7 +630,7 @@ button { border: none; }
 }
 .p2p-title { font-size: 18px; font-weight: 700; color: white; }
 
-/* --- WALLET HISTORY STYLES --- */
+/* --- WALLET HISTORY & NEW PROFILE STYLES --- */
 .wh-item {
     display: flex;
     justify-content: space-between;
@@ -684,4 +690,53 @@ button { border: none; }
     color: #555;
 }
 
+/* New Wallet Design Elements */
+.balance-hero { padding: 30px 16px 10px; text-align: left; }
+.bh-label { color: #888; font-size: 14px; margin-bottom: 4px; font-weight: 600; }
+.bh-val { 
+    font-size: 40px; font-weight: 800; color: white; 
+    display:flex; align-items:center; gap:8px; letter-spacing: -1px;
+}
+.bh-icon { width: 32px; height: 32px; object-fit: contain; }
 
+.profile-tabs { 
+    display: flex; gap: 24px; padding: 0 16px; margin-bottom: 20px; 
+    border-bottom: 1px solid #222; 
+}
+.p-tab { 
+    padding: 12px 0; font-size: 16px; font-weight: 700; 
+    color: #666; cursor: pointer; position: relative; 
+    transition: color 0.2s;
+}
+.p-tab.active { color: white; }
+.p-tab.active::after { 
+    content:''; position: absolute; bottom:0; left:0; 
+    width:100%; height:3px; background:white; border-radius:3px; 
+}
+
+.hist-card {
+    background: #111; border: 1px solid #222; border-radius: 20px;
+    padding: 16px; margin-bottom: 12px; display: flex; 
+    justify-content: space-between; align-items: center;
+}
+.hc-left { display: flex; align-items: center; gap: 12px; }
+.hc-icon { width: 42px; height: 42px; object-fit: contain; }
+.hc-info { display: flex; flex-direction: column; gap: 2px; }
+.hc-info h4 { font-size: 16px; font-weight: 700; color: white; }
+.hc-info p { font-size: 13px; color: #777; font-weight: 500; }
+.hc-right { display: flex; flex-direction: column; align-items: flex-end; justify-content: center; gap: 6px; }
+
+.bubble-val {
+    padding: 6px 12px; border-radius: 12px; 
+    font-size: 15px; font-weight: 800; 
+    display: flex; align-items: center; gap: 4px;
+}
+.b-green { background: rgba(204, 255, 0, 0.15); color: #CCFF00; }
+.b-blue { background: rgba(0, 136, 204, 0.2); color: #33b5e5; }
+.b-red { background: rgba(255, 59, 48, 0.15); color: #FF3B30; }
+
+.goods-item {
+    background: #1c1c1c; border-radius: 16px; padding: 16px; 
+    margin-bottom: 10px; display: flex; justify-content: space-between; 
+    align-items: center; border: 1px solid #333;
+}
