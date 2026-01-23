@@ -230,7 +230,7 @@
                     amountHtml = `+${formatCompact(tx.amount)} <img src="Sprites/Blyx.png" class="wh-coin-icon">`;
                 }
                 
-                // 2. TRANSFER IN
+                // 2. TRANSFER IN (Подарок от друга)
                 else if(tx.type === 'transfer_in' || tx.type === 'receive') {
                     title = 'Gift';
                     icon = 'Sprites/Gift.png';
@@ -245,7 +245,7 @@
                     }
                 }
 
-                // 3. TRANSFER OUT
+                // 3. TRANSFER OUT (Отправка другу)
                 else if(tx.type === 'transfer_out' || tx.type === 'send') {
                     title = 'Transfer';
                     icon = 'Sprites/Cart.png';
@@ -257,28 +257,26 @@
                     }
                 }
 
-                // 4. PURCHASE (Покупка крипты у робота)
-                // ИСПРАВЛЕНО: Пишем сколько ПОТРАТИЛИ BLYX
-                else if(tx.type === 'buy') {
+                // 4. PURCHASE (Покупка у робота ИЛИ P2P) - Всегда трата BLYX
+                else if(tx.type === 'buy' || tx.type === 'p2p_buy') {
                     title = 'Purchase';
                     icon = 'Sprites/Cart.png';
                     sub = 'balance';
                     
-                    // tx.cost - это поле, которое мы сохраняем в crypto_info.html при покупке
-                    // Если его нет (старая транзакция), считаем amount * price
-                    let cost = tx.cost || (tx.amount * tx.price);
+                    // tx.total (обычно в P2P), tx.cost (Curve). Fallback: amount*price
+                    let spent = tx.total || tx.cost || (tx.amount * tx.price);
                     
-                    amountHtml = `-${formatCompact(cost)} <img src="Sprites/Blyx.png" class="wh-coin-icon">`;
+                    amountHtml = `-${formatCompact(spent)} <img src="Sprites/Blyx.png" class="wh-coin-icon">`;
                 }
 
-                // 5. SALE (Продажа крипты)
+                // 5. SALE (Продажа робота или P2P) - Всегда доход BLYX
                 else if(tx.type === 'sell' || tx.type === 'p2p_sold') {
                     title = 'Sale'; 
                     icon = 'Sprites/Sell.png'; 
                     sub = 'portfolio';
-                    // Берем итоговую сумму в блюксах (total) или вычисляем
-                    let val = tx.total || (tx.amount * tx.price);
-                    amountHtml = `+${formatCompact(val)} <img src="Sprites/Blyx.png" class="wh-coin-icon">`;
+                    
+                    let earned = tx.total || (tx.amount * tx.price);
+                    amountHtml = `+${formatCompact(earned)} <img src="Sprites/Blyx.png" class="wh-coin-icon">`;
                 }
                 
                 else {
