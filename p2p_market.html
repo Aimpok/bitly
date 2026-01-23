@@ -16,15 +16,13 @@
         <button class="btn-launch-pill" style="margin-left: auto;" onclick="goToSell()">+ Sell</button>
     </div>
 
-    <!-- Filters -->
     <div class="market-filters">
         <div class="m-filter-btn active" onclick="filterOrders('cheap', this)">Cheapest</div>
         <div class="m-filter-btn" onclick="filterOrders('new', this)">Newest</div>
-        <div class="m-filter-btn" onclick="filterOrders('rep', this)">Reputation</div>
     </div>
 
     <div id="orderList" style="padding: 0 16px 40px;">
-        <div style="text-align:center; padding:20px; color:#555;">Loading orders...</div>
+        <div style="text-align:center; padding:20px; color:#555;">Loading...</div>
     </div>
 
     <script type="module">
@@ -43,6 +41,9 @@
         function formatPrice(val) {
             return val < 0.01 ? val.toFixed(8).replace(/\.?0+$/, "") : val.toFixed(4);
         }
+        function formatCompact(num) {
+            return Intl.NumberFormat('en-US', { notation: "compact", maximumFractionDigits: 2 }).format(num);
+        }
 
         async function loadOrders() {
             document.getElementById('marketTitle').innerText = tokenId + " Market";
@@ -53,7 +54,8 @@
             
             snap.forEach(doc => {
                 const d = doc.data();
-                if(d.amount >= (d.minLimit || 0)) {
+                // Показываем только если есть остаток
+                if(d.amount > 0) {
                     allOrders.push({ id: doc.id, ...d });
                 }
             });
@@ -65,11 +67,9 @@
                 document.querySelectorAll('.m-filter-btn').forEach(b => b.classList.remove('active'));
                 el.classList.add('active');
             }
-            
             let sorted = [...allOrders];
             if(type === 'cheap') sorted.sort((a,b) => a.price - b.price);
             if(type === 'new') sorted.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
-            
             renderOrders(sorted);
         }
 
@@ -84,6 +84,13 @@
 
             orders.forEach(o => {
                 const isMine = String(o.sellerId) === String(currentUser.id);
+                
+                // Аватарка или заглушка
+                let avatarHtml = `<div class="oc-avatar" style="background:#333;"></div>`;
+                if(o.sellerAvatar) {
+                    avatarHtml = `<img src="${o.sellerAvatar}" class="oc-avatar-img">`;
+                }
+
                 const el = document.createElement('div');
                 el.className = 'order-card';
                 el.innerHTML = `
@@ -94,15 +101,18 @@
                             : `<button class="oc-buy-btn" onclick="location.href='p2p_buy.html?oid=${o.id}'">Buy</button>`}
                     </div>
                     <div class="oc-user-row">
-                        <div class="oc-avatar" style="background:#333;"></div>
+                        ${avatarHtml}
                         <div>
                             <div class="oc-username">${o.sellerName}</div>
                             <div class="oc-stats">100 trades, 100%</div>
                         </div>
                     </div>
                     <div class="oc-limits-row">
-                        <span>Avail: <span class="oc-val">${Math.floor(o.amount).toLocaleString()}</span></span>
-                        <span>Min: <span class="oc-val">${Math.floor(o.minLimit).toLocaleString()}</span></span>
+                        <span>Avail: <span class="oc-val">${formatCompact(o.amount)} ${tokenId}</span></span>
+                        <span style="display:flex; align-items:center; gap:2px;">
+                            Lim: <span class="oc-val">${formatCompact(o.minLimit)}</span>
+                            <img src="Sprites/Blyx.png" style="width:10px; height:10px;">
+                        </span>
                     </div>
                 `;
                 list.appendChild(el);
