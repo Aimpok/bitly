@@ -25,28 +25,28 @@
                 <img src="Sprites/Blyx.png" class="star-icon-small" alt="blyx">
             </div>
         </div>
+        
+        <!-- Подсказка про комиссию -->
+        <div style="font-size: 12px; color: #666; margin-top: -8px; margin-bottom: 12px; margin-left: 10px;">
+            Fee: 5%
+        </div>
 
         <!-- Username Input with Avatar -->
         <div class="input-wrapper input-with-avatar" id="userWrapper">
-            <!-- Сюда будет подставляться картинка -->
             <img id="receiverAvatar" src="" class="avatar-preview">
-            
             <input type="text" id="usernameInput" placeholder="@username" oninput="handleUsernameInput(this)" autocomplete="off">
             
-            <!-- Индикатор загрузки/поиска -->
             <div id="searchLoader" style="display:none; color: #888; font-size: 12px; margin-right: 10px;">
-                Searching...
+                ...
             </div>
         </div>
         
-        <!-- Info Text -->
-        <div id="receiverInfo" style="font-size: 12px; color: #666; margin-top: -8px; margin-bottom: 15px; margin-left: 10px; height: 14px;">
-            <!-- Сюда выводится имя найденного юзера -->
-        </div>
+        <!-- Info Text (Ошибки) -->
+        <div id="receiverInfo" style="font-size: 12px; color: #FF3B30; margin-top: -8px; margin-bottom: 15px; margin-left: 10px; height: 14px;"></div>
     </div>
 
     <div class="bottom-cost-panel">
-        <div class="cost-label">Total Send</div>
+        <div class="cost-label">Total Cost (inc. 5% fee)</div>
         <button class="btn-white-large btn-disabled" id="sendBtn" onclick="doTransfer()">
             <span id="btnAmount">0</span>
             <img src="Sprites/Blyx.png" class="star-icon-small" alt="blyx">
@@ -56,61 +56,60 @@
     <script type="module">
         import { initUser, getUserRef } from './user-service.js';
         import { db } from './firebase-config.js';
-        import { collection, query, where, getDocs, runTransaction, doc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { collection, query, where, getDocs, runTransaction, doc, arrayUnion } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         const tg = window.Telegram.WebApp;
         tg.expand();
         tg.setHeaderColor('#000000');
 
         let currentUser = null;
-        let receiverData = null; // Данные получателя
+        let receiverData = null;
         let searchTimer = null;
+        const FEE_PERCENT = 0.05; // 5%
 
         async function init() {
             currentUser = await initUser();
         }
         init();
 
-        // Обновление кнопки и проверка валидации
+        // Обновление кнопки (Сумма + 5%)
         window.updateButton = function() {
-            const val = parseFloat(document.getElementById('amountInput').value);
+            const inputVal = parseFloat(document.getElementById('amountInput').value);
             const btn = document.getElementById('sendBtn');
-            const displayVal = val ? val : '0';
             
-            document.getElementById('btnAmount').innerText = displayVal;
-
-            // Кнопка активна только если есть сумма > 0 и найден получатель
-            if (val > 0 && receiverData) {
-                btn.classList.remove('btn-disabled');
+            if (inputVal && inputVal > 0) {
+                const totalCost = inputVal * (1 + FEE_PERCENT); // Добавляем 5%
+                // Округляем до 2 знаков для красоты, но считать будем точно
+                document.getElementById('btnAmount').innerText = parseFloat(totalCost.toFixed(2));
+                
+                if (receiverData) btn.classList.remove('btn-disabled');
+                else btn.classList.add('btn-disabled');
             } else {
+                document.getElementById('btnAmount').innerText = "0";
                 btn.classList.add('btn-disabled');
             }
         }
 
-        // Логика поиска юзера (Debounce)
+        // Логика поиска
         window.handleUsernameInput = function(el) {
             clearTimeout(searchTimer);
             const rawVal = el.value.trim();
-            const username = rawVal.replace('@', ''); // Убираем собачку для поиска
+            const username = rawVal.replace('@', ''); 
             
-            // Сброс UI
+            // Сброс
             receiverData = null;
             document.getElementById('receiverAvatar').classList.remove('avatar-visible');
-            document.getElementById('receiverInfo').innerText = "";
-            document.getElementById('receiverInfo').style.color = "#666";
+            document.getElementById('receiverInfo').innerText = ""; // Очищаем текст
             updateButton();
 
             if(username.length < 3) return;
 
             document.getElementById('searchLoader').style.display = 'block';
-
-            // Задержка поиска 500мс, чтобы не спамить в базу
             searchTimer = setTimeout(() => searchUser(username), 500);
         }
 
         async function searchUser(username) {
             try {
-                // Ищем в коллекции users по полю username (оно должно быть в базе!)
                 const q = query(collection(db, "users"), where("username", "==", username));
                 const querySnapshot = await getDocs(q);
 
@@ -120,29 +119,25 @@
                     const userDoc = querySnapshot.docs[0];
                     const data = userDoc.data();
 
-                    // Нельзя отправить самому себе
                     if(data.id === currentUser.id) {
-                        document.getElementById('receiverInfo').innerText = "You cannot send to yourself";
-                        document.getElementById('receiverInfo').style.color = "#FF3B30";
+                        document.getElementById('receiverInfo').innerText = "Cannot send to yourself";
                         return;
                     }
 
-                    receiverData = { ...data, docId: userDoc.id }; // Сохраняем получателя
+                    receiverData = { ...data, docId: userDoc.id };
                     
-                    // 1. Показываем Аватарку
+                    // Показываем аватар
                     const avatarEl = document.getElementById('receiverAvatar');
-                    // Если у юзера есть фото в базе - ставим его, иначе заглушку
                     avatarEl.src = data.photoUrl || 'https://upload.wikimedia.org/wikipedia/commons/2/2c/Default_pfp.svg'; 
                     avatarEl.classList.add('avatar-visible');
 
-                    // 2. Показываем Имя
-                    document.getElementById('receiverInfo').innerText = `Found: ${data.first_name} ${data.last_name || ''}`;
-                    document.getElementById('receiverInfo').style.color = "#CCFF00"; // Зеленый цвет успеха
+                    // Текст НЕ пишем, если найден (как ты просил)
+                    document.getElementById('receiverInfo').innerText = ""; 
 
                     updateButton();
                 } else {
-                    document.getElementById('receiverInfo').innerText = "User not found in database";
-                    document.getElementById('receiverInfo').style.color = "#FF3B30";
+                    // Если не найден - пишем ошибку
+                    document.getElementById('receiverInfo').innerText = "User not found in Bitly";
                 }
             } catch (e) {
                 console.error(e);
@@ -150,47 +145,52 @@
             }
         }
 
-        // Выполнение перевода (Транзакция)
+        // Перевод с комиссией
         window.doTransfer = async function() {
             const amount = parseFloat(document.getElementById('amountInput').value);
             
             if(!amount || amount <= 0) return;
-            if(!receiverData) { tg.showAlert("Select a receiver"); return; }
-            if(amount > currentUser.balance) { tg.showAlert("Insufficient funds!"); return; }
+            if(!receiverData) return;
 
-            tg.showConfirm(`Send ${amount} BLYX to @${receiverData.username}?`, async (ok) => {
+            const totalDeduction = amount * (1 + FEE_PERCENT); // Снимаем с нас (Сумма + 5%)
+
+            if(totalDeduction > currentUser.balance) { 
+                tg.showAlert(`Insufficient funds! You need ${totalDeduction.toFixed(2)} BLYX`); 
+                return; 
+            }
+
+            tg.showConfirm(`Send ${amount} BLYX to @${receiverData.username}?\nTotal cost: ${totalDeduction.toFixed(2)} BLYX (5% fee)`, async (ok) => {
                 if(ok) {
                     try {
-                        const senderRef = getUserRef(); // Ссылка на нас
-                        const receiverRef = doc(db, "users", receiverData.docId); // Ссылка на получателя
+                        const senderRef = getUserRef();
+                        const receiverRef = doc(db, "users", receiverData.docId);
 
-                        // Атомарная транзакция (гарантирует, что деньги не исчезнут)
                         await runTransaction(db, async (transaction) => {
                             const senderDoc = await transaction.get(senderRef);
-                            if (!senderDoc.exists()) throw "Sender does not exist!";
+                            if (!senderDoc.exists()) throw "Error: Sender not found";
 
-                            const newSenderBalance = senderDoc.data().balance - amount;
-                            if (newSenderBalance < 0) throw "Not enough money!";
+                            const currentBalance = senderDoc.data().balance || 0;
+                            if (currentBalance < totalDeduction) throw "Not enough money!";
 
                             const receiverDoc = await transaction.get(receiverRef);
-                            if (!receiverDoc.exists()) throw "Receiver does not exist!";
+                            if (!receiverDoc.exists()) throw "Error: Receiver not found";
                             
-                            const newReceiverBalance = (receiverDoc.data().balance || 0) + amount;
-
-                            // 1. Списываем у нас
+                            // 1. Списываем у нас ПОЛНУЮ сумму (перевод + комиссия)
                             transaction.update(senderRef, { 
-                                balance: newSenderBalance,
+                                balance: increment(-totalDeduction),
                                 transactions: arrayUnion({
                                     type: 'send', 
                                     to: receiverData.username, 
-                                    amount: amount, 
+                                    amount: amount,
+                                    fee: amount * FEE_PERCENT,
+                                    total: totalDeduction,
                                     date: new Date().toISOString()
                                 })
                             });
 
-                            // 2. Начисляем ему
+                            // 2. Получателю начисляем ТОЛЬКО сумму перевода (комиссия сгорает)
                             transaction.update(receiverRef, { 
-                                balance: newReceiverBalance,
+                                balance: increment(amount),
                                 transactions: arrayUnion({
                                     type: 'receive', 
                                     from: currentUser.username || 'Hidden', 
@@ -200,19 +200,18 @@
                             });
                         });
 
-                        tg.showAlert("Success! Funds sent.");
+                        tg.showAlert("Sent successfully!");
                         window.history.back();
 
                     } catch (e) {
                         console.error(e);
-                        tg.showAlert("Error: " + e); // Показывает, если нет денег и т.д.
+                        tg.showAlert("Transaction failed: " + e);
                     }
                 }
             });
         }
         
-        // Вспомогательная функция для arrayUnion (нужна для модулей)
-        import { arrayUnion } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { increment } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
     </script>
 </body>
 </html>
