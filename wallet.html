@@ -10,17 +10,14 @@
     <style>
         .wh-amount { color: #FFFFFF !important; }
         .wh-coin-icon { width: 16px; height: 16px; object-fit: contain; vertical-align: middle; margin-left: 4px; border-radius: 50%; }
-        
-        /* Убираем линию под вкладками */
         .tabs-scroll { margin-bottom: 20px; border-bottom: none !important; }
-        
         .hidden { display: none !important; }
         .wh-item { border: none !important; }
     </style>
 </head>
 <body>
 
-    <!-- Total Assets Header (Only Total BLYX) -->
+    <!-- Total Assets Header -->
     <div class="balance-card">
         <div class="balance-label">Total Assets</div>
         <div class="balance-val" style="display: flex; align-items: center; gap: 8px;">
@@ -113,7 +110,6 @@
             return d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
         }
 
-        // TABS
         window.switchTab = function(tabName, el) {
             document.querySelectorAll('.tab-link').forEach(t => t.classList.remove('active'));
             el.classList.add('active');
@@ -230,7 +226,7 @@
                     amountHtml = `+${formatCompact(tx.amount)} <img src="Sprites/Blyx.png" class="wh-coin-icon">`;
                 }
                 
-                // 2. TRANSFER IN (Подарок от друга)
+                // 2. TRANSFER IN (Gift)
                 else if(tx.type === 'transfer_in' || tx.type === 'receive') {
                     title = 'Gift';
                     icon = 'Sprites/Gift.png';
@@ -245,7 +241,7 @@
                     }
                 }
 
-                // 3. TRANSFER OUT (Отправка другу)
+                // 3. TRANSFER OUT (Send)
                 else if(tx.type === 'transfer_out' || tx.type === 'send') {
                     title = 'Transfer';
                     icon = 'Sprites/Cart.png';
@@ -257,25 +253,27 @@
                     }
                 }
 
-                // 4. PURCHASE (Покупка у робота ИЛИ P2P) - Всегда трата BLYX
+                // 4. PURCHASE (Buy at Curve OR P2P Buy)
                 else if(tx.type === 'buy' || tx.type === 'p2p_buy') {
                     title = 'Purchase';
                     icon = 'Sprites/Cart.png';
                     sub = 'balance';
                     
-                    // tx.total (обычно в P2P), tx.cost (Curve). Fallback: amount*price
-                    let spent = tx.total || tx.cost || (tx.amount * tx.price);
+                    // Рассчитываем потраченные Блюксы
+                    // Если есть поле total (или cost) - используем его
+                    // Иначе считаем amount * price
+                    let spent = tx.total || tx.cost || (tx.amount * tx.price) || 0;
                     
                     amountHtml = `-${formatCompact(spent)} <img src="Sprites/Blyx.png" class="wh-coin-icon">`;
                 }
 
-                // 5. SALE (Продажа робота или P2P) - Всегда доход BLYX
+                // 5. SALE (Sell at Curve OR P2P Sell)
                 else if(tx.type === 'sell' || tx.type === 'p2p_sold') {
                     title = 'Sale'; 
                     icon = 'Sprites/Sell.png'; 
                     sub = 'portfolio';
                     
-                    let earned = tx.total || (tx.amount * tx.price);
+                    let earned = tx.total || (tx.amount * tx.price) || 0;
                     amountHtml = `+${formatCompact(earned)} <img src="Sprites/Blyx.png" class="wh-coin-icon">`;
                 }
                 
