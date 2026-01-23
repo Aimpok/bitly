@@ -684,26 +684,4 @@ button { border: none; }
     color: #555;
 }
 
-/* Wallet Tabs specific */
-.wallet-tabs {
-    display: flex;
-    gap: 20px;
-    padding: 0 16px;
-    margin-bottom: 15px;
-    border-bottom: 1px solid #222;
-}
-.wt-link {
-    padding: 10px 0;
-    font-size: 15px;
-    font-weight: 600;
-    color: #777;
-    cursor: pointer;
-    position: relative;
-}
-.wt-link.active {
-    color: white;
-}
-.wt-link.active::after {
-    content: ''; position: absolute; bottom: -1px; left: 0; right: 0;
-    height: 2px; background: white;
-}
+
