@@ -47,7 +47,7 @@ export async function initUser() {
         const newUser = {
             id: user.id,
             ...freshTgData, // Записываем свежие данные
-            balance: 1000,
+            balance: 0,
             starsBalance: 0,
             createdAt: new Date().toISOString(),
             portfolio: {},
