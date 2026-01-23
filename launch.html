@@ -31,32 +31,38 @@
         .cropper-body {
             flex: 1; position: relative; overflow: hidden;
             display: flex; align-items: center; justify-content: center;
+            background: #111;
         }
         #cropperImg {
             position: absolute;
             transform-origin: center;
             will-change: transform;
+            /* Убираем дефолтное поведение перетаскивания */
+            user-select: none;
+            -webkit-user-drag: none;
         }
-        /* Маска затемнения с прозрачным кругом посередине */
+        /* Маска затемнения */
         .cropper-mask {
             position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-            background: radial-gradient(circle 120px at center, transparent 120px, rgba(0,0,0,0.7) 122px);
-            pointer-events: none; /* Пропускаем клики сквозь маску к картинке */
-            border: 2px solid rgba(255,255,255,0.1);
+            background: radial-gradient(circle 120px at center, transparent 120px, rgba(0,0,0,0.8) 121px);
+            pointer-events: none;
+            border: 1px solid rgba(255,255,255,0.05);
         }
-        /* Круг-ориентир */
+        /* Круг-ориентир (240x240) */
         .cropper-circle-guide {
             position: absolute;
             width: 240px; height: 240px;
             border: 2px solid #fff;
             border-radius: 50%;
             pointer-events: none;
-            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.7); /* Альтернативный способ затемнения */
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.7);
+            z-index: 10;
         }
         .cropper-footer {
-            height: 80px; background: #111;
+            height: 80px; background: #000;
             display: flex; justify-content: space-between; align-items: center;
             padding: 0 24px; z-index: 10001;
+            border-top: 1px solid #222;
         }
     </style>
 </head>
@@ -136,6 +142,9 @@
             <div class="token-calc-text">
                 You receive: <span id="tokensRecieveText" style="color: white; font-weight: 700;">0</span> tokens
             </div>
+             <div class="token-calc-text" style="margin-top: 5px;">
+                Starting Price: <span id="startPriceText" style="color: #CCFF00;">0</span>
+            </div>
             <div class="token-calc-text" id="limitWarning" style="color: #FF3B30; display:none;">
                 Max buy is 30% of supply!
             </div>
@@ -185,18 +194,23 @@
         tg.setHeaderColor('#000000');
 
         const CREATION_FEE = 200;
-        const INITIAL_PRICE = 0.00002;
         const TOTAL_SUPPLY = 1000000000;
         
-        let base64Image = null; // Итоговая обрезанная картинка
+        let base64Image = null; 
         let currentUser = null;
+
+        // --- GLOBAL FORMATTER ---
+        window.formatPrice = function(val) {
+            if(!val || val === 0) return "0";
+            return val < 0.01 ? val.toFixed(8).replace(/\.?0+$/, "") : val.toFixed(4);
+        }
 
         async function init() {
             currentUser = await initUser();
         }
         init();
 
-        // --- INPUT LOGIC (English only & Counters) ---
+        // --- INPUT LOGIC ---
         window.handleInput = function(type) {
             const el = type === 'name' ? document.getElementById('tokenName') : document.getElementById('tokenTicker');
             const counter = type === 'name' ? document.getElementById('nameCount') : document.getElementById('tickerCount');
@@ -205,14 +219,11 @@
             let val = el.value;
 
             if(type === 'ticker') {
-                // Оставляем только Английские буквы
                 val = val.replace(/[^a-zA-Z]/g, '').toUpperCase();
                 el.value = val;
             }
 
-            // Обновляем счетчик (сколько осталось)
             counter.innerText = max - val.length;
-
             checkForm();
         }
 
@@ -224,13 +235,12 @@
             else btn.classList.add('btn-disabled'); 
         }
 
-        // --- REAL CROPPER LOGIC ---
-        let cropperState = { x: 0, y: 0, scale: 1 };
-        let startDist = 0;
-        let startScale = 1;
+        // --- REAL CROPPER LOGIC WITH BOUNDARIES ---
+        let cs = { x: 0, y: 0, s: 1 }; // current state
+        let startDist = 0, startScale = 1;
         let startX = 0, startY = 0;
         let lastX = 0, lastY = 0;
-        const cropSize = 240; // Размер круга (должен совпадать с CSS .cropper-circle-guide)
+        const CROP_SIZE = 240; // Размер круга
 
         window.initCropper = function(input) {
             if (input.files && input.files[0]) {
@@ -238,14 +248,17 @@
                 reader.onload = function (e) {
                     const img = document.getElementById('cropperImg');
                     img.onload = () => {
-                        // Сброс состояния
-                        cropperState = { x: 0, y: 0, scale: 1 };
+                        // Сброс и центрирование
+                        cs = { x: 0, y: 0, s: 1 };
                         
-                        // Подгоняем начальный масштаб, чтобы картинка заполнила экран по ширине
-                        const screenW = window.innerWidth;
-                        cropperState.scale = screenW / img.naturalWidth;
-                        if(cropperState.scale < 0.5) cropperState.scale = 0.5;
-
+                        // 1. Рассчитываем минимальный зум, чтобы картинка покрывала круг 240px
+                        const minScaleW = CROP_SIZE / img.naturalWidth;
+                        const minScaleH = CROP_SIZE / img.naturalHeight;
+                        const minScale = Math.max(minScaleW, minScaleH);
+                        
+                        // Ставим начальный зум чуть больше минимума для удобства
+                        cs.s = minScale * 1.2; 
+                        
                         updateTransform();
                         document.getElementById('cropperOverlay').style.display = 'flex';
                         document.getElementById('btnContainer').style.display = 'none';
@@ -257,8 +270,27 @@
         }
 
         function updateTransform() {
+            // --- BOUNDARY LOGIC (ГРАНИЦЫ) ---
             const img = document.getElementById('cropperImg');
-            img.style.transform = `translate(${cropperState.x}px, ${cropperState.y}px) scale(${cropperState.scale})`;
+            if (!img.naturalWidth) return;
+
+            // 1. Ограничение зума (не меньше размера круга)
+            const minScale = Math.max(CROP_SIZE / img.naturalWidth, CROP_SIZE / img.naturalHeight);
+            if (cs.s < minScale) cs.s = minScale;
+
+            // 2. Ограничение перемещения (X/Y)
+            // Картинка трансформируется от центра. 
+            // Максимальное смещение = (РеальнаяШирина - ШиринаКропа) / 2
+            const maxDistX = (img.naturalWidth * cs.s - CROP_SIZE) / 2;
+            const maxDistY = (img.naturalHeight * cs.s - CROP_SIZE) / 2;
+
+            if (cs.x > maxDistX) cs.x = maxDistX;
+            if (cs.x < -maxDistX) cs.x = -maxDistX;
+            if (cs.y > maxDistY) cs.y = maxDistY;
+            if (cs.y < -maxDistY) cs.y = -maxDistY;
+
+            // Применяем
+            img.style.transform = `translate(${cs.x}px, ${cs.y}px) scale(${cs.s})`;
         }
 
         // Жесты
@@ -267,32 +299,31 @@
             if(e.touches.length === 1) {
                 startX = e.touches[0].clientX;
                 startY = e.touches[0].clientY;
-                lastX = cropperState.x;
-                lastY = cropperState.y;
+                lastX = cs.x;
+                lastY = cs.y;
             } else if(e.touches.length === 2) {
                 startDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-                startScale = cropperState.scale;
+                startScale = cs.s;
             }
         });
 
         area.addEventListener('touchmove', (e) => {
-            e.preventDefault(); // Блокируем скролл страницы
+            e.preventDefault(); 
             if(e.touches.length === 1) {
                 const dx = e.touches[0].clientX - startX;
                 const dy = e.touches[0].clientY - startY;
-                cropperState.x = lastX + dx;
-                cropperState.y = lastY + dy;
-                updateTransform();
+                cs.x = lastX + dx;
+                cs.y = lastY + dy;
             } else if(e.touches.length === 2) {
                 const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-                cropperState.scale = Math.max(0.1, startScale * (dist / startDist));
-                updateTransform();
+                cs.s = Math.max(0.1, startScale * (dist / startDist));
             }
+            updateTransform(); // Проверка границ внутри
         });
 
         window.closeCropper = function() {
             document.getElementById('cropperOverlay').style.display = 'none';
-            document.getElementById('fileInput').value = ''; // сброс
+            document.getElementById('fileInput').value = ''; 
             document.getElementById('btnContainer').style.display = 'block';
         }
 
@@ -301,58 +332,31 @@
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
 
-            // Размер итоговой иконки
+            // Итоговый размер 300x300
             const size = 300; 
             canvas.width = size;
             canvas.height = size;
 
-            // Вычисляем координаты
-            // Центр экрана (где находится круг) относительно картинки
-            const rect = area.getBoundingClientRect();
-            const centerX = rect.width / 2;
-            const centerY = rect.height / 2;
-
-            // Позиция картинки (центр картинки смещен на x, y)
-            // Но transform-origin: center, значит x,y это смещение от центра контейнера
-            // Нам нужно найти, какая часть картинки находится под кругом 240x240 в центре экрана
-            
-            // Математика обратного проецирования
-            // 1. Сдвигаем канвас в центр
-            // 2. Рисуем картинку с учетом текущего scale и translate
-            
-            // Простой способ: нарисовать картинку так же как на экране, но в канвас размером с круг? 
-            // Нет, лучше вычислить source координаты.
-            
-            // Эффективный способ: 
-            // Изображение сдвинуто на (state.x, state.y) и масштабировано (state.scale)
-            // Центр круга (точка 0,0 относительно кропа) находится в центре экрана.
-            
             ctx.fillStyle = '#000';
             ctx.fillRect(0, 0, size, size);
 
-            // Сохраняем контекст, перемещаем в центр канваса
             ctx.save();
+            // Центрируем контекст
             ctx.translate(size/2, size/2);
             
-            // Применяем те же трансформации, что и на экране, но:
-            // На экране x,y двигают картинку.
-            // Нам нужно "сдвинуть" картинку так, чтобы центр круга попал в центр канваса.
-            // Так как мы рендерим КУСОК картинки, нам нужно понять масштаб.
-            // Визуальный круг = 240px. Итоговый = 300px.
-            // Коэффициент = 300 / 240 = 1.25.
-            const ratio = size / cropSize; 
-
-            ctx.scale(cropperState.scale * ratio, cropperState.scale * ratio);
-            ctx.translate(cropperState.x / cropperState.scale, cropperState.y / cropperState.scale);
+            // Масштабируем с учетом разницы размеров (Круг 240 -> Канвас 300)
+            const ratio = size / CROP_SIZE; 
+            ctx.scale(cs.s * ratio, cs.s * ratio);
             
-            // Рисуем картинку с центром в точке 0,0
+            // Смещаем картинку
+            ctx.translate(cs.x / cs.s, cs.y / cs.s);
+            
+            // Рисуем (центр картинки в 0,0)
             ctx.drawImage(img, -img.naturalWidth/2, -img.naturalHeight/2);
-            
             ctx.restore();
 
             base64Image = canvas.toDataURL('image/jpeg', 0.8);
             
-            // Показываем результат
             const preview = document.getElementById('finalAvatar');
             preview.src = base64Image;
             preview.style.display = 'block';
@@ -361,7 +365,7 @@
             closeCropper();
         }
 
-        // --- NAVIGATION & CALCULATION ---
+        // --- MATH & PAYMENT ---
         window.handleBack = function() {
             if(document.getElementById('step2').style.display === 'block') {
                 document.getElementById('step2').style.display = 'none';
@@ -383,15 +387,21 @@
 
         window.updateCalc = function() {
             const buyBlyx = parseFloat(document.getElementById('shareInput').value) || 0;
-            const tokensToReceive = buyBlyx / INITIAL_PRICE;
-            const maxBuy = TOTAL_SUPPLY * 0.30;
-            const warning = document.getElementById('limitWarning');
-            const createBtn = document.getElementById('createBtn');
-
+            
+            // Цена формируется от вклада + комиссии
+            const initialMarketCap = CREATION_FEE + buyBlyx;
+            const startPrice = initialMarketCap / TOTAL_SUPPLY;
+            const tokensToReceive = buyBlyx > 0 ? (buyBlyx / startPrice) : 0;
+            
             document.getElementById('tokensRecieveText').innerText = Math.floor(tokensToReceive).toLocaleString();
+            document.getElementById('startPriceText').innerText = window.formatPrice(startPrice) + " BLYX";
             document.getElementById('shareCostText').innerText = buyBlyx;
             document.getElementById('btnTotalText').innerText = (CREATION_FEE + buyBlyx);
 
+            const maxBuy = TOTAL_SUPPLY * 0.30;
+            const warning = document.getElementById('limitWarning');
+            const createBtn = document.getElementById('createBtn');
+            
             if (tokensToReceive > maxBuy) {
                 warning.style.display = 'block';
                 createBtn.classList.add('btn-disabled');
@@ -406,8 +416,11 @@
             const ticker = document.getElementById('tokenTicker').value.trim().toUpperCase();
             const desc = document.getElementById('tokenDesc').value;
             const buyBlyx = parseFloat(document.getElementById('shareInput').value) || 0;
+            
+            const initialMarketCap = CREATION_FEE + buyBlyx;
+            const startPrice = initialMarketCap / TOTAL_SUPPLY;
+            const tokensToReceive = buyBlyx > 0 ? (buyBlyx / startPrice) : 0;
             const totalCost = CREATION_FEE + buyBlyx;
-            const tokensToReceive = buyBlyx / INITIAL_PRICE;
 
             if(tokensToReceive > TOTAL_SUPPLY * 0.3) {
                 tg.showAlert("Reduce buy amount (Max 30%)");
@@ -438,13 +451,19 @@
                             name: name,
                             description: desc,
                             image: base64Image,
-                            price: INITIAL_PRICE,
+                            price: startPrice,
                             change: 0,
                             ownerId: currentUser.id,
                             createdAt: new Date().toISOString(),
                             maxSupply: TOTAL_SUPPLY,
                             sold: tokensToReceive, 
-                            marketCap: tokensToReceive * INITIAL_PRICE
+                            marketCap: initialMarketCap,
+                            txCount: 1,
+                            holdersCount: 1,
+                            // Инициализация истории для графика
+                            transactions: [
+                                { type: 'create_buy', price: startPrice, date: new Date().toISOString() }
+                            ]
                         });
 
                         const updates = {
@@ -453,7 +472,7 @@
                         if(tokensToReceive > 0) {
                             updates[`portfolio.${ticker}`] = increment(tokensToReceive);
                             updates.transactions = arrayUnion({
-                                type: 'create_buy', token: ticker, amount: tokensToReceive, price: INITIAL_PRICE, date: new Date().toISOString()
+                                type: 'create_buy', token: ticker, amount: tokensToReceive, price: startPrice, date: new Date().toISOString()
                             });
                         }
 
