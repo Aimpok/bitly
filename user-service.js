@@ -7,15 +7,15 @@ const tg = window.Telegram.WebApp;
 
 // --- USER LOGIC ---
 
-// Получаем данные юзера из TG
 export function getTgUser() {
-    // Если запускаем в браузере (для тестов), возвращаем фейкового юзера
+    // Для тестов в браузере (если открыто не в TG)
     if (!tg.initDataUnsafe || !tg.initDataUnsafe.user) {
         return { 
             id: 'test_user_777', 
             username: 'TestBuilder', 
             first_name: 'Dev', 
-            photo_url: 'https://upload.wikimedia.org/wikipedia/commons/2/2c/Default_pfp.svg' 
+            // Ставим заглушку для тестов
+            photo_url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2c/Default_pfp.svg/1024px-Default_pfp.svg.png' 
         };
     }
     return tg.initDataUnsafe.user;
@@ -26,35 +26,42 @@ export function getUserRef() {
     return doc(db, "users", user.id.toString());
 }
 
-// Создание или загрузка профиля
+// Создание или АПДЕЙТ профиля
 export async function initUser() {
     const user = getTgUser();
     const userRef = getUserRef();
     const snap = await getDoc(userRef);
 
+    // Данные, которые могут измениться в Телеграме (Ник, Имя, Аватар)
+    // Telegram отдает photo_url уже в оптимизированном размере (не full HD),
+    // поэтому просто сохраняем ссылку.
+    const freshTgData = {
+        username: user.username || 'Anon',
+        first_name: user.first_name || '', // Исправил на first_name как в базе
+        // Если аватарки нет, сохраняем пустую строку или null
+        photoUrl: user.photo_url || '' 
+    };
+
     if (!snap.exists()) {
-        // Если юзера нет - создаем
+        // --- НОВЫЙ ЮЗЕР ---
         const newUser = {
             id: user.id,
-            username: user.username || 'Anon',
-            firstName: user.first_name || '',
-            photoUrl: user.photo_url || '', // ВАЖНО: Сохраняем фото для Transfer
-            balance: 1000,     // Стартовый бонус (можно поставить 0)
-            starsBalance: 0,   // Реальные Stars
+            ...freshTgData, // Записываем свежие данные
+            balance: 1000,
+            starsBalance: 0,
             createdAt: new Date().toISOString(),
-            portfolio: {},     // { "BTC": 0.001 }
+            portfolio: {},
             transactions: []   
         };
         await setDoc(userRef, newUser);
         return newUser;
     } else {
-        // Если юзер есть - обновляем его данные (на случай если сменил аватарку или ник)
-        await updateDoc(userRef, {
-            username: user.username || 'Anon',
-            firstName: user.first_name || '',
-            photoUrl: user.photo_url || ''
-        });
-        return snap.data();
+        // --- СУЩЕСТВУЮЩИЙ ЮЗЕР ---
+        // Обязательно обновляем фото и ник, если они поменялись
+        await updateDoc(userRef, freshTgData);
+        
+        // Возвращаем данные из базы + то, что только что обновили
+        return { ...snap.data(), ...freshTgData };
     }
 }
 
@@ -68,7 +75,6 @@ export function subscribeToUser(callback) {
 
 // --- MARKET LOGIC (Рынок) ---
 
-// Функция заливки начальных данных рынка (запускается, если база пустая)
 export async function initMarketDataIfNeeded() {
     const tokensRef = collection(db, "tokens");
     const snap = await getDocs(tokensRef);
@@ -77,7 +83,6 @@ export async function initMarketDataIfNeeded() {
         console.log("База токенов пуста. Создаем начальный рынок...");
         const batch = writeBatch(db);
         
-        // Начальные токены с параметрами для Bonding Curve
         const initialTokens = [
             { 
                 id: "BTC", name: "Bitcoin", price: 96500.00, change: -1.2, image: "Sprites/token_btc.png", description: "Digital Gold",
@@ -111,7 +116,6 @@ export async function initMarketDataIfNeeded() {
     }
 }
 
-// Слушать цены рынка в реальном времени
 export function subscribeToMarket(callback) {
     const tokensRef = collection(db, "tokens");
     return onSnapshot(tokensRef, (snapshot) => {
