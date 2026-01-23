@@ -31,9 +31,14 @@ export async function initUser() {
     const userRef = getUserRef();
     const snap = await getDoc(userRef);
 
+    // Подготовка имен
+    const safeUsername = user.username || 'Anon';
+    
     // Данные, которые обновляются при каждом входе
+    // Добавляем username_lower для поиска без учета регистра
     const freshTgData = {
-        username: user.username || 'Anon',
+        username: safeUsername,
+        username_lower: safeUsername.toLowerCase(), // <--- ВАЖНОЕ ИЗМЕНЕНИЕ
         first_name: user.first_name || '',
         photoUrl: user.photo_url || '' 
     };
@@ -42,7 +47,7 @@ export async function initUser() {
         // --- НОВЫЙ ЮЗЕР ---
         const newUser = {
             id: user.id,
-            ...freshTgData,
+            ...freshTgData, // Сюда попадет и username_lower
             balance: 0,        // Стартовый баланс
             starsBalance: 0,
             tradesCount: 0,    // Кол-во сделок
@@ -55,6 +60,7 @@ export async function initUser() {
         return newUser;
     } else {
         // --- СУЩЕСТВУЮЩИЙ ЮЗЕР ---
+        // Обновляем данные (вдруг он сменил никнейм в Телеграм)
         await updateDoc(userRef, freshTgData);
         return { ...snap.data(), ...freshTgData };
     }
