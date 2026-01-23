@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>P2P Market</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+
+    <div class="header-nav">
+        <button class="back-btn" onclick="window.history.back()"><svg class="icon" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
+        <div class="header-title" id="marketTitle">Market</div>
+        <button class="btn-launch-pill" style="margin-left: auto;" onclick="goToSell()">+ Sell</button>
+    </div>
+
+    <!-- Filters -->
+    <div class="market-filters">
+        <div class="m-filter-btn active" onclick="filterOrders('cheap', this)">Cheapest</div>
+        <div class="m-filter-btn" onclick="filterOrders('new', this)">Newest</div>
+        <div class="m-filter-btn" onclick="filterOrders('rep', this)">Reputation</div>
+    </div>
+
+    <div id="orderList" style="padding: 0 16px 40px;">
+        <div style="text-align:center; padding:20px; color:#555;">Loading orders...</div>
+    </div>
+
+    <script type="module">
+        import { db } from './firebase-config.js';
+        import { collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getTgUser } from './user-service.js';
+
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        tg.setHeaderColor('#000000');
+
+        const tokenId = new URLSearchParams(window.location.search).get('id');
+        let allOrders = [];
+        const currentUser = getTgUser();
+
+        function formatPrice(val) {
+            return val < 0.01 ? val.toFixed(8).replace(/\.?0+$/, "") : val.toFixed(4);
+        }
+
+        async function loadOrders() {
+            document.getElementById('marketTitle').innerText = tokenId + " Market";
+            
+            const q = query(collection(db, "orders"), where("tokenId", "==", tokenId));
+            const snap = await getDocs(q);
+            allOrders = [];
+            
+            snap.forEach(doc => {
+                const d = doc.data();
+                if(d.amount >= (d.minLimit || 0)) {
+                    allOrders.push({ id: doc.id, ...d });
+                }
+            });
+            filterOrders('cheap', document.querySelector('.m-filter-btn'));
+        }
+
+        window.filterOrders = function(type, el) {
+            if(el) {
+                document.querySelectorAll('.m-filter-btn').forEach(b => b.classList.remove('active'));
+                el.classList.add('active');
+            }
+            
+            let sorted = [...allOrders];
+            if(type === 'cheap') sorted.sort((a,b) => a.price - b.price);
+            if(type === 'new') sorted.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
+            
+            renderOrders(sorted);
+        }
+
+        function renderOrders(orders) {
+            const list = document.getElementById('orderList');
+            list.innerHTML = "";
+            
+            if(orders.length === 0) {
+                list.innerHTML = '<div style="text-align:center; padding:20px; color:#555;">No active orders</div>';
+                return;
+            }
+
+            orders.forEach(o => {
+                const isMine = String(o.sellerId) === String(currentUser.id);
+                const el = document.createElement('div');
+                el.className = 'order-card';
+                el.innerHTML = `
+                    <div class="oc-header">
+                        <div class="oc-price">${formatPrice(o.price)} <img src="Sprites/Blyx.png" style="width:16px;"></div>
+                        ${isMine 
+                            ? '<span style="color:#666; font-size:12px;">My Order</span>' 
+                            : `<button class="oc-buy-btn" onclick="location.href='p2p_buy.html?oid=${o.id}'">Buy</button>`}
+                    </div>
+                    <div class="oc-user-row">
+                        <div class="oc-avatar" style="background:#333;"></div>
+                        <div>
+                            <div class="oc-username">${o.sellerName}</div>
+                            <div class="oc-stats">100 trades, 100%</div>
+                        </div>
+                    </div>
+                    <div class="oc-limits-row">
+                        <span>Avail: <span class="oc-val">${Math.floor(o.amount).toLocaleString()}</span></span>
+                        <span>Min: <span class="oc-val">${Math.floor(o.minLimit).toLocaleString()}</span></span>
+                    </div>
+                `;
+                list.appendChild(el);
+            });
+        }
+
+        window.goToSell = function() {
+            location.href = `p2p_sell.html?id=${tokenId}`;
+        }
+
+        loadOrders();
+    </script>
+</body>
+</html>
