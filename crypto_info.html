@@ -7,12 +7,17 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <!-- Chart.js для нормального графика -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* Стили для графика, которые ты скинул */
+        .chart-controls { display: flex; gap: 12px; margin-bottom: 10px; align-items: center; padding-left: 4px; }
+        .time-btn { font-size: 13px; font-weight: 700; color: #555; padding: 4px 10px; border-radius: 8px; cursor: pointer; transition: 0.2s; background: #111; }
+        .time-btn.active { color: #000; background: #FFF; }
+        .chart-area { height: 320px; width: 100%; background: transparent; position: relative; overflow: hidden; margin-bottom: 20px; }
+        .chart-area canvas { display: block; width: 100%; height: 100%; }
+    </style>
 </head>
 <body>
 
-    <!-- Header -->
     <div class="launch-header">
         <div class="top-nav">
             <button class="back-btn" onclick="window.history.back()">
@@ -22,148 +27,96 @@
             <div style="width: 24px;"></div>
         </div>
 
-        <!-- Token Icon -->
         <img id="tokenIcon" src="" class="token-avatar-big" style="display:none;">
         <div id="tokenLetter" class="token-avatar-big" style="display:none; background:#333; display:flex; align-items:center; justify-content:center; font-size:32px; font-weight:700;">?</div>
         
         <div class="token-name-header" id="tokenName">LOADING...</div>
 
-        <!-- Holders | Txs -->
         <div class="stats-split-row">
-            <div class="stat-box">
-                <svg class="icon" style="width:16px;height:16px;" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-                <span class="stat-val" id="holdersCount">0</span>
-            </div>
+            <div class="stat-box"><span style="color:#888;">Holders:</span> <span class="stat-val" id="holdersCount">0</span></div>
             <div class="divider-v"></div>
-            <div class="stat-box">
-                <svg class="icon" style="width:16px;height:16px;" viewBox="0 0 24 24"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
-                <span class="stat-val" id="txCount">0</span>
-            </div>
+            <div class="stat-box"><span style="color:#888;">Txs:</span> <span class="stat-val" id="txCount">0</span></div>
         </div>
 
-        <!-- Market Cap Big -->
         <div class="market-cap-row">
             <span class="mc-val" id="marketCapVal">0</span>
             <img src="Sprites/Blyx.png" class="mc-icon">
         </div>
-
-        <!-- Bonding Curve -->
-        <div class="progress-container" id="bondingContainer">
-            <div class="p-bar-bg">
-                <div class="p-bar-fill" id="bondingBar" style="width: 0%;"></div>
-            </div>
-            <div class="p-labels">
-                <span id="bondingText">0% collected</span>
-                <span style="color: #888;">Trading Unlock at 100%</span>
-            </div>
+        <div style="text-align: center; color: #888; font-size: 13px; margin-bottom: 15px;">
+            1 Token = <span id="tokenPriceDisplay" style="color: white; font-weight: 700;">...</span> BLYX
         </div>
-        <div class="progress-container" id="tradingLive" style="display: none; text-align: center;">
-            <span style="color: #CCFF00; font-weight: 700; font-size: 14px;">⚡ TRADING IS LIVE ON DEX</span>
+
+        <div class="progress-container" id="bondingContainer">
+            <div class="p-bar-bg"><div class="p-bar-fill" id="bondingBar" style="width: 0%;"></div></div>
+            <div class="p-labels"><span id="bondingText">0% collected</span><span style="color: #888;">Unlock at 100%</span></div>
         </div>
     </div>
 
-    <!-- Tabs -->
     <div class="tabs-scroll">
         <div class="tab-link active" onclick="switchTab('chart', this)">Chart</div>
         <div class="tab-link" onclick="switchTab('tx', this)">Transactions</div>
         <div class="tab-link" onclick="switchTab('socials', this)">Socials</div>
     </div>
 
-    <!-- Content -->
     <div class="content-section">
-        
-        <!-- TAB: CHART -->
+        <!-- GRAPH CANVAS -->
         <div id="tab-chart">
             <div class="chart-controls">
-                <div class="time-btn active">1h</div>
-                <div class="time-btn">1D</div>
+                <!-- В будущем можно сделать логику для 1h, 1d -->
+                <div class="time-btn active" onclick="setFrame(5)">5m</div> 
+                <div class="time-btn" onclick="setFrame(15)">15m</div>
+                <div class="time-btn" onclick="setFrame(60)">1h</div>
             </div>
             <div class="chart-area">
-                <canvas id="priceChart"></canvas>
+                <canvas id="chartCanvas"></canvas>
             </div>
             
             <div class="trans-summary">
-                <div class="ts-item">
-                    <div class="ts-label">Your Balance</div>
-                    <div class="ts-val" id="myTokenBalance">0</div>
-                </div>
-                <div class="ts-item" style="text-align: right;">
-                    <div class="ts-label">Value (BLYX)</div>
-                    <div class="ts-val" style="color: var(--accent-green);" id="myTokenValue">≈ 0</div>
-                </div>
+                <div class="ts-item"><div class="ts-label">Your Balance</div><div class="ts-val" id="myTokenBalance">0</div></div>
+                <div class="ts-item" style="text-align: right;"><div class="ts-label">Value (BLYX)</div><div class="ts-val" style="color: var(--accent-green);" id="myTokenValue">≈ 0</div></div>
             </div>
             <div style="height: 120px;"></div>
         </div>
 
-        <!-- TAB: TX -->
         <div id="tab-tx" class="hidden">
-            <div class="trans-list" id="txList">
-                <div style="text-align:center; padding:20px; color:#555;">Loading...</div>
-            </div>
+            <div class="trans-list" id="txList"><div style="text-align:center; padding:20px; color:#555;">Loading...</div></div>
             <div style="height: 120px;"></div>
         </div>
 
-        <!-- TAB: SOCIALS -->
         <div id="tab-socials" class="hidden">
-            <div class="social-list">
-                 <div class="social-card">
-                    <div class="sc-left">
-                        <div class="sc-title">Description</div>
-                        <div class="sc-sub" id="tokenDesc">No description.</div>
-                    </div>
-                </div>
-            </div>
+            <div class="social-list"><div class="social-card"><div class="sc-left"><div class="sc-title">Description</div><div class="sc-sub" id="tokenDesc">No description.</div></div></div></div>
             <div style="height: 120px;"></div>
         </div>
     </div>
 
-    <!-- Actions -->
     <div class="fixed-action-container">
         <div style="display: flex; gap: 10px;">
-            <button class="btn-buy-floating" id="sellBtn" style="background: #1c1c1c; color: white; border: 1px solid #333; display:none;" onclick="openTrade('sell')">
-                Sell
-            </button>
-            <button class="btn-buy-floating" style="background: white; color: black;" onclick="openTrade('buy')">
-                Buy
-            </button>
+            <button class="btn-buy-floating" id="sellBtn" style="background: #1c1c1c; color: white; border: 1px solid #333; display:none;" onclick="openTrade('sell')">Sell</button>
+            <button class="btn-buy-floating" style="background: white; color: black;" onclick="openTrade('buy')">Buy</button>
         </div>
     </div>
 
-    <!-- Trade Overlay -->
     <div id="tradeOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:9999; flex-direction:column; justify-content:center; padding: 20px;">
         <h2 id="tradeTitle" style="text-align:center; margin-bottom:20px; font-size: 24px;">Buy</h2>
-        
         <div class="input-wrapper">
             <input type="number" id="tradeInput" placeholder="Amount" oninput="calcTrade()">
             <div class="input-suffix" id="tradeSuffix">BLYX</div>
         </div>
-
         <div style="display:flex; justify-content:space-between; margin-bottom:20px; font-size:14px; color:#888;">
             <span>Balance: <span id="tradeBalance" style="color:white;">0</span></span>
             <span id="receiveLabel">You get: <span id="tradeTotal" style="color:white;">0</span> TOKENS</span>
         </div>
-
         <button class="btn-white-large" onclick="executeTrade()">Confirm</button>
         <button class="btn-text" style="margin-top:10px; width:100%; text-align:center; color:#555;" onclick="closeTrade()">Cancel</button>
     </div>
 
     <!-- Bottom Nav -->
     <div class="bottom-nav">
-        <div class="nav-item" onclick="location.href='index.html'">
-            <svg class="icon" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
-        </div>
-        <div class="nav-item" onclick="location.href='markets.html'">
-            <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
-        </div>
-        <div class="nav-trade-circle" onclick="location.href='crypto_info.html'">
-             <svg class="icon" style="color:black;" viewBox="0 0 24 24"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
-        </div>
-        <div class="nav-item" onclick="location.href='transfer.html'">
-            <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-        </div>
-        <div class="nav-item" onclick="location.href='wallet.html'">
-            <svg class="icon" viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
-        </div>
+        <div class="nav-item" onclick="location.href='index.html'"><svg class="icon" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg></div>
+        <div class="nav-item" onclick="location.href='markets.html'"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg></div>
+        <div class="nav-trade-circle" onclick="location.href='markets.html'"><svg class="icon" style="color:black;" viewBox="0 0 24 24"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg></div>
+        <div class="nav-item" onclick="location.href='transfer.html'"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg></div>
+        <div class="nav-item" onclick="location.href='wallet.html'"><svg class="icon" viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg></div>
     </div>
 
     <script type="module">
@@ -175,62 +128,230 @@
         tg.expand();
         tg.setHeaderColor('#000000');
 
-        const urlParams = new URLSearchParams(window.location.search);
-        const tokenId = urlParams.get('id');
+        const tokenId = new URLSearchParams(window.location.search).get('id');
+        const TOTAL_SUPPLY = 1000000000;
         
         let currentTokenData = null;
         let currentUserData = null;
         let tradeType = 'buy';
-        let priceChart = null;
+        let currentTimeframe = 5; // minutes
 
-        const TOTAL_SUPPLY = 1000000000; // 1 Миллиард фиксировано
+        // Format Helper
+        function formatPrice(val) {
+            if(!val || val === 0) return "0";
+            return val < 0.01 ? val.toFixed(8).replace(/\.?0+$/, "") : val.toFixed(4);
+        }
 
-        // TABS
+        // --- CHART DRAWING LOGIC ---
+        window.setFrame = function(min) {
+            currentTimeframe = min;
+            // Обновляем UI кнопок
+            document.querySelectorAll('.time-btn').forEach(b => {
+                b.classList.remove('active');
+                if(b.innerText.includes(min + 'm') || (min===60 && b.innerText==='1h')) b.classList.add('active');
+            });
+            drawRealChart();
+        }
+
+        function generateCandles(transactions, timeframeMinutes) {
+            if(!transactions || transactions.length === 0) return [];
+            
+            const candles = [];
+            // Сортируем по дате
+            const sorted = [...transactions].sort((a,b) => new Date(a.date) - new Date(b.date));
+            const intervalMs = timeframeMinutes * 60 * 1000;
+
+            let currentCandle = null;
+            let bucketStart = 0;
+
+            sorted.forEach(tx => {
+                const time = new Date(tx.date).getTime();
+                // Определяем к какому временному отрезку относится
+                const bucket = Math.floor(time / intervalMs) * intervalMs;
+
+                if (!currentCandle || bucket !== bucketStart) {
+                    if (currentCandle) candles.push(currentCandle);
+                    
+                    // Start new candle
+                    // Open = prev close OR current price if first
+                    const prevClose = candles.length > 0 ? candles[candles.length-1].c : tx.price;
+                    
+                    bucketStart = bucket;
+                    currentCandle = {
+                        t: bucket, // time
+                        o: prevClose, // open
+                        h: tx.price, // high
+                        l: tx.price, // low
+                        c: tx.price  // close
+                    };
+                } else {
+                    // Update existing candle
+                    if (tx.price > currentCandle.h) currentCandle.h = tx.price;
+                    if (tx.price < currentCandle.l) currentCandle.l = tx.price;
+                    currentCandle.c = tx.price;
+                }
+            });
+            if (currentCandle) candles.push(currentCandle);
+
+            // Если мало свечей, продублируем последнюю для визуала
+            if(candles.length < 2 && candles.length > 0) {
+                 // просто заглушка, чтобы график не был пустым
+            }
+            return candles;
+        }
+
+        function drawRealChart() {
+            const canvas = document.getElementById('chartCanvas');
+            if(!canvas || !currentTokenData) return;
+            const parent = canvas.parentElement;
+            canvas.width = parent.offsetWidth;
+            canvas.height = parent.offsetHeight;
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width;
+            const h = canvas.height;
+            const paddingRight = 50; 
+            const paddingBottom = 20; 
+            const chartW = w - paddingRight;
+            const chartH = h - paddingBottom;
+
+            ctx.clearRect(0,0,w,h);
+
+            // 1. Prepare Data
+            const txs = currentTokenData.transactions || [];
+            // Если транзакций нет или одна, создадим фейковую, чтобы отрисовалось хоть что-то
+            if(txs.length === 0) return;
+
+            const candles = generateCandles(txs, currentTimeframe);
+            if(candles.length === 0) return;
+
+            // Find Min/Max for Y-Axis scaling
+            let minP = Infinity;
+            let maxP = -Infinity;
+            candles.forEach(c => {
+                if(c.l < minP) minP = c.l;
+                if(c.h > maxP) maxP = c.h;
+            });
+            // Add padding to chart vertically
+            if(minP === maxP) { minP *= 0.95; maxP *= 1.05; } // если цена не менялась
+            const range = maxP - minP;
+            const paddedMin = minP - (range * 0.1);
+            const paddedMax = maxP + (range * 0.1);
+            const scaleY = chartH / (paddedMax - paddedMin);
+
+            // 2. Draw Grid & Prices (Right)
+            const steps = 5;
+            ctx.font = "600 10px Inter, sans-serif";
+            ctx.textAlign = "left";
+            ctx.lineWidth = 1;
+
+            for(let i=0; i<=steps; i++) {
+                const val = paddedMax - (i * ((paddedMax - paddedMin)/steps));
+                const yPos = (i * (chartH/steps));
+                // Grid line
+                ctx.strokeStyle = '#222';
+                ctx.beginPath(); ctx.moveTo(0, yPos); ctx.lineTo(chartW, yPos); ctx.stroke();
+                // Price Label
+                ctx.fillStyle = '#666';
+                ctx.fillText(formatPrice(val), chartW + 5, yPos + 3);
+            }
+
+            // 3. Draw Time Grid (Bottom) -- Simplified
+            ctx.strokeStyle = '#222';
+            const timeSteps = 5;
+            const stepW = chartW / timeSteps;
+            for(let i=0; i<=timeSteps; i++) {
+                const x = i * stepW;
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, chartH); ctx.stroke();
+            }
+
+            // 4. Draw Candles
+            // Width calc
+            // Чтобы график всегда был справа, если свечей мало
+            const candleW = 8;
+            const gap = 4;
+            const totalCandleW = candleW + gap;
+            
+            // Начинаем рисовать справа налево или слева направо?
+            // Обычно слева. Если свечей мало, они будут слева.
+            // Но в трейдинге свежие справа.
+            // Давай рисовать с конца массива (свежие) справа.
+            
+            // X координата для самой правой свечи
+            let currentX = chartW - totalCandleW; 
+            
+            // Рисуем с конца массива (последние транзакции)
+            for (let i = candles.length - 1; i >= 0; i--) {
+                const c = candles[i];
+                if (currentX < -10) break; // Ушли за левый край
+
+                const isUp = c.c >= c.o;
+                const color = isUp ? '#FFFFFF' : '#000000'; // Fill
+                const stroke = '#FFFFFF'; // Border
+
+                // Y coordinates (flip coordinate system because 0 is top)
+                const yHigh = chartH - ((c.h - paddedMin) * scaleY);
+                const yLow = chartH - ((c.l - paddedMin) * scaleY);
+                const yOpen = chartH - ((c.o - paddedMin) * scaleY);
+                const yClose = chartH - ((c.c - paddedMin) * scaleY);
+
+                // Body coords
+                const bodyTop = Math.min(yOpen, yClose);
+                const bodyHeight = Math.max(1, Math.abs(yClose - yOpen)); // at least 1px
+
+                // Wick
+                ctx.strokeStyle = stroke;
+                ctx.beginPath();
+                ctx.moveTo(currentX + candleW/2, yHigh);
+                ctx.lineTo(currentX + candleW/2, yLow);
+                ctx.stroke();
+
+                // Body
+                ctx.fillStyle = color;
+                ctx.strokeStyle = stroke;
+                ctx.fillRect(currentX, bodyTop, candleW, bodyHeight);
+                ctx.strokeRect(currentX, bodyTop, candleW, bodyHeight);
+
+                currentX -= totalCandleW;
+            }
+        }
+
+        // --- INIT & LOGIC ---
+
         window.switchTab = function(tabName, el) {
             document.querySelectorAll('.tab-link').forEach(t => t.classList.remove('active'));
             el.classList.add('active');
             ['chart', 'tx', 'socials'].forEach(id => document.getElementById('tab-' + id).classList.add('hidden'));
             document.getElementById('tab-' + tabName).classList.remove('hidden');
+            if(tabName === 'chart') setTimeout(drawRealChart, 50);
         }
 
         async function initPage() {
             if(!tokenId) return;
             await initUser();
-
-            // 1. Подписка на токен
             onSnapshot(doc(db, "tokens", tokenId), (docSnap) => {
                 if (docSnap.exists()) {
                     currentTokenData = docSnap.data();
                     renderTokenInfo();
-                    updateChart(currentTokenData.price);
+                    drawRealChart(); // Draw on update
                 }
             });
-
-            // 2. Подписка на юзера
             subscribeToUser((user) => {
                 currentUserData = user;
                 renderUserPos();
                 renderHistory();
             });
+            window.addEventListener('resize', drawRealChart);
         }
 
         function renderTokenInfo() {
-            // Имя
             document.getElementById('tokenName').innerText = currentTokenData.name;
             document.getElementById('tokenDesc').innerText = currentTokenData.description || "No description.";
+            document.getElementById('holdersCount').innerText = currentTokenData.holdersCount || 1;
+            document.getElementById('txCount').innerText = currentTokenData.txCount || 0;
             
-            // Stats: Holders | Transactions
-            // (Пока берем из базы, если полей нет - 0)
-            const holders = currentTokenData.holdersCount || 1; // Создатель - первый холдер
-            const txs = currentTokenData.txCount || 0;
-            document.getElementById('holdersCount').innerText = holders;
-            document.getElementById('txCount').innerText = txs;
+            document.getElementById('marketCapVal').innerText = Math.floor(currentTokenData.marketCap || 0).toLocaleString();
+            document.getElementById('tokenPriceDisplay').innerText = formatPrice(currentTokenData.price);
 
-            // Market Cap
-            const cap = currentTokenData.marketCap || 0;
-            document.getElementById('marketCapVal').innerText = Math.floor(cap).toLocaleString();
-
-            // Иконка
             if(currentTokenData.image) {
                 document.getElementById('tokenIcon').src = currentTokenData.image;
                 document.getElementById('tokenIcon').style.display = 'block';
@@ -241,22 +362,16 @@
                 document.getElementById('tokenLetter').style.display = 'flex';
             }
 
-            // Bonding Curve
-            // Прогресс считаем по проданным токенам (sold) от макс сапплая
-            const maxSupply = currentTokenData.maxSupply || TOTAL_SUPPLY;
             const sold = currentTokenData.sold || 0;
-            const progress = Math.min((sold / maxSupply) * 100, 100);
-
+            const progress = Math.min((sold / TOTAL_SUPPLY) * 100, 100);
             document.getElementById('bondingBar').style.width = progress + '%';
-            document.getElementById('bondingText').innerText = progress.toFixed(1) + '% collected';
+            document.getElementById('bondingText').innerText = progress.toFixed(2) + '% collected';
 
             if(progress >= 100) {
                 document.getElementById('bondingContainer').style.display = 'none';
-                document.getElementById('tradingLive').style.display = 'block';
                 document.getElementById('sellBtn').style.display = 'block';
             } else {
                 document.getElementById('bondingContainer').style.display = 'block';
-                document.getElementById('tradingLive').style.display = 'none';
                 document.getElementById('sellBtn').style.display = 'none';
             }
         }
@@ -265,211 +380,114 @@
             if(!currentUserData || !currentTokenData) return;
             const bal = currentUserData.portfolio?.[tokenId] || 0;
             document.getElementById('myTokenBalance').innerText = Math.floor(bal).toLocaleString();
-            // Value = Balance * Price
             document.getElementById('myTokenValue').innerText = "≈ " + (bal * currentTokenData.price).toFixed(2);
         }
 
-        // --- CHART.JS (Нормальный график) ---
-        function updateChart(currentPrice) {
-            if(priceChart) return; // Не перерисовываем каждый раз при обновлении цены, чтобы не мерцало
-
-            const ctx = document.getElementById('priceChart').getContext('2d');
-            
-            // Генерируем фейковую историю для красоты (в реале надо брать из БД)
-            const history = [];
-            let price = currentPrice;
-            for(let i=0; i<24; i++) {
-                history.unshift(price);
-                price = price * (1 + (Math.random() * 0.06 - 0.03)); // +/- 3%
-            }
-
-            const gradient = ctx.createLinearGradient(0, 0, 0, 300);
-            gradient.addColorStop(0, 'rgba(204, 255, 0, 0.2)');
-            gradient.addColorStop(1, 'rgba(204, 255, 0, 0)');
-
-            priceChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: Array(24).fill(''),
-                    datasets: [{
-                        data: history,
-                        borderColor: '#CCFF00',
-                        backgroundColor: gradient,
-                        borderWidth: 2,
-                        pointRadius: 0,
-                        fill: true,
-                        tension: 0.4
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        x: { display: false },
-                        y: { 
-                            display: true, 
-                            position: 'right',
-                            grid: { color: '#222' },
-                            ticks: { color: '#555' }
-                        }
-                    }
-                }
-            });
-        }
-
-        // --- TRADE LOGIC ---
+        // Trade Functions
         window.openTrade = function(type) {
             tradeType = type;
             const overlay = document.getElementById('tradeOverlay');
             document.getElementById('tradeTitle').innerText = type === 'buy' ? 'Buy' : 'Sell';
-            
             const suffix = type === 'buy' ? 'BLYX' : currentTokenData.id;
             document.getElementById('tradeSuffix').innerText = suffix;
             document.getElementById('tradeInput').value = '';
             document.getElementById('tradeTotal').innerText = '0';
             
-            if(type === 'buy') {
-                 document.getElementById('tradeBalance').innerText = Math.floor(currentUserData.balance) + " BLYX";
-            } else {
-                 const bal = currentUserData.portfolio?.[tokenId] || 0;
-                 document.getElementById('tradeBalance').innerText = Math.floor(bal) + " " + tokenId;
+            if(type === 'buy') document.getElementById('tradeBalance').innerText = Math.floor(currentUserData.balance) + " BLYX";
+            else {
+                const bal = currentUserData.portfolio?.[tokenId] || 0;
+                document.getElementById('tradeBalance').innerText = Math.floor(bal) + " " + tokenId;
             }
             overlay.style.display = 'flex';
         }
-
-        window.closeTrade = function() {
-            document.getElementById('tradeOverlay').style.display = 'none';
-        }
+        window.closeTrade = function() { document.getElementById('tradeOverlay').style.display = 'none'; }
 
         window.calcTrade = function() {
             const amt = parseFloat(document.getElementById('tradeInput').value) || 0;
             const price = currentTokenData.price;
             if(tradeType === 'buy') {
-                // Вводим BLYX -> Получаем Токены
                 const tokens = amt / price;
                 document.getElementById('tradeTotal').innerText = Math.floor(tokens).toLocaleString();
-                document.getElementById('receiveLabel').innerHTML = "You get: <span style='color:white'>" + Math.floor(tokens).toLocaleString() + "</span> " + currentTokenData.id;
+                document.getElementById('receiveLabel').innerHTML = "Get: <span style='color:white'>" + Math.floor(tokens).toLocaleString() + "</span> TOKENS";
             } else {
-                // Вводим Токены -> Получаем BLYX
                 const blyx = amt * price;
                 document.getElementById('tradeTotal').innerText = blyx.toFixed(4);
-                 document.getElementById('receiveLabel').innerHTML = "You get: <span style='color:white'>" + blyx.toFixed(4) + "</span> BLYX";
+                document.getElementById('receiveLabel').innerHTML = "Get: <span style='color:white'>" + blyx.toFixed(4) + "</span> BLYX";
             }
         }
 
         window.executeTrade = async function() {
             const inputVal = parseFloat(document.getElementById('tradeInput').value);
             if(!inputVal || inputVal <= 0) return;
-
             const currentPrice = currentTokenData.price;
             const userRef = doc(db, "users", currentUserData.id.toString());
             const tokenRef = doc(db, "tokens", tokenId);
 
             try {
                 if(tradeType === 'buy') {
-                    // Input = BLYX
-                    const costBlyx = inputVal;
-                    const tokensToGet = costBlyx / currentPrice;
+                    if(currentUserData.balance < inputVal) { tg.showAlert("Not enough BLYX"); return; }
+                    const tokensToGet = inputVal / currentPrice;
+                    const newCap = (currentTokenData.marketCap || 0) + inputVal;
+                    const newPrice = newCap / TOTAL_SUPPLY;
 
-                    if(currentUserData.balance < costBlyx) {
-                        tg.showAlert("Not enough BLYX");
-                        return;
-                    }
-
-                    // Обновляем User
                     await updateDoc(userRef, {
-                        balance: increment(-costBlyx),
+                        balance: increment(-inputVal),
                         [`portfolio.${tokenId}`]: increment(tokensToGet),
                         transactions: arrayUnion({ type: 'buy', token: tokenId, amount: tokensToGet, price: currentPrice, date: new Date().toISOString() })
                     });
-
-                    // --- ВАЖНО: Обновляем Рынок по формуле ---
-                    // 1. Увеличиваем Market Cap
-                    // 2. Увеличиваем Sold
-                    // 3. Увеличиваем TxCount
-                    // 4. Пересчитываем Цену = NewCap / TotalSupply
-                    
-                    const newCap = (currentTokenData.marketCap || 0) + costBlyx;
-                    const newPrice = newCap / TOTAL_SUPPLY;
-
                     await updateDoc(tokenRef, {
-                        marketCap: increment(costBlyx),
+                        marketCap: increment(inputVal),
                         sold: increment(tokensToGet),
                         txCount: increment(1),
-                        price: newPrice 
+                        price: newPrice,
+                        // Важно! Пишем транзакцию в историю токена для общего графика
+                        transactions: arrayUnion({ price: newPrice, date: new Date().toISOString() })
                     });
-
-                    tg.showAlert("Bought successfully!");
-
+                    tg.showAlert("Bought!");
                 } else {
-                    // SELL
                     const tokensToSell = inputVal;
                     const blyxToGet = tokensToSell * currentPrice;
                     const currentBal = currentUserData.portfolio?.[tokenId] || 0;
-
-                    if(currentBal < tokensToSell) {
-                        tg.showAlert("Not enough tokens");
-                        return;
-                    }
+                    if(currentBal < tokensToSell) { tg.showAlert("Not enough tokens"); return; }
+                    const newCap = Math.max(0, (currentTokenData.marketCap || 0) - blyxToGet);
+                    const newPrice = newCap / TOTAL_SUPPLY;
 
                     await updateDoc(userRef, {
                         balance: increment(blyxToGet),
                         [`portfolio.${tokenId}`]: increment(-tokensToSell),
                         transactions: arrayUnion({ type: 'sell', token: tokenId, amount: tokensToSell, price: currentPrice, date: new Date().toISOString() })
                     });
-
-                    // Уменьшаем Cap и Цену
-                    const newCap = Math.max(0, (currentTokenData.marketCap || 0) - blyxToGet);
-                    const newPrice = newCap / TOTAL_SUPPLY;
-
                     await updateDoc(tokenRef, {
                         marketCap: increment(-blyxToGet),
                         txCount: increment(1),
-                        price: newPrice 
+                        price: newPrice,
+                        // Важно! Пишем транзакцию в историю токена
+                        transactions: arrayUnion({ price: newPrice, date: new Date().toISOString() })
                     });
-                    
-                    tg.showAlert("Sold successfully!");
+                    tg.showAlert("Sold!");
                 }
                 closeTrade();
-            } catch(e) {
-                console.error(e);
-                tg.showAlert("Error: " + e.message);
-            }
+            } catch(e) { console.error(e); tg.showAlert(e.message); }
         }
 
         function renderHistory() {
             const list = document.getElementById('txList');
             const txs = (currentUserData.transactions || []).filter(t => t.token === tokenId).reverse();
-            
             list.innerHTML = '';
             if(txs.length === 0) { list.innerHTML = '<div style="text-align:center; padding:20px; color:#555;">No transactions</div>'; return; }
-
             txs.forEach(tx => {
                 const isBuy = tx.type === 'buy' || tx.type === 'create_buy';
                 const action = isBuy ? 'Buy' : 'Sell';
-                const colorClass = isBuy ? 'c-green' : 'c-pink';
-                const avatarClass = isBuy ? 'bg-orange-soft' : 'bg-pink-soft'; 
+                const color = isBuy ? 'var(--accent-green)' : 'var(--accent-pink)';
                 const icon = isBuy ? '🔥' : '⚡';
-
                 const html = `
                 <div class="trans-item">
-                    <div class="ti-left">
-                        <div class="ti-avatar ${avatarClass}">${icon}</div>
-                        <div class="ti-info">
-                            <div class="ti-addr">You</div>
-                            <div class="ti-action ${colorClass}">${action} <span class="ti-time">${new Date(tx.date).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span></div>
-                        </div>
-                    </div>
-                    <div class="ti-right">
-                        <div class="ti-amount-row">${(tx.amount * tx.price).toFixed(2)} <img src="Sprites/Blyx.png" class="icon-blyx-right"></div>
-                        <div class="ti-amount-token">${Math.floor(tx.amount).toLocaleString()} ${tokenId}</div>
-                    </div>
+                    <div class="ti-left"><div class="ti-avatar" style="color:${color};background:#222;">${icon}</div><div class="ti-info"><div class="ti-addr">You</div><div class="ti-action" style="color:${color}">${action}</div></div></div>
+                    <div class="ti-right"><div class="ti-amount-row">${(tx.amount * tx.price).toFixed(2)} <img src="Sprites/Blyx.png" class="icon-blyx-right"></div><div class="ti-amount-token">${Math.floor(tx.amount).toLocaleString()} ${tokenId}</div></div>
                 </div>`;
                 list.innerHTML += html;
             });
         }
-
         initPage();
     </script>
 </body>
