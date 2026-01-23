@@ -57,7 +57,7 @@ button, a, input, textarea, .action-btn, .action-btn-small,
 .card-icon-area, .nav-item, .nav-trade-circle, .token-item, 
 .launch-card, .crypto-card, .btn-white-large, .back-btn, 
 .market-item, .btn-launch-pill, .upload-circle, .time-btn, 
-.social-card, .filter-chip {
+.social-card, .filter-chip, .oc-buy-btn, .m-filter-btn {
     pointer-events: auto;
     cursor: pointer;
 }
@@ -110,9 +110,7 @@ button { border: none; }
 }
 .btn-text { background: none; border: none; color: white; font-weight: 600; font-size: 16px; padding: 10px; }
 
-/* =========================================
-   DEPOSIT & TRANSFER INPUTS
-========================================= */
+/* Input Wrappers */
 .input-wrapper { 
     background: #1c1c1c; border-radius: 16px; 
     border: 1px solid transparent; 
@@ -129,6 +127,15 @@ button { border: none; }
 .input-wrapper input::placeholder { color: #555; }
 .input-suffix { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 700; color: white; }
 .star-icon-small { width: 20px; height: 20px; object-fit: contain; }
+
+/* Avatar inside Input */
+.input-with-avatar { position: relative; display: flex; align-items: center; }
+.avatar-preview {
+    width: 32px; height: 32px; border-radius: 50%; object-fit: cover;
+    margin-right: 10px; display: none; background: #333; border: 1px solid #555; flex-shrink: 0;
+}
+.avatar-visible { display: block; animation: fadeIn 0.3s ease; }
+@keyframes fadeIn { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: scale(1); } }
 
 /* =========================================
    LAUNCH SCREEN (CREATE TOKEN)
@@ -158,7 +165,6 @@ button { border: none; }
 .launch-label { font-size: 14px; font-weight: 600; margin-bottom: 8px; display: block; margin-top: 20px; }
 .label-row { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 8px; margin-top: 20px; }
 .char-counter { font-size: 14px; font-weight: 600; color: #555; }
-.char-count { float: right; font-size: 12px; color: var(--text-sec); } /* Старый класс, оставил на всякий */
 
 .launch-input-box { 
     background: var(--surface-light); border-radius: 12px; padding: 14px 16px; 
@@ -274,7 +280,7 @@ button { border: none; }
 .mc-val { font-size: 32px; font-weight: 800; color: white; line-height: 1; }
 .mc-icon { width: 28px; height: 28px; object-fit: contain; }
 
-.market-cap-text { font-size: 42px; font-weight: 800; color: #FFFFFF; margin-bottom: 25px; text-shadow: 0 0 20px rgba(255,255,255,0.15); } /* Старый класс */
+.market-cap-text { font-size: 42px; font-weight: 800; color: #FFFFFF; margin-bottom: 25px; text-shadow: 0 0 20px rgba(255,255,255,0.15); } 
 
 /* Bonding Curve Progress */
 .progress-container { padding: 0 24px; margin-bottom: 10px; }
@@ -481,74 +487,104 @@ button { border: none; }
     background: #FFFFFF; color: #000000;
 }
 
-/* Стили для аватара внутри инпута */
-.input-with-avatar {
+/* === P2P MARKET SPECIFIC STYLES === */
+
+.market-filters {
+    display: flex;
+    gap: 8px;
+    padding: 0 4px;
+    margin-bottom: 15px;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+.m-filter-btn {
+    background: #1c1c1c;
+    color: #888;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    border: 1px solid #333;
+    white-space: nowrap;
+}
+.m-filter-btn.active {
+    background: #fff;
+    color: #000;
+    border-color: #fff;
+}
+
+/* P2P Order Card */
+.order-card {
+    background: #111;
+    border: 1px solid #222;
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 10px;
     position: relative;
+}
+.oc-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 12px;
+}
+.oc-price {
+    font-size: 20px;
+    font-weight: 700;
+    color: white;
     display: flex;
     align-items: center;
+    gap: 4px;
+}
+.oc-buy-btn {
+    background: #1c1c1c;
+    border: 1px solid #333;
+    color: white;
+    padding: 6px 20px;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 14px;
 }
 
-.avatar-preview {
-    width: 32px;
-    height: 32px;
+/* P2P User Info */
+.oc-user-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+.oc-avatar {
+    width: 20px;
+    height: 20px;
     border-radius: 50%;
-    object-fit: cover;
-    margin-right: 10px;
-    display: none; /* Скрыто по умолчанию */
-    background: #333;
-    border: 1px solid #555;
-    flex-shrink: 0;
+    background: #333; 
+}
+.oc-username {
+    font-size: 14px;
+    font-weight: 600;
+    color: white;
+}
+.oc-stats {
+    font-size: 12px;
+    color: #666;
 }
 
-/* Анимация появления */
-.avatar-visible {
-    display: block;
-    animation: fadeIn 0.3s ease;
+/* P2P Limits */
+.oc-limits-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    color: #888;
+    margin-top: 4px;
+}
+.oc-val {
+    color: #ccc;
+    font-weight: 500;
 }
 
-@keyframes fadeIn {
-    from { opacity: 0; transform: scale(0.8); }
-    to { opacity: 1; transform: scale(1); }
-}
-
-/* P2P Button in Crypto Info */
 #mainActionBtn {
     transition: all 0.3s ease;
     font-weight: 800;
     font-size: 16px;
     box-shadow: 0 4px 20px rgba(0,0,0,0.4);
-}
-
-/* Статус "Live Market" */
-.market-live-badge {
-    color: #CCFF00;
-    font-weight: 700;
-    font-size: 14px;
-    border: 1px solid rgba(204, 255, 0, 0.3);
-    padding: 6px 16px;
-    border-radius: 20px;
-    background: rgba(204, 255, 0, 0.1);
-    display: inline-block;
-    margin-bottom: 10px;
-}
-
-/* Кнопка главного действия в Crypto Info */
-#mainActionBtn {
-    transition: all 0.3s ease;
-    font-weight: 800;
-    font-size: 16px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
-}
-
-/* Бейдж статуса рынка */
-.market-live-badge {
-    color: #CCFF00;
-    font-weight: 700;
-    font-size: 14px;
-    border: 1px solid rgba(204, 255, 0, 0.3);
-    padding: 6px 16px;
-    border-radius: 20px;
-    background: rgba(204, 255, 0, 0.1);
-    display: inline-block;
-    margin-bottom: 10px;
 }
