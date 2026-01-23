@@ -2,20 +2,30 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Wallet</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        /* Доп. стили для выравнивания, если в style.css что-то не так */
+        .wh-amount { color: #FFFFFF !important; } /* Принудительно белый */
+        .wh-coin-icon { width: 16px; height: 16px; object-fit: contain; vertical-align: middle; margin-left: 4px; border-radius: 50%; }
+        .tabs-scroll { margin-bottom: 20px; }
+        .hidden { display: none !important; }
+    </style>
 </head>
 <body>
 
-    <!-- Total Assets Header -->
+    <!-- Total Assets Header (In BLYX) -->
     <div class="balance-card">
         <div class="balance-label">Total Assets</div>
-        <div class="balance-val" id="totalAssetsVal">$0.00</div>
-        <div style="color:#666; font-size:14px; margin-top:5px; display:flex; gap:6px;">
-            <span>Balance:</span> <span id="blyxBalance" style="color:white; font-weight:700;">0</span> <img src="Sprites/Blyx.png" style="width:16px; height:16px; margin-top:1px;">
+        <div class="balance-val" style="display: flex; align-items: center; gap: 8px;">
+            <span id="totalAssetsDisplay">0</span>
+            <img src="Sprites/Blyx.png" style="width: 32px; height: 32px; object-fit: contain; margin-top: 4px;" alt="Blyx">
+        </div>
+        <div style="font-size: 13px; color: #666; margin-top: 4px;">
+            Liquid: <span id="liquidBalance">0</span> BLYX
         </div>
     </div>
 
@@ -32,31 +42,31 @@
     </div>
 
     <!-- Tabs -->
-    <div class="tabs-scroll" style="margin-bottom: 20px;">
+    <div class="tabs-scroll">
         <div class="tab-link active" onclick="switchTab('portfolio', this)">Portfolio</div>
         <div class="tab-link" onclick="switchTab('goods', this)">Goods</div>
         <div class="tab-link" onclick="switchTab('history', this)">History</div>
     </div>
 
-    <!-- CONTENT -->
+    <!-- CONTENT AREA -->
     <div style="padding: 0 16px 100px;">
-        
-        <!-- TAB: PORTFOLIO -->
-        <div id="tab-portfolio" class="content-section">
+
+        <!-- 1. PORTFOLIO -->
+        <div id="tab-portfolio">
             <div class="portfolio-grid" id="portfolioGrid">
-                <div style="color: #666; font-size: 14px; grid-column: 1/-1; text-align: center;">Loading...</div>
+                <div style="color: #666; font-size: 14px; text-align:center; grid-column:1/-1;">Loading...</div>
             </div>
         </div>
 
-        <!-- TAB: GOODS (Selling) -->
-        <div id="tab-goods" class="content-section hidden">
-            <div id="itemsList" class="market-list">
+        <!-- 2. GOODS (Active Orders) -->
+        <div id="tab-goods" class="hidden">
+            <div id="goodsList" class="market-list">
                 <div style="color: #666; font-size: 14px; text-align: center;">No active sell orders</div>
             </div>
         </div>
 
-        <!-- TAB: HISTORY -->
-        <div id="tab-history" class="content-section hidden">
+        <!-- 3. HISTORY -->
+        <div id="tab-history" class="hidden">
             <div id="historyList">
                 <div style="color: #666; font-size: 14px; text-align: center;">No transactions</div>
             </div>
@@ -76,30 +86,34 @@
     <script type="module">
         import { initUser, subscribeToUser, subscribeToMarket } from './user-service.js';
         import { db } from './firebase-config.js';
-        import { collection, query, where, getDocs, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         const tg = window.Telegram.WebApp;
         tg.expand();
         tg.setHeaderColor('#000000');
 
-        let currentMarket = []; 
+        let currentMarket = [];
         let currentUserData = null;
 
-        // FORMATTERS
-        function formatPrice(val) {
-            if(!val || val === 0) return "0";
-            return val < 0.01 ? val.toFixed(8).replace(/\.?0+$/, "") : val.toFixed(2);
-        }
+        // --- UTILS ---
         function formatCompact(num) {
             if (!num) return "0";
             return Intl.NumberFormat('en-US', { notation: "compact", maximumFractionDigits: 2 }).format(num);
         }
+        function formatPrice(val) {
+            if(!val) return "0";
+            return val < 0.01 ? val.toFixed(6) : val.toFixed(2);
+        }
         function formatDate(iso) {
             const d = new Date(iso);
-            return d.getDate() + ' ' + d.toLocaleString('en', {month:'short'}) + ' ' + d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
+            return d.getDate() + ' ' + d.toLocaleString('en', {month:'short'}); // 10 May
+        }
+        function formatTime(iso) {
+            const d = new Date(iso);
+            return d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0'); // 09:04
         }
 
-        // TABS
+        // --- TABS LOGIC ---
         window.switchTab = function(tabName, el) {
             document.querySelectorAll('.tab-link').forEach(t => t.classList.remove('active'));
             el.classList.add('active');
@@ -110,86 +124,80 @@
         async function initWallet() {
             await initUser();
 
-            // 1. Market Data
+            // 1. Рынок (для цен)
             subscribeToMarket((tokens) => {
                 currentMarket = tokens;
-                if(currentUserData) {
-                    renderPortfolio();
-                    renderTotalAssets();
-                }
+                if(currentUserData) renderPortfolio(); 
             });
 
-            // 2. User Data
+            // 2. Юзер
             subscribeToUser((user) => {
                 currentUserData = user;
-                renderPortfolio();
                 renderTotalAssets();
-                renderHistory();
+                renderPortfolio();
                 renderGoods();
+                renderHistory();
             });
         }
 
+        // --- RENDER TOTAL ---
         function renderTotalAssets() {
             if(!currentUserData) return;
-            let totalBlyx = currentUserData.balance || 0;
-            let totalValue = totalBlyx; // Assuming 1 BLYX = $1 for simplicity or base calculation
-            
-            // Add Token Values
+            let liquid = currentUserData.balance || 0;
+            let total = liquid;
+
+            // Считаем стоимость токенов в BLYX
             const port = currentUserData.portfolio || {};
             for(let t in port) {
-                const amount = port[t];
-                const tokenData = currentMarket.find(x => x.id === t);
-                if(tokenData && amount > 0) {
-                    // Total Value in BLYX
-                    totalValue += amount * tokenData.price;
+                const amt = port[t];
+                if(amt > 0) {
+                    const tData = currentMarket.find(x => x.id === t);
+                    if(tData) total += (amt * tData.price);
                 }
             }
-            
-            // Render Total
-            // Assuming we display value in BLYX or similar equivalent
-            document.getElementById('totalAssetsVal').innerText = "≈ " + formatCompact(totalValue); 
-            document.getElementById('blyxBalance').innerText = formatCompact(totalBlyx);
+
+            document.getElementById('totalAssetsDisplay').innerText = formatCompact(total);
+            document.getElementById('liquidBalance').innerText = formatCompact(liquid);
         }
 
+        // --- RENDER PORTFOLIO ---
         function renderPortfolio() {
             const grid = document.getElementById('portfolioGrid');
             const port = currentUserData.portfolio || {};
-            const keys = Object.keys(port);
+            const keys = Object.keys(port).filter(k => port[k] > 0);
+
             grid.innerHTML = '';
-
-            const validKeys = keys.filter(k => port[k] > 0);
-
-            if(validKeys.length === 0) {
-                grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#666;padding:20px;">No assets</div>';
+            if(keys.length === 0) {
+                grid.innerHTML = '<div style="grid-column: 1/-1; color: #555; text-align: center; padding: 20px;">No assets</div>';
                 return;
             }
 
-            validKeys.forEach(tid => {
+            keys.forEach(tid => {
                 const amt = port[tid];
                 const tInfo = currentMarket.find(x => x.id === tid) || { name: tid, price: 0, image: null, id: tid };
-                
-                let iconHtml = tInfo.image ? `<img src="${tInfo.image}" class="card-icon-img">` : `<div class="token-icon-fallback">${tInfo.id[0]}</div>`;
+                const img = tInfo.image || 'Sprites/GiftIcon.png'; // Заглушка
 
                 const card = document.createElement('div');
                 card.className = 'crypto-card';
                 card.onclick = () => location.href = `crypto_info.html?id=${tid}`;
                 card.innerHTML = `
-                    <div class="card-icon-area">${iconHtml}</div>
+                    <div class="card-icon-area">
+                        <img src="${img}" class="card-icon-img" style="border-radius:50%;">
+                    </div>
                     <div class="card-info">
                         <span class="token-name">${tInfo.name}</span>
                         <div class="card-row">
-                            <span class="price-tag">${formatPrice(tInfo.price)}</span>
-                            <span class="token-amount">${formatCompact(amt)}</span>
+                            <span class="price-tag">${formatPrice(tInfo.price)} <img src="Sprites/Blyx.png" style="width:10px; height:10px; margin-left:2px;"></span>
+                            <span class="token-amount">x${formatCompact(amt)}</span>
                         </div>
                     </div>`;
                 grid.appendChild(card);
             });
         }
 
+        // --- RENDER GOODS (Selling) ---
         async function renderGoods() {
-            const list = document.getElementById('itemsList');
-            if(!currentUserData) return;
-
+            const list = document.getElementById('goodsList');
             const q = query(collection(db, "orders"), where("sellerId", "==", currentUserData.id.toString()));
             const snap = await getDocs(q);
             
@@ -202,14 +210,17 @@
             snap.forEach(d => {
                 const o = d.data();
                 const item = document.createElement('div');
-                item.className = 'goods-item';
+                item.className = 'goods-item'; // Используем класс из styles, как market-item
+                // Сделаем простой стиль для goods
+                item.style.cssText = "display:flex; justify-content:space-between; align-items:center; background:#111; padding:12px; border-radius:12px; margin-bottom:8px; border:1px solid #222;";
                 item.innerHTML = `
-                    <div class="gi-title">Selling ${formatCompact(o.amount)} ${o.tokenId}</div>
-                    <div class="gi-price">${o.price} BLYX</div>`;
+                    <div style="font-weight:700;">Selling ${formatCompact(o.amount)} ${o.tokenId}</div>
+                    <div style="color:#CCFF00; font-weight:700;">${o.price} BLYX</div>`;
                 list.appendChild(item);
             });
         }
 
+        // --- RENDER HISTORY ---
         function renderHistory() {
             const list = document.getElementById('historyList');
             const txs = (currentUserData.transactions || []).reverse();
@@ -221,69 +232,84 @@
             }
 
             txs.forEach(tx => {
-                // DEFAULT VARS
-                let icon = 'Sprites/Purchase.png'; 
+                let icon = 'Sprites/Purchase.png'; // Дефолт
                 let title = 'Transaction';
                 let sub = 'balance';
-                let amountHtml = `<span style="color:white;">${formatCompact(tx.amount)}</span>`;
-                
-                // LOGIC MAPPING
+                let amountHtml = '';
+
+                // 1. REPLENISH
                 if(tx.type === 'replenish' || tx.type === 'deposit') {
-                    // Пополнение баланса
                     title = 'Replenishment';
                     icon = 'Sprites/Replenishment.png';
                     sub = 'balance';
-                    amountHtml = `<span style="color:#FFF;">+${formatCompact(tx.amount)}</span> <img src="Sprites/Blyx.png" class="wh-coin-icon">`;
+                    amountHtml = `+${formatCompact(tx.amount)} <img src="Sprites/Blyx.png" class="wh-coin-icon">`;
                 }
+                // 2. TRANSFER (IN)
                 else if(tx.type === 'transfer_in' || tx.type === 'receive') {
-                    // Получение перевода
                     title = 'Transfer';
                     icon = 'Sprites/Transfer.png';
-                    sub = `from @${tx.fromUser || tx.from || 'user'}`;
-                    amountHtml = `<span style="color:#FFF;">+${formatCompact(tx.amount)}</span> <img src="Sprites/Blyx.png" class="wh-coin-icon">`;
+                    sub = `from @${tx.fromUser || 'user'}`;
+                    // Проверка, крипта или валюта
+                    if(tx.token && tx.token !== 'BLYX') {
+                         const tInfo = currentMarket.find(x => x.id === tx.token);
+                         const imgUrl = tInfo ? tInfo.image : '';
+                         amountHtml = `+${formatCompact(tx.amount)} ${tx.token} ${imgUrl ? `<img src="${imgUrl}" class="wh-coin-icon">` : ''}`;
+                    } else {
+                         amountHtml = `+${formatCompact(tx.amount)} <img src="Sprites/Blyx.png" class="wh-coin-icon">`;
+                    }
                 }
+                // 3. TRANSFER (OUT)
                 else if(tx.type === 'transfer_out' || tx.type === 'send') {
-                    // Отправка перевода
                     title = 'Transfer';
-                    icon = 'Sprites/Transfer.png'; // Можно использовать повернутую или ту же
-                    sub = `to @${tx.toUser || tx.to || 'user'}`;
-                    amountHtml = `<span style="color:#FFF;">-${formatCompact(tx.amount)}</span> <img src="Sprites/Blyx.png" class="wh-coin-icon">`;
+                    icon = 'Sprites/Transfer.png';
+                    sub = `to @${tx.toUser || 'user'}`;
+                    if(tx.token && tx.token !== 'BLYX') {
+                         amountHtml = `-${formatCompact(tx.amount)} ${tx.token}`; // Крипта без иконки при отправке, или можно добавить
+                    } else {
+                         amountHtml = `-${formatCompact(tx.amount)} <img src="Sprites/Blyx.png" class="wh-coin-icon">`;
+                    }
                 }
+                // 4. PURCHASE (Crypto Buy)
                 else if(tx.type === 'buy') {
-                    // Покупка крипты (Spending BLYX -> Gaining Token)
                     title = 'Purchase';
-                    icon = 'Sprites/Purchase.png';
+                    icon = 'Sprites/Purchase.png'; // Трата денег
                     sub = 'balance';
-                    // Справа показываем сколько крипты получили
-                    // tx.token - имя токена (BTC)
-                    // Иконку крипты можно найти в currentMarket по имени
-                    const tData = currentMarket.find(x => x.id === tx.token);
-                    const tIcon = tData && tData.image ? `<img src="${tData.image}" class="wh-coin-icon" style="border-radius:50%;">` : `<div class="wh-coin-icon" style="background:#444;border-radius:50%;font-size:8px;display:flex;align-items:center;justify-content:center;">${tx.token?tx.token[0]:'?'}</div>`;
-
-                    amountHtml = `<span style="color:#FFF;">+${formatCompact(tx.amount)} ${tx.token}</span> ${tIcon}`;
+                    // Купил крипту: показываем сколько крипты получил
+                    const tInfo = currentMarket.find(x => x.id === tx.token);
+                    const imgUrl = tInfo ? tInfo.image : '';
+                    amountHtml = `+${formatCompact(tx.amount)} ${tx.token} ${imgUrl ? `<img src="${imgUrl}" class="wh-coin-icon">` : ''}`;
                 }
+                // 5. SALE (Crypto Sell)
                 else if(tx.type === 'sell') {
-                    // Продажа крипты (Selling Token -> Gaining BLYX)
-                    title = 'Sale';
-                    icon = 'Sprites/Replenishment.png'; // Получаем деньги
+                    title = 'Replenishment'; // Получил деньги
+                    icon = 'Sprites/Replenishment.png'; 
                     sub = 'portfolio';
-                    // Показываем сколько BLYX получили
-                    let totalVal = tx.total || (tx.amount * tx.price);
-                    amountHtml = `<span style="color:#CCFF00;">+${formatCompact(totalVal)}</span> <img src="Sprites/Blyx.png" class="wh-coin-icon">`;
+                    // Продал крипту: показываем сколько BLYX получил
+                    let val = tx.total || (tx.amount * tx.price);
+                    amountHtml = `+${formatCompact(val)} <img src="Sprites/Blyx.png" class="wh-coin-icon">`;
                 }
+                else {
+                    // Fallback
+                    amountHtml = `${formatCompact(tx.amount)}`;
+                }
+
+                // Дата
+                const dateStr = formatDate(tx.date) + ' ' + formatTime(tx.date);
 
                 const html = `
-                <div class="wh-item">
+                <div class="wh-item" style="background:transparent; border-bottom:1px solid #222; border-radius:0; padding:12px 0;">
                     <div class="wh-left">
-                        <div class="wh-icon-bg"><img src="${icon}" class="wh-icon-img" onerror="this.src='Sprites/Blyx.png'"></div>
+                        <div class="wh-icon-bg" style="background:#1c1c1c; border-radius:12px; width:42px; height:42px;">
+                            <img src="${icon}" class="wh-icon-img" style="width:24px; height:24px;">
+                        </div>
                         <div class="wh-info">
-                            <div class="wh-title">${title}</div>
+                            <div class="wh-title" style="font-size:16px;">${title}</div>
                             <div class="wh-sub">${sub}</div>
                         </div>
                     </div>
                     <div class="wh-right">
-                        <div class="wh-amount">${amountHtml}</div>
-                        <div class="wh-date">${formatDate(tx.date)}</div>
+                        <div class="wh-amount" style="font-size:16px; font-weight:700;">${amountHtml}</div>
+                        <div class="wh-date">${dateStr}</div>
                     </div>
                 </div>`;
                 list.insertAdjacentHTML('beforeend', html);
