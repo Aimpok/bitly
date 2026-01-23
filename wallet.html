@@ -222,7 +222,7 @@
                 let sub = 'balance';
                 let amountHtml = '';
 
-                // 1. REPLENISH -> Wallet.png
+                // 1. REPLENISH
                 if(tx.type === 'replenish' || tx.type === 'deposit') {
                     title = 'Replenishment';
                     icon = 'Sprites/Wallet.png'; 
@@ -230,7 +230,7 @@
                     amountHtml = `+${formatCompact(tx.amount)} <img src="Sprites/Blyx.png" class="wh-coin-icon">`;
                 }
                 
-                // 2. TRANSFER IN -> Gift.png (Подарок от друга)
+                // 2. TRANSFER IN
                 else if(tx.type === 'transfer_in' || tx.type === 'receive') {
                     title = 'Gift';
                     icon = 'Sprites/Gift.png';
@@ -245,7 +245,7 @@
                     }
                 }
 
-                // 3. TRANSFER OUT -> Cart.png (Отправка другу)
+                // 3. TRANSFER OUT
                 else if(tx.type === 'transfer_out' || tx.type === 'send') {
                     title = 'Transfer';
                     icon = 'Sprites/Cart.png';
@@ -257,18 +257,21 @@
                     }
                 }
 
-                // 4. PURCHASE -> Cart.png (Покупка крипты у робота)
+                // 4. PURCHASE (Покупка крипты у робота)
+                // ИСПРАВЛЕНО: Пишем сколько ПОТРАТИЛИ BLYX
                 else if(tx.type === 'buy') {
                     title = 'Purchase';
                     icon = 'Sprites/Cart.png';
                     sub = 'balance';
-                    // Показываем, что получили крипту
-                    const tInfo = currentMarket.find(x => x.id === tx.token);
-                    const imgUrl = tInfo ? tInfo.image : '';
-                    amountHtml = `+${formatCompact(tx.amount)} ${tx.token} ${imgUrl ? `<img src="${imgUrl}" class="wh-coin-icon">` : ''}`;
+                    
+                    // tx.cost - это поле, которое мы сохраняем в crypto_info.html при покупке
+                    // Если его нет (старая транзакция), считаем amount * price
+                    let cost = tx.cost || (tx.amount * tx.price);
+                    
+                    amountHtml = `-${formatCompact(cost)} <img src="Sprites/Blyx.png" class="wh-coin-icon">`;
                 }
 
-                // 5. SALE -> Sell.png (Продажа крипты)
+                // 5. SALE (Продажа крипты)
                 else if(tx.type === 'sell' || tx.type === 'p2p_sold') {
                     title = 'Sale'; 
                     icon = 'Sprites/Sell.png'; 
