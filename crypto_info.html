@@ -17,6 +17,7 @@
 </head>
 <body>
 
+    <!-- Header -->
     <div class="launch-header">
         <div class="top-nav">
             <button class="back-btn" onclick="window.history.back()">
@@ -42,15 +43,22 @@
             <img src="Sprites/Blyx.png" class="mc-icon">
         </div>
         <div style="text-align: center; color: #888; font-size: 13px; margin-bottom: 15px;">
-            1 Token = <span id="tokenPriceDisplay" style="color: white; font-weight: 700;">...</span> BLYX
+            Price: <span id="tokenPriceDisplay" style="color: white; font-weight: 700;">...</span> BLYX
         </div>
 
+        <!-- Bonding Curve Progress -->
         <div class="progress-container" id="bondingContainer">
             <div class="p-bar-bg"><div class="p-bar-fill" id="bondingBar" style="width: 0%;"></div></div>
             <div class="p-labels"><span id="bondingText">0% collected</span><span style="color: #888;">Unlock at 100%</span></div>
         </div>
+        
+        <!-- Live Status (Hidden by default) -->
+        <div id="tradingLive" style="display: none; text-align: center;">
+            <div class="market-live-badge">⚡ LIVE P2P MARKET</div>
+        </div>
     </div>
 
+    <!-- Tabs -->
     <div class="tabs-scroll">
         <div class="tab-link active" onclick="switchTab('chart', this)">Chart</div>
         <div class="tab-link" onclick="switchTab('tx', this)">Transactions</div>
@@ -65,9 +73,7 @@
                 <div class="time-btn" onclick="setFrame(15)">15m</div>
                 <div class="time-btn" onclick="setFrame(60)">1h</div>
             </div>
-            <div class="chart-area">
-                <canvas id="chartCanvas"></canvas>
-            </div>
+            <div class="chart-area"><canvas id="chartCanvas"></canvas></div>
             
             <div class="trans-summary">
                 <div class="ts-item"><div class="ts-label">Your Balance</div><div class="ts-val" id="myTokenBalance">0</div></div>
@@ -76,33 +82,37 @@
             <div style="height: 120px;"></div>
         </div>
 
+        <!-- TRANSACTIONS -->
         <div id="tab-tx" class="hidden">
             <div class="trans-list" id="txList"><div style="text-align:center; padding:20px; color:#555;">Loading...</div></div>
             <div style="height: 120px;"></div>
         </div>
 
+        <!-- SOCIALS -->
         <div id="tab-socials" class="hidden">
             <div class="social-list"><div class="social-card"><div class="sc-left"><div class="sc-title">Description</div><div class="sc-sub" id="tokenDesc">No description.</div></div></div></div>
             <div style="height: 120px;"></div>
         </div>
     </div>
 
+    <!-- MAIN BUTTON -->
     <div class="fixed-action-container">
-        <div style="display: flex; gap: 10px;">
-            <button class="btn-buy-floating" id="sellBtn" style="background: #1c1c1c; color: white; border: 1px solid #333; display:none;" onclick="openTrade('sell')">Sell</button>
-            <button class="btn-buy-floating" style="background: white; color: black;" onclick="openTrade('buy')">Buy</button>
-        </div>
+        <!-- Кнопка меняется в зависимости от статуса (Curve / P2P) -->
+        <button class="btn-buy-floating" id="mainActionBtn" onclick="handleAction()">
+            Loading...
+        </button>
     </div>
 
+    <!-- ROBOT BUY OVERLAY (Only for Bonding Curve) -->
     <div id="tradeOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:9999; flex-direction:column; justify-content:center; padding: 20px;">
-        <h2 id="tradeTitle" style="text-align:center; margin-bottom:20px; font-size: 24px;">Buy</h2>
+        <h2 style="text-align:center; margin-bottom:20px; font-size: 24px;">Buy (Curve)</h2>
         <div class="input-wrapper">
-            <input type="number" id="tradeInput" placeholder="Amount" oninput="calcTrade()">
-            <div class="input-suffix" id="tradeSuffix">BLYX</div>
+            <input type="number" id="tradeInput" placeholder="Amount BLYX" oninput="calcTrade()">
+            <div class="input-suffix">BLYX</div>
         </div>
         <div style="display:flex; justify-content:space-between; margin-bottom:20px; font-size:14px; color:#888;">
-            <span>Balance: <span id="tradeBalance" style="color:white;">0</span></span>
-            <span id="receiveLabel">You get: <span id="tradeTotal" style="color:white;">0</span> TOKENS</span>
+            <span>Balance: <span id="tradeBalance">0</span></span>
+            <span id="receiveLabel">Get: <span id="tradeTotal" style="color:white;">0</span> TOKENS</span>
         </div>
         <button class="btn-white-large" onclick="executeTrade()">Confirm</button>
         <button class="btn-text" style="margin-top:10px; width:100%; text-align:center; color:#555;" onclick="closeTrade()">Cancel</button>
@@ -131,22 +141,157 @@
         
         let currentTokenData = null;
         let currentUserData = null;
-        let tradeType = 'buy';
+        let isP2P = false;
         let currentTimeframe = 5;
 
-        // FORMATTER (Цена)
+        // FORMATTERS
         function formatPrice(val) {
             if(!val || val === 0) return "0";
             return val < 0.01 ? val.toFixed(8).replace(/\.?0+$/, "") : val.toFixed(4);
         }
-
-        // COMPACT FORMATTER (1.5k, 2M)
         function formatCompact(num) {
             if (!num) return "0";
-            return Intl.NumberFormat('en-US', {
-                notation: "compact",
-                maximumFractionDigits: 2
-            }).format(num);
+            return Intl.NumberFormat('en-US', { notation: "compact", maximumFractionDigits: 2 }).format(num);
+        }
+
+        window.switchTab = function(tabName, el) {
+            document.querySelectorAll('.tab-link').forEach(t => t.classList.remove('active'));
+            el.classList.add('active');
+            ['chart', 'tx', 'socials'].forEach(id => document.getElementById('tab-' + id).classList.add('hidden'));
+            document.getElementById('tab-' + tabName).classList.remove('hidden');
+            if(tabName === 'chart') setTimeout(drawRealChart, 50);
+        }
+
+        async function initPage() {
+            if(!tokenId) return;
+            await initUser();
+            
+            onSnapshot(doc(db, "tokens", tokenId), (docSnap) => {
+                if (docSnap.exists()) {
+                    currentTokenData = docSnap.data();
+                    renderUI();
+                    drawRealChart();
+                }
+            });
+            
+            subscribeToUser((user) => {
+                currentUserData = user;
+                renderUserPos();
+                renderHistory();
+            });
+            window.addEventListener('resize', drawRealChart);
+        }
+
+        function renderUI() {
+            // Basic Info
+            document.getElementById('tokenName').innerText = currentTokenData.name;
+            document.getElementById('tokenDesc').innerText = currentTokenData.description || "No description.";
+            document.getElementById('holdersCount').innerText = formatCompact(currentTokenData.holdersCount || 1);
+            document.getElementById('txCount').innerText = formatCompact(currentTokenData.txCount || 0);
+            document.getElementById('marketCapVal').innerText = formatCompact(currentTokenData.marketCap || 0);
+            document.getElementById('tokenPriceDisplay').innerText = formatPrice(currentTokenData.price);
+
+            // Icon
+            if(currentTokenData.image) {
+                document.getElementById('tokenIcon').src = currentTokenData.image;
+                document.getElementById('tokenIcon').style.display = 'block';
+                document.getElementById('tokenLetter').style.display = 'none';
+            } else {
+                document.getElementById('tokenIcon').style.display = 'none';
+                document.getElementById('tokenLetter').innerText = tokenId[0];
+                document.getElementById('tokenLetter').style.display = 'flex';
+            }
+
+            // Bonding Curve Progress
+            const sold = currentTokenData.sold || 0;
+            const progress = Math.min((sold / TOTAL_SUPPLY) * 100, 100);
+            
+            document.getElementById('bondingBar').style.width = progress + '%';
+            document.getElementById('bondingText').innerText = progress.toFixed(2) + '% collected';
+
+            const btn = document.getElementById('mainActionBtn');
+
+            // Logic Switch: Bonding Curve -> P2P Market
+            if(progress >= 99.99) {
+                isP2P = true;
+                document.getElementById('bondingContainer').style.display = 'none';
+                document.getElementById('tradingLive').style.display = 'block';
+                
+                btn.innerText = "Go to P2P Market";
+                btn.style.background = "#fff";
+                btn.style.color = "#000";
+            } else {
+                isP2P = false;
+                document.getElementById('bondingContainer').style.display = 'block';
+                document.getElementById('tradingLive').style.display = 'none';
+                
+                btn.innerText = "Buy (Bonding Curve)";
+                btn.style.background = "#CCFF00"; // Green
+                btn.style.color = "#000";
+            }
+        }
+
+        function renderUserPos() {
+            if(!currentUserData || !currentTokenData) return;
+            const bal = currentUserData.portfolio?.[tokenId] || 0;
+            document.getElementById('myTokenBalance').innerText = formatCompact(bal);
+            document.getElementById('myTokenValue').innerText = "≈ " + (bal * currentTokenData.price).toFixed(2);
+        }
+
+        // --- BUTTON ACTION ---
+        window.handleAction = function() {
+            if(isP2P) {
+                // Переход на страницу рынка
+                location.href = `p2p_market.html?id=${tokenId}`;
+            } else {
+                // Открытие модалки покупки у робота
+                document.getElementById('tradeOverlay').style.display = 'flex';
+                document.getElementById('tradeBalance').innerText = formatCompact(currentUserData.balance) + " BLYX";
+            }
+        }
+
+        // --- ROBOT BUY (Bonding Curve Logic) ---
+        window.closeTrade = function() { document.getElementById('tradeOverlay').style.display = 'none'; }
+        
+        window.calcTrade = function() {
+            const amt = parseFloat(document.getElementById('tradeInput').value) || 0;
+            const tokens = amt / currentTokenData.price;
+            document.getElementById('tradeTotal').innerText = formatCompact(tokens);
+        }
+
+        window.executeTrade = async function() {
+            const inputVal = parseFloat(document.getElementById('tradeInput').value);
+            if(!inputVal) return;
+            if(currentUserData.balance < inputVal) { tg.showAlert("Not enough BLYX"); return; }
+
+            const currentPrice = currentTokenData.price;
+            const tokensToGet = inputVal / currentPrice;
+            
+            // New Price Calc
+            const newCap = (currentTokenData.marketCap || 0) + inputVal;
+            const newPrice = newCap / TOTAL_SUPPLY;
+
+            const userRef = doc(db, "users", currentUserData.id.toString());
+            const tokenRef = doc(db, "tokens", tokenId);
+
+            try {
+                await updateDoc(userRef, {
+                    balance: increment(-inputVal),
+                    [`portfolio.${tokenId}`]: increment(tokensToGet),
+                    transactions: arrayUnion({ type: 'buy', token: tokenId, amount: tokensToGet, price: currentPrice, date: new Date().toISOString() })
+                });
+                await updateDoc(tokenRef, {
+                    marketCap: increment(inputVal),
+                    sold: increment(tokensToGet),
+                    txCount: increment(1),
+                    price: newPrice,
+                    transactions: arrayUnion({ price: newPrice, date: new Date().toISOString() })
+                });
+                tg.showAlert("Bought successfully!");
+                closeTrade();
+            } catch(e) {
+                tg.showAlert("Error: " + e.message);
+            }
         }
 
         // --- CHART DRAWING ---
@@ -201,7 +346,12 @@
             if(txs.length === 0) return;
 
             const candles = generateCandles(txs, currentTimeframe);
-            if(candles.length === 0) return;
+            // Если транзакций мало для свечей, рисуем линию последней цены
+            if(candles.length === 0 && txs.length > 0) {
+                const price = txs[txs.length-1].price;
+                ctx.strokeStyle = '#CCFF00'; ctx.beginPath(); ctx.moveTo(0, h/2); ctx.lineTo(w, h/2); ctx.stroke();
+                return;
+            }
 
             let minP = Infinity, maxP = -Infinity;
             candles.forEach(c => { if(c.l < minP) minP = c.l; if(c.h > maxP) maxP = c.h; });
@@ -252,170 +402,15 @@
             }
         }
 
-        // --- INIT ---
-        window.switchTab = function(tabName, el) {
-            document.querySelectorAll('.tab-link').forEach(t => t.classList.remove('active'));
-            el.classList.add('active');
-            ['chart', 'tx', 'socials'].forEach(id => document.getElementById('tab-' + id).classList.add('hidden'));
-            document.getElementById('tab-' + tabName).classList.remove('hidden');
-            if(tabName === 'chart') setTimeout(drawRealChart, 50);
-        }
-
-        async function initPage() {
-            if(!tokenId) return;
-            await initUser();
-            onSnapshot(doc(db, "tokens", tokenId), (docSnap) => {
-                if (docSnap.exists()) {
-                    currentTokenData = docSnap.data();
-                    renderTokenInfo();
-                    drawRealChart();
-                }
-            });
-            subscribeToUser((user) => {
-                currentUserData = user;
-                renderUserPos();
-                renderHistory();
-            });
-            window.addEventListener('resize', drawRealChart);
-        }
-
-        function renderTokenInfo() {
-            document.getElementById('tokenName').innerText = currentTokenData.name;
-            document.getElementById('tokenDesc').innerText = currentTokenData.description || "No description.";
-            document.getElementById('holdersCount').innerText = formatCompact(currentTokenData.holdersCount || 1);
-            document.getElementById('txCount').innerText = formatCompact(currentTokenData.txCount || 0);
-            
-            document.getElementById('marketCapVal').innerText = formatCompact(currentTokenData.marketCap || 0);
-            document.getElementById('tokenPriceDisplay').innerText = formatPrice(currentTokenData.price);
-
-            if(currentTokenData.image) {
-                document.getElementById('tokenIcon').src = currentTokenData.image;
-                document.getElementById('tokenIcon').style.display = 'block';
-                document.getElementById('tokenLetter').style.display = 'none';
-            } else {
-                document.getElementById('tokenIcon').style.display = 'none';
-                document.getElementById('tokenLetter').innerText = tokenId[0];
-                document.getElementById('tokenLetter').style.display = 'flex';
-            }
-
-            const sold = currentTokenData.sold || 0;
-            const progress = Math.min((sold / TOTAL_SUPPLY) * 100, 100);
-            document.getElementById('bondingBar').style.width = progress + '%';
-            document.getElementById('bondingText').innerText = progress.toFixed(2) + '% collected';
-
-            if(progress >= 100) {
-                document.getElementById('bondingContainer').style.display = 'none';
-                document.getElementById('sellBtn').style.display = 'block';
-            } else {
-                document.getElementById('bondingContainer').style.display = 'block';
-                document.getElementById('sellBtn').style.display = 'none';
-            }
-        }
-
-        function renderUserPos() {
-            if(!currentUserData || !currentTokenData) return;
-            const bal = currentUserData.portfolio?.[tokenId] || 0;
-            document.getElementById('myTokenBalance').innerText = formatCompact(bal);
-            document.getElementById('myTokenValue').innerText = "≈ " + (bal * currentTokenData.price).toFixed(2);
-        }
-
-        // TRADE LOGIC
-        window.openTrade = function(type) {
-            tradeType = type;
-            const overlay = document.getElementById('tradeOverlay');
-            document.getElementById('tradeTitle').innerText = type === 'buy' ? 'Buy' : 'Sell';
-            const suffix = type === 'buy' ? 'BLYX' : currentTokenData.id;
-            document.getElementById('tradeSuffix').innerText = suffix;
-            document.getElementById('tradeInput').value = '';
-            document.getElementById('tradeTotal').innerText = '0';
-            
-            if(type === 'buy') document.getElementById('tradeBalance').innerText = formatCompact(currentUserData.balance) + " BLYX";
-            else {
-                const bal = currentUserData.portfolio?.[tokenId] || 0;
-                document.getElementById('tradeBalance').innerText = formatCompact(bal) + " " + tokenId;
-            }
-            overlay.style.display = 'flex';
-        }
-        window.closeTrade = function() { document.getElementById('tradeOverlay').style.display = 'none'; }
-
-        window.calcTrade = function() {
-            const amt = parseFloat(document.getElementById('tradeInput').value) || 0;
-            const price = currentTokenData.price;
-            if(tradeType === 'buy') {
-                const tokens = amt / price;
-                document.getElementById('tradeTotal').innerText = formatCompact(tokens);
-                document.getElementById('receiveLabel').innerHTML = "Get: <span style='color:white'>" + formatCompact(tokens) + "</span> TOKENS";
-            } else {
-                const blyx = amt * price;
-                document.getElementById('tradeTotal').innerText = blyx.toFixed(2);
-                document.getElementById('receiveLabel').innerHTML = "Get: <span style='color:white'>" + blyx.toFixed(2) + "</span> BLYX";
-            }
-        }
-
-        window.executeTrade = async function() {
-            const inputVal = parseFloat(document.getElementById('tradeInput').value);
-            if(!inputVal || inputVal <= 0) return;
-            const currentPrice = currentTokenData.price;
-            const userRef = doc(db, "users", currentUserData.id.toString());
-            const tokenRef = doc(db, "tokens", tokenId);
-
-            try {
-                if(tradeType === 'buy') {
-                    if(currentUserData.balance < inputVal) { tg.showAlert("Not enough BLYX"); return; }
-                    const tokensToGet = inputVal / currentPrice;
-                    
-                    // Math Fix
-                    const newCap = (currentTokenData.marketCap || 0) + inputVal;
-                    const newPrice = newCap / TOTAL_SUPPLY;
-
-                    await updateDoc(userRef, {
-                        balance: increment(-inputVal),
-                        [`portfolio.${tokenId}`]: increment(tokensToGet),
-                        transactions: arrayUnion({ type: 'buy', token: tokenId, amount: tokensToGet, price: currentPrice, date: new Date().toISOString() })
-                    });
-                    await updateDoc(tokenRef, {
-                        marketCap: increment(inputVal),
-                        sold: increment(tokensToGet),
-                        txCount: increment(1),
-                        price: newPrice,
-                        transactions: arrayUnion({ price: newPrice, date: new Date().toISOString() })
-                    });
-                    tg.showAlert("Bought!");
-                } else {
-                    const tokensToSell = inputVal;
-                    const blyxToGet = tokensToSell * currentPrice;
-                    const currentBal = currentUserData.portfolio?.[tokenId] || 0;
-                    if(currentBal < tokensToSell) { tg.showAlert("Not enough tokens"); return; }
-
-                    const newCap = Math.max(0, (currentTokenData.marketCap || 0) - blyxToGet);
-                    const newPrice = newCap / TOTAL_SUPPLY;
-
-                    await updateDoc(userRef, {
-                        balance: increment(blyxToGet),
-                        [`portfolio.${tokenId}`]: increment(-tokensToSell),
-                        transactions: arrayUnion({ type: 'sell', token: tokenId, amount: tokensToSell, price: currentPrice, date: new Date().toISOString() })
-                    });
-                    await updateDoc(tokenRef, {
-                        marketCap: increment(-blyxToGet),
-                        txCount: increment(1),
-                        price: newPrice,
-                        transactions: arrayUnion({ price: newPrice, date: new Date().toISOString() })
-                    });
-                    tg.showAlert("Sold!");
-                }
-                closeTrade();
-            } catch(e) { console.error(e); tg.showAlert(e.message); }
-        }
-
         function renderHistory() {
             const list = document.getElementById('txList');
             const txs = (currentUserData.transactions || []).filter(t => t.token === tokenId).reverse();
             list.innerHTML = '';
             if(txs.length === 0) { list.innerHTML = '<div style="text-align:center; padding:20px; color:#555;">No transactions</div>'; return; }
             txs.forEach(tx => {
-                const isBuy = tx.type === 'buy' || tx.type === 'create_buy';
+                const isBuy = tx.type.includes('buy');
                 const action = isBuy ? 'Buy' : 'Sell';
-                const color = isBuy ? 'var(--accent-green)' : 'var(--accent-pink)';
+                const color = isBuy ? '#CCFF00' : '#FF3B30';
                 const icon = isBuy ? '🔥' : '⚡';
                 const html = `
                 <div class="trans-item">
@@ -425,6 +420,7 @@
                 list.innerHTML += html;
             });
         }
+
         initPage();
     </script>
 </body>
