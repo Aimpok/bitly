@@ -36,7 +36,6 @@
     <h3 class="portfolio-title">Portfolio</h3>
     
     <div class="portfolio-grid" id="portfolioGrid">
-        <!-- Сюда скрипт вставит карточки -->
         <div style="color: #666; font-size: 14px;">Loading...</div>
     </div>
 </div>
@@ -67,27 +66,27 @@
     tg.expand();
     tg.setHeaderColor('#000000');
 
-    let currentMarket = []; // Храним цены, чтобы считать стоимость портфеля
+    let currentMarket = []; 
+
+    // Форматтер цены (такой же как везде)
+    function formatPrice(val) {
+        if(!val || val === 0) return "0";
+        return val < 0.01 ? val.toFixed(8).replace(/\.?0+$/, "") : val.toFixed(4);
+    }
 
     async function initWallet() {
         await initUser();
 
-        // 1. Подписываемся на цены рынка (чтобы знать актуальную цену в портфеле)
         subscribeToMarket((tokens) => {
             currentMarket = tokens;
-            // Если юзер уже загружен, перерисовываем портфель с новыми ценами
             const userData = window.currentUserData; 
             if(userData) renderPortfolio(userData);
         });
 
-        // 2. Подписываемся на данные юзера
         subscribeToUser((user) => {
-            window.currentUserData = user; // Сохраняем глобально для доступа внутри функции рынка
-            
-            // Обновляем общий баланс BLYX
+            window.currentUserData = user; 
             const balance = user.balance !== undefined ? user.balance : 0;
             document.getElementById('mainBalance').innerText = Math.floor(balance).toLocaleString();
-
             renderPortfolio(user);
         });
     }
@@ -107,10 +106,10 @@
         }
 
         keys.forEach(tokenId => {
-            const amount = portfolio[tokenId]; // Количество монет у юзера
-            if(amount <= 0) return; // Не показываем нулевые балансы
+            const amount = portfolio[tokenId];
+            if(amount <= 0) return; 
 
-            // Ищем инфу о токене в рыночных данных
+            // Ищем токен
             const tokenInfo = currentMarket.find(t => t.id === tokenId) || { 
                 name: tokenId, 
                 price: 0, 
@@ -118,14 +117,8 @@
                 id: tokenId
             };
 
-            // ФОРМАТИРОВАНИЕ ЦЕНЫ (Исправлено)
-            // Если цена меньше 0.01, показываем 6 знаков, иначе 2 знака
-            const displayPrice = parseFloat(tokenInfo.price) < 0.01 
-                ? parseFloat(tokenInfo.price).toFixed(6) 
-                : parseFloat(tokenInfo.price).toFixed(2);
+            const displayPrice = formatPrice(tokenInfo.price);
 
-            // ЛОГИКА ИКОНКИ (Исправлено)
-            // Если нет картинки -> показываем букву
             let iconHtml;
             if (tokenInfo.image) {
                 iconHtml = `<img src="${tokenInfo.image}" class="card-icon-img" alt="${tokenId}">`;
