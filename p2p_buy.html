@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Buy P2P</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+
+    <div class="header-nav">
+        <button class="back-btn" onclick="window.history.back()"><svg class="icon" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
+        <div class="header-title">Buy Token</div>
+    </div>
+
+    <div style="padding: 0 16px;">
+        <!-- Order Info Card -->
+        <div style="background:#111; border:1px solid #333; border-radius:16px; padding:16px; margin-bottom:20px;">
+            <div style="font-size:12px; color:#888; margin-bottom:4px;">Price</div>
+            <div style="font-size:24px; font-weight:700; color:white; display:flex; align-items:center; gap:6px;">
+                <span id="priceVal">0</span> <img src="Sprites/Blyx.png" style="width:20px;">
+            </div>
+            
+            <div style="width:100%; height:1px; background:#222; margin:12px 0;"></div>
+            
+            <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                <span style="color:#888; font-size:13px;">Seller</span>
+                <span style="color:white; font-weight:600; font-size:13px;" id="sellerName">...</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                <span style="color:#888; font-size:13px;">Available</span>
+                <span style="color:white; font-weight:600; font-size:13px;" id="availVal">0</span>
+            </div>
+            <div style="display:flex; justify-content:space-between;">
+                <span style="color:#888; font-size:13px;">Limits</span>
+                <span style="color:white; font-weight:600; font-size:13px;" id="limitsVal">0 - 0</span>
+            </div>
+        </div>
+
+        <div class="input-wrapper">
+            <input type="number" id="amountInput" placeholder="Amount to buy" oninput="calcTotal()">
+            <div class="input-suffix">TOKEN</div>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; margin-top:10px; font-size:14px;">
+            <span style="color:#888;">Total Cost:</span>
+            <span style="color:white; font-weight:700;" id="totalCost">0 BLYX</span>
+        </div>
+    </div>
+
+    <div class="fixed-bottom-bar">
+        <button class="btn-white-large" onclick="doBuy()">Confirm Buy</button>
+    </div>
+
+    <script type="module">
+        import { initUser, getTgUser } from './user-service.js';
+        import { db } from './firebase-config.js';
+        import { doc, getDoc, runTransaction, increment, arrayUnion } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        tg.setHeaderColor('#000000');
+
+        const orderId = new URLSearchParams(window.location.search).get('oid');
+        let orderData = null;
+        let currentUser = null;
+
+        async function init() {
+            currentUser = await initUser();
+            const snap = await getDoc(doc(db, "orders", orderId));
+            if(!snap.exists()) {
+                alert("Order not found");
+                window.history.back();
+                return;
+            }
+            orderData = { id: snap.id, ...snap.data() };
+            render();
+        }
+
+        function render() {
+            document.getElementById('priceVal').innerText = parseFloat(orderData.price).toFixed(6);
+            document.getElementById('sellerName').innerText = orderData.sellerName;
+            document.getElementById('availVal').innerText = Math.floor(orderData.amount).toLocaleString();
+            
+            const max = orderData.maxLimit ? Math.min(orderData.maxLimit, orderData.amount) : orderData.amount;
+            document.getElementById('limitsVal').innerText = `${Math.floor(orderData.minLimit)} - ${Math.floor(max)}`;
+        }
+
+        window.calcTotal = function() {
+            const amt = parseFloat(document.getElementById('amountInput').value) || 0;
+            const cost = amt * orderData.price;
+            document.getElementById('totalCost').innerText = cost.toFixed(2) + " BLYX";
+        }
+
+        window.doBuy = async function() {
+            const amount = parseFloat(document.getElementById('amountInput').value);
+            if(!amount) return;
+
+            // Checks
+            const max = orderData.maxLimit ? Math.min(orderData.maxLimit, orderData.amount) : orderData.amount;
+            if(amount < orderData.minLimit || amount > max) {
+                tg.showAlert(`Limits: ${orderData.minLimit} - ${max}`);
+                return;
+            }
+            const cost = amount * orderData.price;
+            if(currentUser.balance < cost) {
+                tg.showAlert("Insufficient BLYX");
+                return;
+            }
+
+            tg.showConfirm(`Buy ${amount} tokens for ${cost.toFixed(2)} BLYX?`, async (ok) => {
+                if(ok) {
+                    try {
+                        await runTransaction(db, async (t) => {
+                            const orderRef = doc(db, "orders", orderId);
+                            const buyerRef = doc(db, "users", currentUser.id.toString());
+                            const sellerRef = doc(db, "users", orderData.sellerId);
+                            const tokenRef = doc(db, "tokens", orderData.tokenId);
+
+                            // Re-read order inside transaction
+                            const oSnap = await t.get(orderRef);
+                            if(!oSnap.exists()) throw "Order gone";
+                            const currentOrder = oSnap.data();
+                            if(currentOrder.amount < amount) throw "Not enough tokens left";
+
+                            // Logic
+                            const newAmount = currentOrder.amount - amount;
+                            if(newAmount < 0.000001) t.delete(orderRef);
+                            else t.update(orderRef, { amount: newAmount });
+
+                            // Money & Tokens
+                            t.update(buyerRef, {
+                                balance: increment(-cost),
+                                [`portfolio.${orderData.tokenId}`]: increment(amount),
+                                transactions: arrayUnion({ type: 'p2p_buy', price: orderData.price, amount: amount, date: new Date().toISOString() })
+                            });
+                            t.update(sellerRef, {
+                                balance: increment(cost),
+                                transactions: arrayUnion({ type: 'p2p_sold', price: orderData.price, amount: amount, date: new Date().toISOString() })
+                            });
+                            // Update Chart Price
+                            t.update(tokenRef, {
+                                price: orderData.price,
+                                txCount: increment(1),
+                                transactions: arrayUnion({ price: orderData.price, date: new Date().toISOString() })
+                            });
+                        });
+                        tg.showAlert("Success!");
+                        window.history.back();
+                    } catch(e) {
+                        tg.showAlert("Error: " + e);
+                    }
+                }
+            });
+        }
+
+        init();
+    </script>
+</body>
+</html>
