@@ -38,22 +38,25 @@
         <!-- Price Input -->
         <label class="launch-label">Price per 1 token (BLYX)</label>
         <div class="input-wrapper">
-            <input type="number" id="priceInput" placeholder="0.00004" oninput="validateForm()">
+            <!-- Ввод с авто-пробелами -->
+            <input type="text" inputmode="decimal" id="priceInput" placeholder="0.00004" oninput="handleInput(this)">
         </div>
 
         <!-- Amount Input -->
         <label class="launch-label">Amount to sell</label>
         <div class="input-wrapper">
-            <input type="number" id="amountInput" placeholder="Amount" oninput="validateForm()">
+            <!-- Ввод с авто-пробелами -->
+            <input type="text" inputmode="decimal" id="amountInput" placeholder="Amount" oninput="handleInput(this)">
         </div>
         <div style="font-size:12px; color:#666; text-align:right; margin-bottom:15px;">
             Available: <span id="availBal">0</span>
         </div>
 
-        <!-- Min Limit Only (Max is Auto) -->
+        <!-- Min Limit Only -->
         <label class="launch-label">Min Limit (BLYX)</label>
         <div class="input-wrapper">
-            <input type="number" id="minInput" value="100" placeholder="Min BLYX" oninput="validateForm()">
+            <!-- Ввод с авто-пробелами -->
+            <input type="text" inputmode="decimal" id="minInput" value="100" placeholder="Min BLYX" oninput="handleInput(this)">
         </div>
         
         <div style="font-size:12px; color:#666; margin-bottom:5px;">
@@ -76,46 +79,80 @@
         const tg = window.Telegram.WebApp;
         tg.expand();
         tg.setHeaderColor('#000000');
-
-        // Ссылка на лоадер
         const loader = document.getElementById('globalLoader');
 
         const tokenId = new URLSearchParams(window.location.search).get('id');
         let currentUser = null;
         let myBalance = 0;
 
+        // Форматтер для отображения
+        function formatDisplay(num) {
+            if (num === undefined || num === null) return "0";
+            let parts = num.toString().split(".");
+            parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+            if (parts[1]) return parts[0] + "." + parts[1].substring(0, 6);
+            return parts[0];
+        }
+
+        // Обработчик ввода (ставит пробелы)
+        window.handleInput = function(el) {
+            let raw = el.value.replace(/[^0-9.]/g, '');
+            if ((raw.match(/\./g) || []).length > 1) raw = raw.replace(/\.$/, '');
+            
+            if(raw.endsWith('.')) {
+                el.value = raw;
+                validateForm();
+                return;
+            }
+            if(!raw) {
+                el.value = "";
+                validateForm();
+                return;
+            }
+
+            const parts = raw.split('.');
+            parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+            if(parts[1] && parts[1].length > 6) parts[1] = parts[1].substring(0,6);
+
+            el.value = parts.join('.');
+            validateForm();
+        }
+
+        // Взять чистое число из инпута
+        function getRawValue(id) {
+            const val = document.getElementById(id).value;
+            return parseFloat(val.replace(/\s/g, '')) || 0;
+        }
+
         async function init() {
             try {
                 currentUser = await initUser();
                 myBalance = currentUser.portfolio?.[tokenId] || 0;
-                document.getElementById('availBal').innerText = Math.floor(myBalance).toLocaleString();
+                document.getElementById('availBal').innerText = formatDisplay(Math.floor(myBalance));
                 
-                // Suggest current market price
                 try {
                     const tSnap = await getDoc(doc(db, "tokens", tokenId));
                     if(tSnap.exists()) {
-                        document.getElementById('priceInput').value = tSnap.data().price.toFixed(6);
+                        // Загружаем цену из базы и сразу форматируем (если там длинное число)
+                        const dbPrice = tSnap.data().price;
+                        // Можно оставить стандартный toFixed или прогнать через пробелы, но для input value обычно лучше без пробелов при старте или сразу отформатировать.
+                        // Здесь просто ставим toFixed(6), а пробелы появятся, когда юзер начнет менять.
+                        document.getElementById('priceInput').value = dbPrice.toFixed(6);
                     }
                 } catch(e){}
                 
                 validateForm();
-            } catch(e) {
-                console.error(e);
-            }
-            
-            // Скрываем загрузку
+            } catch(e){ console.error(e); }
             if(loader) loader.classList.add('loaded');
         }
 
         window.validateForm = function() {
-            const price = parseFloat(document.getElementById('priceInput').value) || 0;
-            const amount = parseFloat(document.getElementById('amountInput').value) || 0;
-            const min = parseFloat(document.getElementById('minInput').value) || 0;
+            const price = getRawValue('priceInput');
+            const amount = getRawValue('amountInput');
+            const min = getRawValue('minInput');
             
-            // Calculate Max Limit automatically (Total Value)
             const totalValue = price * amount;
-            
-            document.getElementById('maxLimitText').innerText = totalValue > 0 ? `${totalValue.toFixed(2)} BLYX` : "Auto";
+            document.getElementById('maxLimitText').innerText = totalValue > 0 ? `${formatDisplay(totalValue)} BLYX` : "Auto";
 
             const btn = document.getElementById('publishBtn');
             const err = document.getElementById('errorText');
@@ -130,7 +167,7 @@
             }
             
             if(totalValue < 100) {
-                err.innerText = `Total order value (${totalValue.toFixed(2)} BLYX) is less than 100 BLYX`;
+                err.innerText = `Total value (${formatDisplay(totalValue)}) < 100 BLYX`;
                 return;
             }
 
@@ -140,7 +177,7 @@
             }
 
             if(min > totalValue) {
-                err.innerText = `Min limit (${min}) cannot exceed total value (${totalValue.toFixed(2)})`;
+                err.innerText = `Min limit (${formatDisplay(min)}) > total value`;
                 return;
             }
 
@@ -148,25 +185,21 @@
         }
 
         window.createOrder = async function() {
-            const price = parseFloat(document.getElementById('priceInput').value);
-            const amount = parseFloat(document.getElementById('amountInput').value);
-            const min = parseFloat(document.getElementById('minInput').value);
-            const max = price * amount; // Auto-calculated max
+            const price = getRawValue('priceInput');
+            const amount = getRawValue('amountInput');
+            const min = getRawValue('minInput');
+            const max = price * amount;
 
-            tg.showConfirm(`Sell ${amount} ${tokenId}?\nTokens will be locked.`, async (ok) => {
+            tg.showConfirm(`Sell ${formatDisplay(amount)} ${tokenId}?\nTokens will be locked.`, async (ok) => {
                 if(ok) {
-                    // Включаем загрузку
                     if(loader) loader.classList.remove('loaded');
-
                     try {
                         const userRef = doc(db, "users", currentUser.id.toString());
                         
-                        // Lock tokens
                         await updateDoc(userRef, {
                             [`portfolio.${tokenId}`]: increment(-amount)
                         });
 
-                        // Create Order
                         await addDoc(collection(db, "orders"), {
                             tokenId: tokenId,
                             sellerId: currentUser.id.toString(),
@@ -179,11 +212,9 @@
                             createdAt: new Date().toISOString(),
                             sellerRep: 100 
                         });
-
                         tg.showAlert("Order created!");
                         window.history.back();
                     } catch(e) {
-                        // Выключаем загрузку при ошибке
                         if(loader) loader.classList.add('loaded');
                         tg.showAlert("Error: " + e.message);
                     }
