@@ -10,8 +10,12 @@
     <style>
         .wh-amount { color: #FFFFFF !important; }
         .wh-coin-icon { width: 16px; height: 16px; object-fit: contain; vertical-align: middle; margin-left: 4px; border-radius: 50%; }
+        
+        /* Убираем линию под вкладками */
         .tabs-scroll { margin-bottom: 20px; border-bottom: none !important; }
+        
         .hidden { display: none !important; }
+        /* Убираем границы у элементов истории */
         .wh-item { border: none !important; }
     </style>
 </head>
@@ -253,23 +257,22 @@
                     }
                 }
 
-                // 4. PURCHASE (Buy at Curve OR P2P Buy)
+                // 4. PURCHASE (Покупка у робота ИЛИ P2P) - Трата BLYX
                 else if(tx.type === 'buy' || tx.type === 'p2p_buy') {
                     title = 'Purchase';
                     icon = 'Sprites/Cart.png';
                     sub = 'balance';
                     
-                    // Рассчитываем потраченные Блюксы
-                    // Если есть поле total (или cost) - используем его
-                    // Иначе считаем amount * price
+                    // Потрачено BLYX
                     let spent = tx.total || tx.cost || (tx.amount * tx.price) || 0;
                     
                     amountHtml = `-${formatCompact(spent)} <img src="Sprites/Blyx.png" class="wh-coin-icon">`;
                 }
 
-                // 5. SALE (Sell at Curve OR P2P Sell)
+                // 5. SALE (Продажа робота или P2P) - Доход BLYX
+                // TITLE CHANGED TO "Sold"
                 else if(tx.type === 'sell' || tx.type === 'p2p_sold') {
-                    title = 'Sale'; 
+                    title = 'Sold'; 
                     icon = 'Sprites/Sell.png'; 
                     sub = 'portfolio';
                     
