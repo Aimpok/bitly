@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="style.css">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        /* === LOADER STYLES (ДОБАВЛЕНО) === */
+        /* === LOADER STYLES === */
         #globalLoader {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background-color: #000000; z-index: 99999;
@@ -26,7 +26,7 @@
 </head>
 <body>
 
-    <!-- === ЗАГРУЗЧИК (ДОБАВЛЕНО) === -->
+    <!-- === ЗАГРУЗЧИК === -->
     <div id="globalLoader"><div class="custom-spinner"></div></div>
 
     <div class="header-nav">
@@ -46,9 +46,9 @@
             </div>
         </div>
         
-        <!-- Подсказка про комиссию -->
+        <!-- Подсказка про комиссию и ЛИМИТЫ -->
         <div style="font-size: 12px; color: #666; margin-top: -8px; margin-bottom: 12px; margin-left: 10px;">
-            Fee: 5%
+            Fee: 5% • Min: 10 • Max: 100k
         </div>
 
         <!-- Username Input with Avatar -->
@@ -61,7 +61,7 @@
             </div>
         </div>
         
-        <!-- Info Text (Ошибки) -->
+        <!-- Info Text (Ошибки поиска юзера или лимитов) -->
         <div id="receiverInfo" style="font-size: 12px; color: #FF3B30; margin-top: -8px; margin-bottom: 15px; margin-left: 10px; min-height: 14px;"></div>
     </div>
 
@@ -82,20 +82,23 @@
         tg.expand();
         tg.setHeaderColor('#000000');
 
-        // (ДОБАВЛЕНО) Ссылка на лоадер
         const loader = document.getElementById('globalLoader');
 
         let currentUser = null;
         let receiverData = null;
         let searchTimer = null;
+        
+        // КОНСТАНТЫ ЛИМИТОВ
         const FEE_PERCENT = 0.05; // 5%
+        const MIN_TRANSFER = 10;
+        const MAX_TRANSFER = 100000;
 
         async function init() {
             try {
                 currentUser = await initUser();
             } catch(e) { console.error(e); }
             
-            // (ДОБАВЛЕНО) Скрываем лоадер после инициализации
+            // Скрываем лоадер после инициализации
             if(loader) loader.classList.add('loaded');
         }
         init();
@@ -103,42 +106,57 @@
         window.updateButton = function() {
             const inputVal = parseFloat(document.getElementById('amountInput').value);
             const btn = document.getElementById('sendBtn');
+            const infoBox = document.getElementById('receiverInfo');
             
-            if (inputVal && inputVal > 0) {
+            // Проверка лимитов для отображения кнопки
+            // Кнопка активна только если сумма в диапазоне [10, 100000]
+            if (inputVal && inputVal >= MIN_TRANSFER && inputVal <= MAX_TRANSFER) {
                 const totalCost = inputVal * (1 + FEE_PERCENT); 
                 document.getElementById('btnAmount').innerText = parseFloat(totalCost.toFixed(2));
                 
-                if (receiverData) btn.classList.remove('btn-disabled');
-                else btn.classList.add('btn-disabled');
+                // Если юзер не найден, очищаем поле ошибки лимитов (чтобы не мешало)
+                if(receiverData) {
+                    btn.classList.remove('btn-disabled');
+                    // Если была ошибка лимитов, убираем ее
+                    if (infoBox.innerText.includes("Limit")) infoBox.innerText = "";
+                } else {
+                    btn.classList.add('btn-disabled');
+                }
             } else {
                 document.getElementById('btnAmount').innerText = "0";
                 btn.classList.add('btn-disabled');
+                
+                // Показываем ошибку, если введено число, но оно не подходит
+                if (inputVal && inputVal > 0) {
+                    if (inputVal < MIN_TRANSFER) infoBox.innerText = `Minimum transfer is ${MIN_TRANSFER} BLYX`;
+                    else if (inputVal > MAX_TRANSFER) infoBox.innerText = `Maximum transfer is ${MAX_TRANSFER.toLocaleString()} BLYX`;
+                } else if (!receiverData) {
+                    // Очищаем, если поле пустое
+                    infoBox.innerText = "";
+                }
             }
         }
 
         window.handleUsernameInput = function(el) {
             clearTimeout(searchTimer);
             const rawVal = el.value.trim();
-            // Убираем @ и переводим в нижний регистр для поиска
             let usernameLower = rawVal.replace('@', '').toLowerCase(); 
             
             // Сброс
             receiverData = null;
             document.getElementById('receiverAvatar').classList.remove('avatar-visible');
             document.getElementById('receiverInfo').innerText = ""; 
-            updateButton();
+            updateButton(); // Перепроверяем кнопку
 
             if(usernameLower.length < 3) return;
 
             document.getElementById('searchLoader').style.display = 'block';
             
-            // Ищем с задержкой 500мс
             searchTimer = setTimeout(() => searchUser(usernameLower), 500);
         }
 
         async function searchUser(usernameLower) {
             try {
-                // Ищем по username_lower, который мы добавили в user-service
                 const q = query(collection(db, "users"), where("username_lower", "==", usernameLower));
                 const querySnapshot = await getDocs(q);
 
@@ -156,7 +174,6 @@
                     receiverData = { ...data, docId: userDoc.id };
                     
                     const avatarEl = document.getElementById('receiverAvatar');
-                    // Если есть фото - ставим, иначе заглушка
                     avatarEl.src = data.photoUrl && data.photoUrl.length > 5 ? data.photoUrl : 'Sprites/GiftIcon.png'; 
                     avatarEl.classList.add('avatar-visible');
 
@@ -175,8 +192,18 @@
         window.doTransfer = async function() {
             const amount = parseFloat(document.getElementById('amountInput').value);
             
-            if(!amount || amount <= 0) return;
+            if(!amount) return;
             if(!receiverData) return;
+
+            // ФИНАЛЬНАЯ ПРОВЕРКА ЛИМИТОВ
+            if (amount < MIN_TRANSFER) {
+                tg.showAlert(`Minimum amount is ${MIN_TRANSFER} BLYX`);
+                return;
+            }
+            if (amount > MAX_TRANSFER) {
+                tg.showAlert(`Maximum amount is ${MAX_TRANSFER.toLocaleString()} BLYX`);
+                return;
+            }
 
             const totalDeduction = amount * (1 + FEE_PERCENT); 
 
@@ -185,9 +212,9 @@
                 return; 
             }
 
-            tg.showConfirm(`Send ${amount} BLYX to @${receiverData.username}?\nTotal cost: ${totalDeduction.toFixed(2)} BLYX (5% fee)`, async (ok) => {
+            tg.showConfirm(`Send ${amount} BLYX to @${receiverData.username}?\nTotal cost: ${totalDeduction.toFixed(2)} BLYX`, async (ok) => {
                 if(ok) {
-                    // (ДОБАВЛЕНО) Включаем лоадер, так как началась транзакция
+                    // Включаем лоадер
                     if(loader) loader.classList.remove('loaded');
                     
                     try {
@@ -234,7 +261,7 @@
 
                     } catch (e) {
                         console.error(e);
-                        // (ДОБАВЛЕНО) Убираем лоадер при ошибке
+                        // Убираем лоадер при ошибке
                         if(loader) loader.classList.add('loaded');
                         tg.showAlert("Transaction failed: " + e);
                     }
