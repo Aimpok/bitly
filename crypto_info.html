@@ -140,13 +140,12 @@
     
     let activeCursor = null; 
 
+    // === ИСПРАВЛЕННЫЙ ФОРМАТТЕР (БЕЗ E-5) ===
     function formatPrice(val) {
-        if(!val || val === 0) return "0";
-        if(val < 0.0001) return val.toExponential(2); 
-        if(val < 1) return val.toFixed(6).replace(/\.?0+$/, "");
-        if(val >= 1000000) return (val/1000000).toFixed(2) + "M";
-        if(val >= 1000) return (val/1000).toFixed(2) + "K";
-        return val.toFixed(2);
+        if(!val && val !== 0) return "0";
+        // Принудительно выводим до 10 знаков и обрезаем лишние нули
+        // Это убирает e-5, e-6 и т.д.
+        return val.toFixed(10).replace(/\.?0+$/, "");
     }
     
     function formatCompact(num) {
@@ -261,8 +260,8 @@
         document.getElementById('txCount').innerText = formatCompact(currentTokenData.txCount || 0);
         document.getElementById('marketCapVal').innerText = formatCompact(currentTokenData.marketCap || 0);
         
-        let displayPrice = currentTokenData.price < 0.01 ? currentTokenData.price.toFixed(8) : currentTokenData.price.toFixed(4);
-        document.getElementById('tokenPriceDisplay').innerText = displayPrice;
+        // Используем новый форматтер
+        document.getElementById('tokenPriceDisplay').innerText = formatPrice(currentTokenData.price);
 
         if(currentTokenData.image) {
             document.getElementById('tokenIcon').src = currentTokenData.image;
@@ -310,39 +309,51 @@
         drawRealChart(null);
     }
 
+    // === ГЕНЕРАЦИЯ СВЕЧЕЙ С ЗАПОЛНЕНИЕМ ПУСТОТ ===
     function generateCandles(transactions, timeframeMinutes) {
         if(!transactions || transactions.length === 0) return [];
+        
         const sorted = [...transactions].sort((a,b) => new Date(a.date) - new Date(b.date));
-        const candles = [];
+        
         const intervalMs = timeframeMinutes * 60 * 1000;
         
-        if (sorted.length === 0) return [];
+        // Начало от первой транзакции
+        const startTime = Math.floor(new Date(sorted[0].date).getTime() / intervalMs) * intervalMs;
+        // Конец - текущее время (чтобы график доходил до правого края)
+        const endTime = Date.now(); 
 
-        let startTime = new Date(sorted[0].date).getTime();
-        let bucketStart = Math.floor(startTime / intervalMs) * intervalMs;
-        
-        let currentCandle = { 
-            t: bucketStart, 
-            o: sorted[0].price, 
-            h: sorted[0].price, 
-            l: sorted[0].price, 
-            c: sorted[0].price 
-        };
+        const candles = [];
+        let lastClose = sorted[0].price; // Цена закрытия предыдущей свечи (для старта берем первую цену)
 
-        sorted.forEach(tx => {
-            const time = new Date(tx.date).getTime();
-            if (time >= bucketStart + intervalMs) {
-                candles.push(currentCandle);
-                bucketStart = Math.floor(time / intervalMs) * intervalMs;
-                const prevClose = currentCandle.c;
-                currentCandle = { t: bucketStart, o: prevClose, h: tx.price, l: tx.price, c: tx.price };
+        // Итерируемся по каждому интервалу от старта до сейчас
+        for (let t = startTime; t <= endTime; t += intervalMs) {
+            
+            // Находим все транзакции, которые попали в этот интервал
+            const bucketTxs = sorted.filter(tx => {
+                const txTime = new Date(tx.date).getTime();
+                return txTime >= t && txTime < t + intervalMs;
+            });
+
+            if (bucketTxs.length > 0) {
+                // Если были сделки
+                const prices = bucketTxs.map(tx => tx.price);
+                
+                const open = lastClose; // Открытие = Закрытие предыдущей
+                const close = prices[prices.length - 1]; // Закрытие = последняя сделка
+                
+                // Хай и Лоу считаем с учетом цены открытия!
+                const high = Math.max(open, ...prices);
+                const low = Math.min(open, ...prices);
+
+                candles.push({ t: t, o: open, h: high, l: low, c: close });
+                lastClose = close; // Обновляем последнюю цену
             } else {
-                if (tx.price > currentCandle.h) currentCandle.h = tx.price;
-                if (tx.price < currentCandle.l) currentCandle.l = tx.price;
-                currentCandle.c = tx.price;
+                // Если сделок НЕ было -> создаем плоскую свечу (Doji)
+                // Цена осталась прежней
+                candles.push({ t: t, o: lastClose, h: lastClose, l: lastClose, c: lastClose });
             }
-        });
-        candles.push(currentCandle);
+        }
+        
         return candles;
     }
 
@@ -375,22 +386,17 @@
         const candles = generateCandles(txs, currentTimeframe);
         if(candles.length === 0) return;
 
-        // Расчет минимума и максимума
         let minP = Infinity, maxP = -Infinity;
         candles.forEach(c => { 
             if(c.l < minP) minP = c.l; 
             if(c.h > maxP) maxP = c.h; 
         });
         
-        // --- ВАЖНО: ОТДАЛЕНИЕ ГРАФИКА (ZOOM OUT) ---
-        // Если движение минимальное, мы искусственно увеличиваем масштаб,
-        // чтобы свечи не были на весь экран.
+        // ZOOM OUT / PADDING
         let range = maxP - minP;
-        if(range === 0) range = maxP * 0.01; // Защита от прямой линии
+        if(range === 0) range = maxP * 0.01;
 
         const midPoint = (maxP + minP) / 2;
-        // Увеличиваем диапазон отображения в 4 раза больше, чем реальный разброс цены
-        // Это сделает свечи маленькими и аккуратными посередине
         const visualRange = range * 4; 
         
         const viewMax = midPoint + (visualRange / 2);
@@ -418,17 +424,13 @@
 
         const availableW = chartW;
         const candleSpacing = availableW / candles.length;
-        
-        // --- ФИКСИРОВАННАЯ ТОНКАЯ ШИРИНА СВЕЧИ ---
-        // Максимум 5px, или меньше если свечей много
         const candleBodyW = Math.min(5, candleSpacing * 0.7); 
-        
         const labelStep = Math.max(1, Math.floor(candles.length / 4));
 
         candles.forEach((c, i) => {
             const xCenter = i * candleSpacing + (candleSpacing / 2);
             
-            // X-Axis
+            // Time Labels
             if(i % labelStep === 0) {
                 ctx.strokeStyle = '#222';
                 ctx.beginPath(); ctx.moveTo(xCenter, 0); ctx.lineTo(xCenter, chartH); ctx.stroke();
@@ -449,7 +451,8 @@
             ctx.beginPath(); ctx.moveTo(xCenter, yH); ctx.lineTo(xCenter, yL); ctx.stroke();
 
             const bodyTop = Math.min(yO, yC);
-            const bodyHeight = Math.max(1, Math.abs(yC - yO));
+            // Минимальная высота свечи 1px, чтобы пустые свечи было видно (как линию)
+            const bodyHeight = Math.max(1, Math.abs(yC - yO)); 
             const xLeft = xCenter - candleBodyW / 2;
 
             if (isUp) {
@@ -464,35 +467,25 @@
             }
         });
 
-        // --- CROSSHAIR (ПЕРЕКРЕСТИЕ) ---
+        // --- CROSSHAIR ---
         if(cursor && cursor.x < chartW && cursor.y < chartH) {
             ctx.setLineDash([4, 4]);
             ctx.lineWidth = 1;
             ctx.strokeStyle = '#FFFFFF';
 
-            ctx.beginPath();
-            ctx.moveTo(cursor.x, 0); ctx.lineTo(cursor.x, chartH);
-            ctx.stroke();
-
-            ctx.beginPath();
-            ctx.moveTo(0, cursor.y); ctx.lineTo(chartW, cursor.y);
-            ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(cursor.x, 0); ctx.lineTo(cursor.x, chartH); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(0, cursor.y); ctx.lineTo(chartW, cursor.y); ctx.stroke();
 
             ctx.setLineDash([]);
 
-            // Цена на курсоре
             const priceAtCursor = viewMax - (cursor.y / scaleY);
-            
             const labelText = formatPrice(priceAtCursor);
             const textWidth = ctx.measureText(labelText).width + 12;
             const labelH = 20;
             
-            // Белая плашка
             ctx.fillStyle = '#FFFFFF';
-            // Рисуем скругленный прямоугольник (упрощенно)
             ctx.fillRect(chartW, cursor.y - labelH/2, textWidth, labelH);
             
-            // Черный текст
             ctx.fillStyle = '#000000';
             ctx.font = "bold 11px Inter";
             ctx.textAlign = "left";
