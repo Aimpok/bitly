@@ -54,7 +54,6 @@
             
             snap.forEach(doc => {
                 const d = doc.data();
-                // Показываем только если есть остаток
                 if(d.amount > 0) {
                     allOrders.push({ id: doc.id, ...d });
                 }
@@ -85,26 +84,31 @@
             orders.forEach(o => {
                 const isMine = String(o.sellerId) === String(currentUser.id);
                 
-                // Аватарка или заглушка
                 let avatarHtml = `<div class="oc-avatar" style="background:#333;"></div>`;
-                if(o.sellerAvatar) {
-                    avatarHtml = `<img src="${o.sellerAvatar}" class="oc-avatar-img">`;
-                }
+                if(o.sellerAvatar) avatarHtml = `<img src="${o.sellerAvatar}" class="oc-avatar-img">`;
+
+                // Получаем количество сделок продавца (если есть в ордере, иначе дефолт)
+                // Но лучше бы хранить актуальное в юзере, но здесь берем из ордера (или заглушку)
+                // Если мы сами, то покажем "Me"
+                const tradesShow = isMine ? 'Me' : (o.sellerRep || 0) + ' trades';
+
+                // Кнопка: EDIT (если мое) или BUY
+                const actionBtn = isMine 
+                    ? `<button class="oc-buy-btn" style="background:#333; color:#fff;" onclick="location.href='p2p_sell.html?oid=${o.id}'">Edit</button>` 
+                    : `<button class="oc-buy-btn" onclick="location.href='p2p_buy.html?oid=${o.id}'">Buy</button>`;
 
                 const el = document.createElement('div');
                 el.className = 'order-card';
                 el.innerHTML = `
                     <div class="oc-header">
                         <div class="oc-price">${formatPrice(o.price)} <img src="Sprites/Blyx.png" style="width:16px;"></div>
-                        ${isMine 
-                            ? '<span style="color:#666; font-size:12px;">My Order</span>' 
-                            : `<button class="oc-buy-btn" onclick="location.href='p2p_buy.html?oid=${o.id}'">Buy</button>`}
+                        ${actionBtn}
                     </div>
                     <div class="oc-user-row">
                         ${avatarHtml}
                         <div>
                             <div class="oc-username">${o.sellerName}</div>
-                            <div class="oc-stats">100 trades, 100%</div>
+                            <div class="oc-stats">${tradesShow}, 100%</div>
                         </div>
                     </div>
                     <div class="oc-limits-row">
