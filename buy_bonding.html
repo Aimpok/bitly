@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Buy Token</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        /* === LOADER STYLES === */
+        #globalLoader {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: #000000; z-index: 99999;
+            display: flex; justify-content: center; align-items: center;
+            transition: opacity 0.3s ease, visibility 0.3s;
+        }
+        #globalLoader.loaded { opacity: 0; visibility: hidden; pointer-events: none; }
+        .custom-spinner {
+            width: 40px; height: 40px; border-radius: 50%;
+            border: 4px solid #333; border-top-color: #ffffff;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        .info-card {
+            background:#111; border:1px solid #333; border-radius:16px; padding:16px; margin-bottom:20px;
+        }
+        .progress-bar-bg {
+            width: 100%; height: 6px; background: #333; border-radius: 4px; margin-top: 10px; overflow: hidden;
+        }
+        .progress-bar-fill {
+            height: 100%; background: #CCFF00; width: 0%; transition: width 0.3s;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ЗАГРУЗЧИК -->
+    <div id="globalLoader"><div class="custom-spinner"></div></div>
+
+    <div class="header-nav">
+        <button class="back-btn" onclick="window.history.back()"><svg class="icon" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
+        <div class="header-title" id="pageTitle">Buy</div>
+    </div>
+
+    <div style="padding: 0 16px;">
+        
+        <!-- Info Block -->
+        <div class="info-card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <img id="tokenImg" src="" style="width:32px; height:32px; border-radius:50%; object-fit:cover; display:none;">
+                    <div id="tokenLetter" style="width:32px; height:32px; border-radius:50%; background:#333; display:flex; align-items:center; justify-content:center; font-weight:700;">?</div>
+                    <div>
+                        <div style="font-weight:700; font-size:16px;" id="tokenTicker">...</div>
+                        <div style="font-size:12px; color:#888;">Bonding Curve</div>
+                    </div>
+                </div>
+                <div style="text-align:right;">
+                    <div style="font-size:12px; color:#888;">Price</div>
+                    <div style="font-weight:700;" id="priceVal">0</div>
+                </div>
+            </div>
+
+            <div style="width:100%; height:1px; background:#222; margin:10px 0;"></div>
+
+            <div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:5px;">
+                <span style="color:#888;">Progress</span>
+                <span style="color:#fff; font-weight:600;" id="progressText">0%</span>
+            </div>
+            <div class="progress-bar-bg">
+                <div class="progress-bar-fill" id="progressFill"></div>
+            </div>
+        </div>
+
+        <!-- Input -->
+        <div class="input-wrapper">
+            <input type="text" inputmode="decimal" id="amountInput" placeholder="Amount BLYX" oninput="handleInput(this)">
+            <div class="input-suffix">BLYX</div>
+        </div>
+        
+        <div style="display:flex; justify-content:space-between; margin-top:10px; padding:0 5px;">
+            <span style="font-size:12px; color:#666;">Balance: <span id="userBal">0</span></span>
+            <span style="font-size:12px; color:#fff;">You get: <span id="tokensGet" style="font-weight:700;">0</span></span>
+        </div>
+
+        <!-- Ошибка -->
+        <div id="errorText" class="error-text"></div>
+    </div>
+
+    <div class="fixed-bottom-bar">
+        <button class="btn-white-large btn-disabled" id="confirmBtn" onclick="doBuy()">
+            <span id="btnLabel">Pay 0</span> 
+            <img src="Sprites/Blyx.png" style="width:20px; height:20px; object-fit:contain; margin-left:6px;">
+        </button>
+    </div>
+
+    <script type="module">
+        import { initUser } from './user-service.js';
+        import { db } from './firebase-config.js';
+        import { doc, getDoc, updateDoc, increment, arrayUnion } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        tg.setHeaderColor('#000000');
+        
+        const loader = document.getElementById('globalLoader');
+        const tokenId = new URLSearchParams(window.location.search).get('id');
+        
+        let tokenData = null;
+        let currentUser = null;
+        const TOTAL_SUPPLY = 1000000000;
+
+        // Форматтер с пробелами
+        function formatDisplay(num) {
+            if (num === undefined || num === null) return "0";
+            let parts = num.toString().split(".");
+            parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+            if (parts[1]) return parts[0] + "." + parts[1].substring(0, 6);
+            return parts[0];
+        }
+
+        // Ввод с пробелами
+        window.handleInput = function(el) {
+            let raw = el.value.replace(/[^0-9.]/g, '');
+            if ((raw.match(/\./g) || []).length > 1) raw = raw.replace(/\.$/, '');
+            
+            if(raw.endsWith('.')) {
+                el.value = raw;
+                updateButton(); return;
+            }
+            if(!raw) {
+                el.value = "";
+                updateButton(); return;
+            }
+
+            const parts = raw.split('.');
+            parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+            if(parts[1] && parts[1].length > 6) parts[1] = parts[1].substring(0,6);
+
+            el.value = parts.join('.');
+            updateButton();
+        }
+
+        function getRawAmount() {
+            return parseFloat(document.getElementById('amountInput').value.replace(/\s/g, '')) || 0;
+        }
+
+        async function init() {
+            try {
+                currentUser = await initUser();
+                document.getElementById('userBal').innerText = formatDisplay(Math.floor(currentUser.balance));
+
+                const snap = await getDoc(doc(db, "tokens", tokenId));
+                if(!snap.exists()) { alert("Token not found"); window.history.back(); return; }
+                
+                tokenData = snap.data();
+                render();
+            } catch(e) { console.error(e); }
+            
+            if(loader) loader.classList.add('loaded');
+        }
+
+        function render() {
+            document.getElementById('pageTitle').innerText = `Buy ${tokenData.name}`;
+            document.getElementById('tokenTicker').innerText = tokenData.id;
+            
+            // Иконка
+            if(tokenData.image) {
+                document.getElementById('tokenImg').src = tokenData.image;
+                document.getElementById('tokenImg').style.display = 'block';
+                document.getElementById('tokenLetter').style.display = 'none';
+            } else {
+                document.getElementById('tokenLetter').innerText = tokenData.id[0];
+            }
+
+            // Цена
+            const price = tokenData.price < 0.01 ? tokenData.price.toFixed(8) : tokenData.price.toFixed(4);
+            document.getElementById('priceVal').innerText = price + " BLYX";
+
+            // Прогресс
+            const sold = tokenData.sold || 0;
+            const progress = Math.min((sold / TOTAL_SUPPLY) * 100, 100);
+            document.getElementById('progressText').innerText = progress.toFixed(2) + "%";
+            document.getElementById('progressFill').style.width = progress + "%";
+        }
+
+        window.updateButton = function() {
+            const inputVal = getRawAmount();
+            const btn = document.getElementById('confirmBtn');
+            const err = document.getElementById('errorText');
+            
+            // Расчет сколько получим токенов
+            const tokensToGet = inputVal / tokenData.price;
+            document.getElementById('tokensGet').innerText = formatDisplay(tokensToGet);
+            document.getElementById('btnLabel').innerText = inputVal > 0 ? formatDisplay(inputVal) : "0";
+
+            btn.classList.add('btn-disabled');
+            err.innerText = "";
+
+            if(inputVal <= 0) return;
+
+            if(inputVal > currentUser.balance) {
+                err.innerText = "Insufficient BLYX balance";
+                return;
+            }
+
+            // Проверка 30% лимита (если не создатель)
+            const myHoldings = currentUser.portfolio?.[tokenId] || 0;
+            const maxAllowed = TOTAL_SUPPLY * 0.30;
+            const isCreator = tokenData.ownerId === currentUser.id.toString(); // ownerId или creatorId, проверьте как в launch.html
+
+            if (!isCreator && (myHoldings + tokensToGet) > maxAllowed) {
+                err.innerText = `Limit reached (Max 30% of supply)`;
+                return;
+            }
+
+            btn.classList.remove('btn-disabled');
+        }
+
+        window.doBuy = async function() {
+            const inputVal = getRawAmount();
+            if(!inputVal) return;
+
+            const tokensToGet = inputVal / tokenData.price;
+            
+            tg.showConfirm(`Buy ${formatDisplay(tokensToGet)} ${tokenId} for ${formatDisplay(inputVal)} BLYX?`, async (ok) => {
+                if(ok) {
+                    if(loader) loader.classList.remove('loaded');
+                    try {
+                        const newCap = (tokenData.marketCap || 0) + inputVal;
+                        const newPrice = newCap / TOTAL_SUPPLY;
+
+                        const userRef = doc(db, "users", currentUser.id.toString());
+                        const tokenRef = doc(db, "tokens", tokenId);
+
+                        // Обновляем баланс юзера
+                        await updateDoc(userRef, {
+                            balance: increment(-inputVal),
+                            [`portfolio.${tokenId}`]: increment(tokensToGet),
+                            transactions: arrayUnion({ type: 'buy', token: tokenId, amount: tokensToGet, cost: inputVal, price: tokenData.price, date: new Date().toISOString() })
+                        });
+
+                        // Обновляем токен
+                        await updateDoc(tokenRef, {
+                            marketCap: increment(inputVal),
+                            sold: increment(tokensToGet),
+                            txCount: increment(1),
+                            price: newPrice,
+                            transactions: arrayUnion({ price: newPrice, date: new Date().toISOString() })
+                        });
+
+                        tg.showAlert("Success!");
+                        window.history.back(); // Возврат на Crypto Info
+                    } catch(e) {
+                        if(loader) loader.classList.add('loaded');
+                        tg.showAlert("Error: " + e.message);
+                    }
+                }
+            });
+        }
+
+        init();
+    </script>
+</body>
+</html>
