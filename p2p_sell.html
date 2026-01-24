@@ -8,7 +8,18 @@
     <link rel="stylesheet" href="style.css">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        /* === LOADER STYLES === */
+        body {
+            background-color: #000;
+            color: #fff;
+            margin: 0;
+            font-family: 'Inter', sans-serif;
+            overflow: hidden; /* Скроллим только внутренний контейнер */
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* === LOADER === */
         #globalLoader {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background-color: #000000; z-index: 99999;
@@ -22,39 +33,79 @@
             animation: spin 1s linear infinite;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        
-        /* === СТИЛИ ДЛЯ КНОПКИ УДАЛЕНИЯ (СЕРЫЙ ЦВЕТ) === */
-        .delete-btn {
-            /* 1. Идентичные размеры и отступы как у .btn-white-large */
-            width: 100%;
-            height: 56px;
-            border-radius: 16px;
+
+        /* === HEADER === */
+        .header-nav {
+            flex-shrink: 0; /* Не сжимать хедер */
+            background: #000;
+            padding: 10px 16px;
+            display: flex; align-items: center; z-index: 10;
+        }
+
+        /* === SCROLLABLE CONTENT === */
+        .scrollable-content {
+            flex: 1; /* Занимает все доступное место */
+            overflow-y: auto;
+            padding: 0 16px 180px 16px; /* Огромный отступ снизу для кнопок */
+            -webkit-overflow-scrolling: touch;
+        }
+
+        /* === BUTTONS (Styles from Launch Example) === */
+        .fixed-bottom-bar {
+            position: fixed;
+            bottom: 20px; left: 0; right: 0;
+            padding: 0 16px;
+            z-index: 100;
             display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-top: 12px;
-            border: none;
-            cursor: pointer;
-            gap: 8px;
-
-            /* 2. Шрифт один в один как у .btn-white-large */
-            font-family: 'Inter', sans-serif;
-            font-size: 18px;
-            font-weight: 800; /* Жирность как у основной кнопки */
-
-            /* 3. Цвет: Серый фон (#333333) и Белый текст */
-            background: #333333; 
-            color: #FFFFFF;      
-            
-            /* Анимация и тень */
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-            transition: opacity 0.2s, transform 0.1s;
+            flex-direction: column;
+            gap: 12px; /* Отступ между кнопками */
+            background: linear-gradient(to top, #000000 80%, rgba(0,0,0,0)); /* Градиент под кнопками */
+            pointer-events: none; /* Чтобы градиент не мешал кликам выше */
         }
         
-        .delete-btn:active {
-            opacity: 0.8;
-            transform: scale(0.98);
+        .fixed-bottom-bar button {
+            pointer-events: auto; /* Возвращаем кликабельность кнопкам */
         }
+
+        /* Белая кнопка (как в примере Create/Launch) */
+        .btn-white-large {
+            background: white; 
+            color: black; 
+            height: 56px; 
+            border-radius: 16px; 
+            font-size: 18px; 
+            font-weight: 800; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            gap: 8px; 
+            width: 100%; 
+            border: none; 
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(255,255,255,0.1);
+            transition: opacity 0.2s;
+        }
+        .btn-white-large:active { opacity: 0.9; }
+        .btn-disabled { background: #333 !important; color: #777 !important; pointer-events: none; }
+
+        /* Серая кнопка (Такой же размер, для Удаления) */
+        .btn-grey-large {
+            background: #1c1c1c; 
+            color: #FF3B30; /* Красный текст для удаления */
+            height: 56px; 
+            border-radius: 16px; 
+            font-size: 18px; 
+            font-weight: 800; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            width: 100%; 
+            border: 1px solid #333; 
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-grey-large:active { background: #252525; }
+
     </style>
 </head>
 <body>
@@ -67,7 +118,8 @@
         <div class="header-title" id="pageTitle">Create Order</div>
     </div>
 
-    <div style="padding: 0 16px;">
+    <!-- Основной контент со скроллом -->
+    <div class="scrollable-content">
         <!-- Price Input -->
         <label class="launch-label">Price per 1 token (BLYX)</label>
         <div class="input-wrapper">
@@ -95,13 +147,18 @@
 
         <!-- Error Text -->
         <div id="errorText" class="error-text"></div>
+        
+        <!-- Пустой блок для надежности скролла на iOS -->
+        <div style="height: 50px;"></div>
     </div>
 
-    <div class="fixed-bottom-bar" style="padding-bottom: 20px;">
+    <!-- Нижняя панель с кнопками -->
+    <div class="fixed-bottom-bar">
+        <!-- Кнопка Publish / Save (Белая, большая) -->
         <button class="btn-white-large btn-disabled" id="publishBtn" onclick="handleSubmit()">Publish Order</button>
         
-        <!-- Кнопка удаления (изначально скрыта) -->
-        <button class="delete-btn" id="deleteBtn" style="display:none;" onclick="handleDelete()">Delete Order</button>
+        <!-- Кнопка удаления (Серая, большая) -->
+        <button class="btn-grey-large" id="deleteBtn" style="display:none;" onclick="handleDelete()">Delete Order</button>
     </div>
 
     <script type="module">
@@ -116,8 +173,8 @@
 
         // Получаем параметры
         const params = new URLSearchParams(window.location.search);
-        const orderId = params.get('oid'); // Если есть - режим редактирования
-        const tokenIdParam = params.get('id'); // Если нет OID, берем ID токена для создания
+        const orderId = params.get('oid'); 
+        const tokenIdParam = params.get('id');
 
         let currentUser = null;
         let myBalance = 0;
@@ -125,7 +182,6 @@
         let currentOrder = null;
         let activeTokenId = '';
 
-        // Форматтер с пробелами
         function formatDisplay(num) {
             if (num === undefined || num === null) return "0";
             let parts = num.toString().split(".");
@@ -134,7 +190,6 @@
             return parts[0];
         }
 
-        // Ввод текста с пробелами
         window.handleInput = function(el) {
             let raw = el.value.replace(/[^0-9.]/g, '');
             if ((raw.match(/\./g) || []).length > 1) raw = raw.replace(/\.$/, '');
@@ -158,7 +213,6 @@
             validateForm();
         }
 
-        // Получить чистое число из инпута
         function getRawValue(id) {
             const val = document.getElementById(id).value;
             return parseFloat(val.replace(/\s/g, '')) || 0;
@@ -173,7 +227,9 @@
                     isEditMode = true;
                     document.getElementById('pageTitle').innerText = "Edit Order";
                     document.getElementById('publishBtn').innerText = "Save Changes";
-                    document.getElementById('deleteBtn').style.display = "flex"; // Показываем кнопку удаления
+                    
+                    // Показываем кнопку удаления
+                    document.getElementById('deleteBtn').style.display = "flex"; 
 
                     const oSnap = await getDoc(doc(db, "orders", orderId));
                     if (!oSnap.exists()) {
@@ -184,12 +240,10 @@
                     currentOrder = { id: oSnap.id, ...oSnap.data() };
                     activeTokenId = currentOrder.tokenId;
 
-                    // Заполняем поля старыми данными
                     document.getElementById('priceInput').value = formatDisplay(currentOrder.price);
                     document.getElementById('amountInput').value = formatDisplay(currentOrder.amount);
                     document.getElementById('minInput').value = formatDisplay(currentOrder.minLimit);
                     
-                    // Блокируем количество (чтобы не усложнять возврат)
                     document.getElementById('amountInput').disabled = true;
                     document.getElementById('amountInput').style.opacity = "0.5";
 
@@ -202,7 +256,6 @@
                     myBalance = currentUser.portfolio?.[activeTokenId] || 0;
                     document.getElementById('availBal').innerText = formatDisplay(Math.floor(myBalance));
                     
-                    // Подгружаем цену
                     try {
                         const tSnap = await getDoc(doc(db, "tokens", activeTokenId));
                         if(tSnap.exists()) {
@@ -210,7 +263,6 @@
                         }
                     } catch(e){}
                 } else {
-                    // Нет параметров
                     window.history.back();
                     return;
                 }
@@ -236,7 +288,6 @@
 
             if(amount <= 0 || price <= 0) return;
             
-            // Проверка баланса только если создаем новый
             if(!isEditMode && amount > myBalance) {
                 err.innerText = "Not enough tokens on balance";
                 return;
@@ -260,13 +311,11 @@
             btn.classList.remove('btn-disabled');
         }
 
-        // Общая функция для кнопки (Создать или Сохранить)
         window.handleSubmit = async function() {
             if (isEditMode) updateOrder();
             else createOrder();
         }
 
-        // === СОЗДАНИЕ ОРДЕРА ===
         async function createOrder() {
             const price = getRawValue('priceInput');
             const amount = getRawValue('amountInput');
@@ -279,12 +328,10 @@
                     try {
                         const userRef = doc(db, "users", currentUser.id.toString());
                         
-                        // Блокируем токены (списываем с баланса)
                         await updateDoc(userRef, {
                             [`portfolio.${activeTokenId}`]: increment(-amount)
                         });
 
-                        // Создаем ордер
                         await addDoc(collection(db, "orders"), {
                             tokenId: activeTokenId,
                             sellerId: currentUser.id.toString(),
@@ -308,12 +355,9 @@
             });
         }
 
-        // === ОБНОВЛЕНИЕ ОРДЕРА (Только цена и лимиты) ===
         async function updateOrder() {
             const price = getRawValue('priceInput');
             const min = getRawValue('minInput');
-            
-            // Кол-во берем из сохраненного объекта, так как инпут заблокирован
             const amount = currentOrder.amount; 
             const max = price * amount;
 
@@ -333,7 +377,6 @@
             }
         }
 
-        // === УДАЛЕНИЕ ОРДЕРА (ВОЗВРАТ СРЕДСТВ) ===
         window.handleDelete = async function() {
             tg.showConfirm("Delete order and return tokens?", async (ok) => {
                 if(ok) {
@@ -348,12 +391,10 @@
                             if(!oDoc.exists()) throw "Order not found";
                             
                             const data = oDoc.data();
-                            const returnAmount = data.amount; // Сколько осталось в ордере
+                            const returnAmount = data.amount;
 
-                            // Удаляем ордер
                             t.delete(oRef);
 
-                            // Возвращаем токены пользователю и пишем в историю
                             t.update(uRef, {
                                 [`portfolio.${data.tokenId}`]: increment(returnAmount),
                                 transactions: arrayUnion({
