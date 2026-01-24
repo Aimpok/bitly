@@ -7,6 +7,29 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        /* === LOADER STYLES === */
+        #globalLoader {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: #000000; z-index: 99999;
+            display: flex; justify-content: center; align-items: center;
+            transition: opacity 0.3s ease, visibility 0.3s;
+        }
+        #globalLoader.loaded { opacity: 0; visibility: hidden; pointer-events: none; }
+        .custom-spinner {
+            width: 40px; height: 40px; border-radius: 50%;
+            border: 4px solid #333; border-top-color: #ffffff;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Chart Canvas Fixes */
+        .chart-area {
+            background: #0A0A0A; 
+            border: 1px solid #222;
+            border-radius: 16px;
+        }
+    </style>
 </head>
 <body>
 
@@ -64,8 +87,6 @@
             <div class="time-btn" onclick="setFrame(60, '1h')">1h</div>
             <div class="time-btn" onclick="setFrame(1440, '1d')">1d</div>
             <div class="time-btn" onclick="setFrame(10080, '1w')">1w</div>
-            <div class="time-btn" onclick="setFrame(43200, '1m')">1M</div>
-            <div class="time-btn" onclick="setFrame(525600, '1y')">1Y</div>
         </div>
         <div class="chart-area"><canvas id="chartCanvas"></canvas></div>
         <div style="height: 120px;"></div>
@@ -122,17 +143,26 @@
     // FORMATTERS
     function formatPrice(val) {
         if(!val || val === 0) return "0";
-        return val < 0.01 ? val.toFixed(8).replace(/\.?0+$/, "") : val.toFixed(4);
+        if(val < 0.0001) return val.toExponential(2); 
+        if(val < 1) return val.toFixed(6).replace(/\.?0+$/, "");
+        if(val >= 1000000) return (val/1000000).toFixed(2) + "M";
+        if(val >= 1000) return (val/1000).toFixed(2) + "K";
+        return val.toFixed(2);
     }
+    
     function formatCompact(num) {
         if (!num) return "0";
         return Intl.NumberFormat('en-US', { notation: "compact", maximumFractionDigits: 2 }).format(num);
     }
-    function formatTime(timestamp, mode) {
+
+    function formatTimeAxis(timestamp, mode) {
         const d = new Date(timestamp);
-        if(mode === '5m' || mode === '1h') return d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
-        if(mode === '1d' || mode === '1w') return d.getDate() + ' ' + d.toLocaleString('en', {month:'short'});
-        return d.toLocaleString('en', {month:'short'}) + " '" + d.getFullYear().toString().substr(2,2);
+        const h = d.getHours().toString().padStart(2,'0');
+        const m = d.getMinutes().toString().padStart(2,'0');
+        if(mode === '5m' || mode === '1h') return `${h}:${m}`;
+        const day = d.getDate();
+        const mon = d.toLocaleString('en', {month:'short'});
+        return `${day} ${mon}`;
     }
 
     window.switchTab = function(tabName, el) {
@@ -147,13 +177,11 @@
         if(!tokenId) return;
         await initUser();
         
-        // Слушаем изменения токена
         onSnapshot(doc(db, "tokens", tokenId), (docSnap) => {
             if (docSnap.exists()) {
                 currentTokenData = docSnap.data();
                 renderUI();
                 drawRealChart();
-                // Убираем загрузку когда данные токена пришли
                 if(loader) loader.classList.add('loaded');
             }
         });
@@ -171,7 +199,9 @@
         document.getElementById('holdersCount').innerText = formatCompact(currentTokenData.holdersCount || 1);
         document.getElementById('txCount').innerText = formatCompact(currentTokenData.txCount || 0);
         document.getElementById('marketCapVal').innerText = formatCompact(currentTokenData.marketCap || 0);
-        document.getElementById('tokenPriceDisplay').innerText = formatPrice(currentTokenData.price);
+        
+        let displayPrice = currentTokenData.price < 0.01 ? currentTokenData.price.toFixed(8) : currentTokenData.price.toFixed(4);
+        document.getElementById('tokenPriceDisplay').innerText = displayPrice;
 
         if(currentTokenData.image) {
             document.getElementById('tokenIcon').src = currentTokenData.image;
@@ -189,8 +219,6 @@
         document.getElementById('bondingText').innerText = progress.toFixed(2) + '% collected';
 
         const btn = document.getElementById('mainActionBtn');
-        
-        // ИЗМЕНЕНИЕ: Кнопка всегда белая, текст "Buy"
         btn.style.background = "#FFFFFF";
         btn.style.color = "#000000";
 
@@ -205,106 +233,166 @@
         }
     }
 
-    // НОВАЯ ЛОГИКА КНОПКИ
     window.handleAction = function() {
         if(isP2P) {
             location.href = `p2p_market.html?id=${tokenId}`;
         } else {
-            // Переход на новый экран покупки у бота
             location.href = `buy_bonding.html?id=${tokenId}`;
         }
     }
 
-    // --- CHART LOGIC (Без изменений) ---
     window.setFrame = function(min, label) {
         currentTimeframe = min;
         timeLabel = label;
         document.querySelectorAll('.time-btn').forEach(b => {
             b.classList.remove('active');
-            if(b.innerText === (min >= 525600 ? '1Y' : (min >= 43200 ? '1M' : (min >= 10080 ? '1w' : (min >= 1440 ? '1d' : (min >= 60 ? '1h' : '5m')))))) b.classList.add('active');
+            if(b.innerText === label) b.classList.add('active');
         });
         drawRealChart();
     }
 
     function generateCandles(transactions, timeframeMinutes) {
         if(!transactions || transactions.length === 0) return [];
-        const candles = [];
         const sorted = [...transactions].sort((a,b) => new Date(a.date) - new Date(b.date));
+        const candles = [];
         const intervalMs = timeframeMinutes * 60 * 1000;
-        let currentCandle = null;
-        let bucketStart = 0;
+        
+        if (sorted.length === 0) return [];
+
+        let startTime = new Date(sorted[0].date).getTime();
+        let bucketStart = Math.floor(startTime / intervalMs) * intervalMs;
+        
+        let currentCandle = { 
+            t: bucketStart, 
+            o: sorted[0].price, 
+            h: sorted[0].price, 
+            l: sorted[0].price, 
+            c: sorted[0].price 
+        };
 
         sorted.forEach(tx => {
             const time = new Date(tx.date).getTime();
-            const bucket = Math.floor(time / intervalMs) * intervalMs;
-            if (!currentCandle || bucket !== bucketStart) {
-                if (currentCandle) candles.push(currentCandle);
-                const prevClose = candles.length > 0 ? candles[candles.length-1].c : tx.price;
-                bucketStart = bucket;
-                currentCandle = { t: bucket, o: prevClose, h: tx.price, l: tx.price, c: tx.price };
+            if (time >= bucketStart + intervalMs) {
+                candles.push(currentCandle);
+                bucketStart = Math.floor(time / intervalMs) * intervalMs;
+                const prevClose = currentCandle.c;
+                currentCandle = { t: bucketStart, o: prevClose, h: tx.price, l: tx.price, c: tx.price };
             } else {
                 if (tx.price > currentCandle.h) currentCandle.h = tx.price;
                 if (tx.price < currentCandle.l) currentCandle.l = tx.price;
                 currentCandle.c = tx.price;
             }
         });
-        if (currentCandle) candles.push(currentCandle);
+        candles.push(currentCandle);
         return candles;
     }
 
     function drawRealChart() {
         const canvas = document.getElementById('chartCanvas');
         if(!canvas || !currentTokenData) return;
+        
+        // High DPI Fix
+        const dpr = window.devicePixelRatio || 1;
+        const rect = canvas.parentElement.getBoundingClientRect();
+        
+        canvas.width = rect.width * dpr;
+        canvas.height = rect.height * dpr;
+        
         const ctx = canvas.getContext('2d');
-        const parent = canvas.parentElement;
-        canvas.width = parent.offsetWidth;
-        canvas.height = parent.offsetHeight;
-        const w = canvas.width;
-        const h = canvas.height;
+        ctx.scale(dpr, dpr);
+        
+        const w = rect.width;
+        const h = rect.height;
+        const paddingRight = 50; 
+        const paddingBottom = 20; 
+        const chartW = w - paddingRight;
+        const chartH = h - paddingBottom;
+
         ctx.clearRect(0,0,w,h);
+
         const txs = currentTokenData.transactions || [];
         if(txs.length === 0) return;
+
         const candles = generateCandles(txs, currentTimeframe);
-        const chartW = w - 40;
-        const chartH = h - 30; 
-        const bottomY = chartH;
-        if(candles.length === 0) {
-             const price = txs[txs.length-1].price;
-             ctx.strokeStyle = '#CCFF00'; ctx.beginPath(); ctx.moveTo(0, h/2); ctx.lineTo(w, h/2); ctx.stroke();
-             return;
-        }
+        if(candles.length === 0) return;
+
         let minP = Infinity, maxP = -Infinity;
-        candles.forEach(c => { if(c.l < minP) minP = c.l; if(c.h > maxP) maxP = c.h; });
+        candles.forEach(c => { 
+            if(c.l < minP) minP = c.l; 
+            if(c.h > maxP) maxP = c.h; 
+        });
+        
         if(minP === maxP) { minP *= 0.95; maxP *= 1.05; }
+        const range = maxP - minP;
+        const paddingY = range * 0.1; 
+        minP -= paddingY;
+        maxP += paddingY;
+        
         const scaleY = chartH / (maxP - minP);
-        ctx.strokeStyle = '#222'; ctx.lineWidth = 1; ctx.font = "600 10px Inter"; ctx.fillStyle = '#666';
-        for(let i=0; i<=5; i++) {
-            const y = i * (chartH/5);
-            const val = maxP - (i * ((maxP - minP)/5));
+
+        // --- GRID ---
+        const steps = 5;
+        ctx.font = "600 10px Inter";
+        ctx.textAlign = "left";
+        ctx.lineWidth = 1;
+
+        for(let i=0; i<=steps; i++) {
+            const priceVal = maxP - (i * ((maxP - minP)/steps));
+            const y = i * (chartH / steps);
+            
+            ctx.strokeStyle = '#222';
             ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(chartW, y); ctx.stroke();
-            ctx.textAlign = "left"; ctx.fillText(formatPrice(val), chartW + 5, y + 3);
+            
+            ctx.fillStyle = '#666';
+            ctx.fillText(formatPrice(priceVal), chartW + 6, y + 4);
         }
-        const candleW = Math.max(2, Math.min(20, (chartW / candles.length) * 0.7));
-        const spacing = (chartW / candles.length);
+
+        const availableW = chartW;
+        const candleSpacing = availableW / candles.length;
+        const candleBodyW = Math.max(2, Math.min(15, candleSpacing * 0.7)); 
         const labelStep = Math.max(1, Math.floor(candles.length / 4));
+
         candles.forEach((c, i) => {
-            const x = i * spacing + (spacing/2);
+            const xCenter = i * candleSpacing + (candleSpacing / 2);
+            
+            // X-Axis Labels
             if(i % labelStep === 0) {
-                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, bottomY); ctx.stroke();
-                ctx.textAlign = "center"; ctx.fillText(formatTime(c.t, timeLabel), x, bottomY + 15);
+                ctx.strokeStyle = '#222';
+                ctx.beginPath(); ctx.moveTo(xCenter, 0); ctx.lineTo(xCenter, chartH); ctx.stroke();
+                
+                ctx.fillStyle = '#666';
+                ctx.textAlign = "center";
+                ctx.fillText(formatTimeAxis(c.t, timeLabel), xCenter, h - 5);
             }
-            const isUp = c.c >= c.o;
-            const color = isUp ? '#FFF' : '#000'; 
-            const stroke = '#FFF';
+
             const yH = (maxP - c.h) * scaleY;
             const yL = (maxP - c.l) * scaleY;
             const yO = (maxP - c.o) * scaleY;
             const yC = (maxP - c.c) * scaleY;
-            const bTop = Math.min(yO, yC);
-            const bH = Math.max(1, Math.abs(yC - yO));
-            ctx.strokeStyle = stroke; ctx.beginPath(); ctx.moveTo(x, yH); ctx.lineTo(x, yL); ctx.stroke();
-            ctx.fillStyle = color; ctx.fillRect(x - candleW/2, bTop, candleW, bH);
-            ctx.strokeRect(x - candleW/2, bTop, candleW, bH);
+
+            const isUp = c.c >= c.o;
+            
+            // Wicks: ALWAYS WHITE
+            ctx.strokeStyle = '#FFFFFF';
+            ctx.beginPath(); ctx.moveTo(xCenter, yH); ctx.lineTo(xCenter, yL); ctx.stroke();
+
+            // Body
+            const bodyTop = Math.min(yO, yC);
+            const bodyHeight = Math.max(1, Math.abs(yC - yO));
+            const xLeft = xCenter - candleBodyW / 2;
+
+            if (isUp) {
+                // UP: Solid White
+                ctx.fillStyle = '#FFFFFF';
+                ctx.fillRect(xLeft, bodyTop, candleBodyW, bodyHeight);
+            } else {
+                // DOWN: Black with White Outline
+                ctx.fillStyle = '#000000'; // Match background
+                ctx.strokeStyle = '#FFFFFF';
+                ctx.lineWidth = 1; 
+                ctx.fillRect(xLeft, bodyTop, candleBodyW, bodyHeight);
+                ctx.strokeRect(xLeft, bodyTop, candleBodyW, bodyHeight);
+            }
         });
     }
 
