@@ -22,23 +22,22 @@
             animation: spin 1s linear infinite;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        
-        /* КНОПКА УДАЛЕНИЯ (ИКОНКА СПРАВА ВВЕРХУ) */
-        .delete-icon-btn {
+
+        /* СТИЛЬ КНОПКИ УДАЛИТЬ (КАК BUY) */
+        .btn-delete-top {
             background: #1c1c1c;
-            color: #888;
+            color: #FFFFFF;
             border: none;
-            width: 40px; height: 40px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            border-radius: 20px;
+            padding: 6px 16px;
+            font-size: 14px;
+            font-weight: 600;
             cursor: pointer;
-            margin-left: auto; /* Двигаем вправо */
+            margin-left: auto;
+            transition: background 0.2s;
         }
-        .delete-icon-btn:active {
+        .btn-delete-top:active {
             background: #333;
-            color: #fff;
         }
     </style>
 </head>
@@ -50,29 +49,44 @@
     <div class="header-nav">
         <button class="back-btn" onclick="window.history.back()"><svg class="icon" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
         <div class="header-title" id="pageTitle">Create Order</div>
-        <!-- Кнопка удаления появится здесь -->
-        <button class="delete-icon-btn" id="deleteBtn" style="display:none;" onclick="handleDelete()">
-            <svg class="icon" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-        </button>
+        
+        <!-- Кнопка удаления справа сверху -->
+        <button class="btn-delete-top" id="deleteBtn" style="display:none;" onclick="handleDelete()">Delete</button>
     </div>
 
     <div style="padding: 0 16px;">
+        <!-- Price Input -->
         <label class="launch-label">Price per 1 token (BLYX)</label>
-        <div class="input-wrapper"><input type="text" inputmode="decimal" id="priceInput" oninput="handleInput(this)"></div>
+        <div class="input-wrapper">
+            <input type="text" inputmode="decimal" id="priceInput" placeholder="0.00004" oninput="handleInput(this)">
+        </div>
 
+        <!-- Amount Input -->
         <label class="launch-label">Amount to sell</label>
-        <div class="input-wrapper"><input type="text" inputmode="decimal" id="amountInput" oninput="handleInput(this)"></div>
-        <div style="font-size:12px; color:#666; text-align:right; margin-bottom:15px;">Available: <span id="availBal">0</span></div>
+        <div class="input-wrapper">
+            <input type="text" inputmode="decimal" id="amountInput" placeholder="Amount" oninput="handleInput(this)">
+        </div>
+        <div style="font-size:12px; color:#666; text-align:right; margin-bottom:15px;">
+            Available: <span id="availBal">0</span>
+        </div>
 
+        <!-- Min Limit Only -->
         <label class="launch-label">Min Limit (BLYX)</label>
-        <div class="input-wrapper"><input type="text" inputmode="decimal" id="minInput" value="100" oninput="handleInput(this)"></div>
-        <div style="font-size:12px; color:#666; margin-bottom:5px;">Max Limit: <span id="maxLimitText">Auto (All)</span></div>
+        <div class="input-wrapper">
+            <input type="text" inputmode="decimal" id="minInput" value="100" placeholder="Min BLYX" oninput="handleInput(this)">
+        </div>
+        
+        <div style="font-size:12px; color:#666; margin-bottom:5px;">
+            Max Limit: <span id="maxLimitText">Auto (All)</span>
+        </div>
+
+        <!-- Error Text -->
         <div id="errorText" class="error-text"></div>
     </div>
 
     <div class="fixed-bottom-bar">
-        <!-- У основной кнопки теперь font-weight: 800 как в launch.html -->
-        <button class="btn-white-large btn-disabled" id="publishBtn" onclick="handleSubmit()">Publish Order</button>
+        <!-- Кнопка с жирным шрифтом 800 -->
+        <button class="btn-white-large btn-disabled" style="font-weight: 800;" id="publishBtn" onclick="handleSubmit()">Publish Order</button>
     </div>
 
     <script type="module">
@@ -86,132 +100,245 @@
         const loader = document.getElementById('globalLoader');
 
         const params = new URLSearchParams(window.location.search);
-        const orderId = params.get('oid');
+        const orderId = params.get('oid'); 
         const tokenIdParam = params.get('id');
 
-        let currentUser = null, myBalance = 0, isEditMode = false, currentOrder = null, activeTokenId = '';
+        let currentUser = null;
+        let myBalance = 0;
+        let isEditMode = false;
+        let currentOrder = null;
+        let activeTokenId = '';
 
-        const fmt = (n) => {
-            if (!n && n !== 0) return "";
-            let [i, d] = n.toString().split(".");
-            i = i.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
-            return d ? `${i}.${d.substring(0, 6)}` : i;
-        };
-        const getVal = (id) => parseFloat(document.getElementById(id).value.replace(/\s/g, '')) || 0;
+        // Форматтер для отображения с пробелами
+        function formatDisplay(num) {
+            if (num === undefined || num === null) return "0";
+            let parts = num.toString().split(".");
+            parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+            if (parts[1]) return parts[0] + "." + parts[1].substring(0, 6);
+            return parts[0];
+        }
 
-        window.handleInput = (el) => {
-            let v = el.value.replace(/[^0-9.]/g, '');
-            if ((v.match(/\./g)||[]).length > 1) v = v.replace(/\.$/, '');
-            if (!v || v.endsWith('.')) { el.value = v; validateForm(); return; }
-            el.value = fmt(v);
+        // Ввод текста с пробелами
+        window.handleInput = function(el) {
+            let raw = el.value.replace(/[^0-9.]/g, '');
+            if ((raw.match(/\./g) || []).length > 1) raw = raw.replace(/\.$/, '');
+            
+            if(raw.endsWith('.')) {
+                el.value = raw;
+                validateForm();
+                return;
+            }
+            if(!raw) {
+                el.value = "";
+                validateForm();
+                return;
+            }
+
+            const parts = raw.split('.');
+            parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+            if(parts[1] && parts[1].length > 6) parts[1] = parts[1].substring(0,6);
+
+            el.value = parts.join('.');
             validateForm();
-        };
+        }
+
+        // Получить чистое число из инпута
+        function getRawValue(id) {
+            const val = document.getElementById(id).value;
+            return parseFloat(val.replace(/\s/g, '')) || 0;
+        }
 
         async function init() {
             try {
                 currentUser = await initUser();
+
                 if (orderId) {
                     isEditMode = true;
                     document.getElementById('pageTitle').innerText = "Edit Order";
                     document.getElementById('publishBtn').innerText = "Save Changes";
-                    document.getElementById('deleteBtn').style.display = "flex";
+                    document.getElementById('deleteBtn').style.display = "block";
 
                     const oSnap = await getDoc(doc(db, "orders", orderId));
-                    if (!oSnap.exists()) { window.history.back(); return; }
-                    
+                    if (!oSnap.exists()) {
+                        alert("Order not found");
+                        window.history.back();
+                        return;
+                    }
                     currentOrder = { id: oSnap.id, ...oSnap.data() };
                     activeTokenId = currentOrder.tokenId;
+
+                    document.getElementById('priceInput').value = formatDisplay(currentOrder.price);
+                    document.getElementById('amountInput').value = formatDisplay(currentOrder.amount);
+                    document.getElementById('minInput').value = formatDisplay(currentOrder.minLimit);
                     
-                    document.getElementById('priceInput').value = fmt(currentOrder.price);
-                    document.getElementById('amountInput').value = fmt(currentOrder.amount);
-                    document.getElementById('minInput').value = fmt(currentOrder.minLimit);
                     document.getElementById('amountInput').disabled = true;
+                    document.getElementById('amountInput').style.opacity = "0.5";
                     document.getElementById('availBal').innerText = "Locked in order";
+
                 } else if (tokenIdParam) {
+                    isEditMode = false;
                     activeTokenId = tokenIdParam;
                     myBalance = currentUser.portfolio?.[activeTokenId] || 0;
-                    document.getElementById('availBal').innerText = fmt(Math.floor(myBalance));
+                    document.getElementById('availBal').innerText = formatDisplay(Math.floor(myBalance));
+                    
                     try {
-                        const t = await getDoc(doc(db, "tokens", activeTokenId));
-                        if(t.exists()) document.getElementById('priceInput').value = t.data().price.toFixed(6);
+                        const tSnap = await getDoc(doc(db, "tokens", activeTokenId));
+                        if(tSnap.exists()) {
+                            document.getElementById('priceInput').value = tSnap.data().price.toFixed(6);
+                        }
                     } catch(e){}
-                } else { window.history.back(); }
+                } else {
+                    window.history.back();
+                    return;
+                }
+                
                 validateForm();
             } catch(e){ console.error(e); }
+            
             if(loader) loader.classList.add('loaded');
         }
 
-        window.validateForm = () => {
-            const p = getVal('priceInput'), a = getVal('amountInput'), m = getVal('minInput');
-            const total = p * a;
-            const err = document.getElementById('errorText');
-            const btn = document.getElementById('publishBtn');
+        window.validateForm = function() {
+            const price = getRawValue('priceInput');
+            const amount = getRawValue('amountInput');
+            const min = getRawValue('minInput');
             
-            document.getElementById('maxLimitText').innerText = total > 0 ? `${fmt(total)} BLYX` : "Auto";
+            const totalValue = price * amount;
+            document.getElementById('maxLimitText').innerText = totalValue > 0 ? `${formatDisplay(totalValue)} BLYX` : "Auto";
+
+            const btn = document.getElementById('publishBtn');
+            const err = document.getElementById('errorText');
             btn.classList.add('btn-disabled');
             err.innerText = "";
 
-            if (!a || !p) return;
-            if (!isEditMode && a > myBalance) return err.innerText = "Insufficient tokens";
-            if (total < 100) return err.innerText = "Total value < 100 BLYX";
-            if (m < 100) return err.innerText = "Min limit < 100 BLYX";
-            if (m > total) return err.innerText = "Min limit > Total value";
+            if(amount <= 0 || price <= 0) return;
+            
+            if(!isEditMode && amount > myBalance) {
+                err.innerText = "Not enough tokens on balance";
+                return;
+            }
+            
+            if(totalValue < 100) {
+                err.innerText = `Total value (${formatDisplay(totalValue)}) < 100 BLYX`;
+                return;
+            }
+
+            if(min < 100) {
+                err.innerText = "Minimum limit must be at least 100 BLYX";
+                return;
+            }
+
+            if(min > totalValue) {
+                err.innerText = `Min limit > total value`;
+                return;
+            }
 
             btn.classList.remove('btn-disabled');
         }
 
-        window.handleSubmit = async () => {
-            const p = getVal('priceInput'), a = getVal('amountInput'), m = getVal('minInput');
-            const max = p * a;
-            
-            if (loader) loader.classList.remove('loaded');
-            
-            try {
-                if (isEditMode) {
-                    await updateDoc(doc(db, "orders", currentOrder.id), { price: p, minLimit: m, maxLimit: max });
-                    tg.showAlert("Updated!");
-                } else {
-                    const userRef = doc(db, "users", currentUser.id.toString());
-                    await updateDoc(userRef, { [`portfolio.${activeTokenId}`]: increment(-a) });
-                    await addDoc(collection(db, "orders"), {
-                        tokenId: activeTokenId, sellerId: currentUser.id.toString(), sellerName: currentUser.username, sellerAvatar: currentUser.photoUrl,
-                        price: p, amount: a, minLimit: m, maxLimit: max, createdAt: new Date().toISOString(), sellerRep: currentUser.tradesCount || 0
-                    });
-                    tg.showAlert("Created!");
-                }
-                window.history.back();
-            } catch (e) {
-                if(loader) loader.classList.add('loaded');
-                tg.showAlert("Error: " + e.message);
-            }
-        };
+        window.handleSubmit = async function() {
+            if (isEditMode) updateOrder();
+            else createOrder();
+        }
 
-        window.handleDelete = async () => {
-            tg.showConfirm("Delete order?", async (ok) => {
+        async function createOrder() {
+            const price = getRawValue('priceInput');
+            const amount = getRawValue('amountInput');
+            const min = getRawValue('minInput');
+            const max = price * amount;
+
+            tg.showConfirm(`Sell ${formatDisplay(amount)} ${activeTokenId}?\nTokens will be locked.`, async (ok) => {
                 if(ok) {
-                    if (loader) loader.classList.remove('loaded');
+                    if(loader) loader.classList.remove('loaded');
                     try {
-                        await runTransaction(db, async (t) => {
-                            const oRef = doc(db, "orders", currentOrder.id);
-                            const uRef = doc(db, "users", currentUser.id.toString());
-                            const oDoc = await t.get(oRef);
-                            if (!oDoc.exists()) throw "Order not found";
-                            const data = oDoc.data();
-                            t.delete(oRef);
-                            t.update(uRef, {
-                                [`portfolio.${data.tokenId}`]: increment(data.amount),
-                                transactions: arrayUnion({ type: 'cancel_order', token: data.tokenId, amount: data.amount, date: new Date().toISOString() })
-                            });
+                        const userRef = doc(db, "users", currentUser.id.toString());
+                        await updateDoc(userRef, {
+                            [`portfolio.${activeTokenId}`]: increment(-amount)
                         });
-                        tg.showAlert("Deleted & Refunded");
+
+                        await addDoc(collection(db, "orders"), {
+                            tokenId: activeTokenId,
+                            sellerId: currentUser.id.toString(),
+                            sellerName: currentUser.username || "Anon",
+                            sellerAvatar: currentUser.photoUrl || "", 
+                            price: price,
+                            amount: amount,
+                            minLimit: min,
+                            maxLimit: max,
+                            createdAt: new Date().toISOString(),
+                            sellerRep: currentUser.tradesCount || 0
+                        });
+
+                        tg.showAlert("Order created!");
                         window.history.back();
-                    } catch (e) {
+                    } catch(e) {
                         if(loader) loader.classList.add('loaded');
                         tg.showAlert("Error: " + e.message);
                     }
                 }
             });
-        };
+        }
+
+        async function updateOrder() {
+            const price = getRawValue('priceInput');
+            const min = getRawValue('minInput');
+            const amount = currentOrder.amount; 
+            const max = price * amount;
+
+            if(loader) loader.classList.remove('loaded');
+            
+            try {
+                await updateDoc(doc(db, "orders", orderId), {
+                    price: price,
+                    minLimit: min,
+                    maxLimit: max
+                });
+                tg.showAlert("Order updated!");
+                window.history.back();
+            } catch(e) {
+                if(loader) loader.classList.add('loaded');
+                tg.showAlert("Error: " + e.message);
+            }
+        }
+
+        window.handleDelete = async function() {
+            tg.showConfirm("Delete order and return tokens?", async (ok) => {
+                if(ok) {
+                    if(loader) loader.classList.remove('loaded');
+                    
+                    try {
+                        await runTransaction(db, async (t) => {
+                            const oRef = doc(db, "orders", orderId);
+                            const uRef = doc(db, "users", currentUser.id.toString());
+                            
+                            const oDoc = await t.get(oRef);
+                            if(!oDoc.exists()) throw "Order not found";
+                            
+                            const data = oDoc.data();
+                            const returnAmount = data.amount;
+
+                            t.delete(oRef);
+
+                            t.update(uRef, {
+                                [`portfolio.${data.tokenId}`]: increment(returnAmount),
+                                transactions: arrayUnion({
+                                    type: 'cancel_order',
+                                    token: data.tokenId,
+                                    amount: returnAmount,
+                                    date: new Date().toISOString()
+                                })
+                            });
+                        });
+
+                        tg.showAlert("Order deleted. Tokens returned.");
+                        window.history.back();
+                    } catch(e) {
+                        if(loader) loader.classList.add('loaded');
+                        tg.showAlert("Error: " + e);
+                    }
+                }
+            });
+        }
 
         init();
     </script>
