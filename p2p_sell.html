@@ -23,25 +23,37 @@
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         
-        /* КНОПКА УДАЛЕНИЯ (ОБНОВЛЕННЫЙ СТИЛЬ) */
+        /* === СТИЛИ ДЛЯ КНОПКИ УДАЛЕНИЯ (СЕРЫЙ ЦВЕТ) === */
         .delete-btn {
-            background: #D93899; /* Розовый цвет */
-            color: #FFFFFF;      /* Белый текст */
-            border: none;        /* Без обводки */
-            border-radius: 16px;
-            height: 56px;        /* Высота как у основной кнопки */
-            font-size: 18px;     /* Размер шрифта как у основной */
-            font-weight: 800;    /* Жирность как у основной */
+            /* 1. Идентичные размеры и отступы как у .btn-white-large */
             width: 100%;
-            margin-top: 12px;
-            cursor: pointer;
+            height: 56px;
+            border-radius: 16px;
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: opacity 0.2s;
+            margin-top: 12px;
+            border: none;
+            cursor: pointer;
+            gap: 8px;
+
+            /* 2. Шрифт один в один как у .btn-white-large */
+            font-family: 'Inter', sans-serif;
+            font-size: 18px;
+            font-weight: 800; /* Жирность как у основной кнопки */
+
+            /* 3. Цвет: Серый фон (#333333) и Белый текст */
+            background: #333333; 
+            color: #FFFFFF;      
+            
+            /* Анимация и тень */
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            transition: opacity 0.2s, transform 0.1s;
         }
+        
         .delete-btn:active {
             opacity: 0.8;
+            transform: scale(0.98);
         }
     </style>
 </head>
