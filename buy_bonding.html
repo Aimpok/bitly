@@ -29,9 +29,13 @@
         .progress-bar-bg {
             width: 100%; height: 6px; background: #333; border-radius: 4px; margin-top: 10px; overflow: hidden;
         }
+        /* БЕЛАЯ ЛИНИЯ ПРОГРЕССА */
         .progress-bar-fill {
-            height: 100%; background: #CCFF00; width: 0%; transition: width 0.3s;
+            height: 100%; background: #FFFFFF; width: 0%; transition: width 0.3s;
         }
+        
+        /* Класс для красного текста ошибки */
+        .text-error { color: #FF3B30 !important; font-weight: 600; }
     </style>
 </head>
 <body>
@@ -54,7 +58,7 @@
                     <div id="tokenLetter" style="width:32px; height:32px; border-radius:50%; background:#333; display:flex; align-items:center; justify-content:center; font-weight:700;">?</div>
                     <div>
                         <div style="font-weight:700; font-size:16px;" id="tokenTicker">...</div>
-                        <div style="font-size:12px; color:#888;">Bonding Curve</div>
+                        <!-- Убрали надпись Bonding Curve -->
                     </div>
                 </div>
                 <div style="text-align:right;">
@@ -76,17 +80,18 @@
 
         <!-- Input -->
         <div class="input-wrapper">
-            <input type="text" inputmode="decimal" id="amountInput" placeholder="Amount BLYX" oninput="handleInput(this)">
-            <div class="input-suffix">BLYX</div>
+            <!-- Вводим ТОКЕНЫ -->
+            <input type="text" inputmode="decimal" id="amountInput" placeholder="Amount" oninput="handleInput(this)">
+            <div class="input-suffix" id="tokenSuffix">TOKEN</div>
         </div>
         
-        <div style="display:flex; justify-content:space-between; margin-top:10px; padding:0 5px;">
-            <span style="font-size:12px; color:#666;">Balance: <span id="userBal">0</span></span>
-            <span style="font-size:12px; color:#fff;">You get: <span id="tokensGet" style="font-weight:700;">0</span></span>
+        <div style="display:flex; justify-content:space-between; margin-top:10px; padding:0 5px; align-items: flex-start;">
+            <!-- Сюда будет писаться баланс ИЛИ ошибка красным -->
+            <span id="balanceInfo" style="font-size:12px; color:#666;">Checking balance...</span>
+            
+            <!-- Справа стоимость -->
+            <span style="font-size:12px; color:#fff;">Cost: <span id="costVal" style="font-weight:700;">0</span> BLYX</span>
         </div>
-
-        <!-- Ошибка -->
-        <div id="errorText" class="error-text"></div>
     </div>
 
     <div class="fixed-bottom-bar">
@@ -150,7 +155,8 @@
         async function init() {
             try {
                 currentUser = await initUser();
-                document.getElementById('userBal').innerText = formatDisplay(Math.floor(currentUser.balance));
+                // Показываем изначальный баланс
+                document.getElementById('balanceInfo').innerText = `Balance: ${formatDisplay(Math.floor(currentUser.balance))} BLYX`;
 
                 const snap = await getDoc(doc(db, "tokens", tokenId));
                 if(!snap.exists()) { alert("Token not found"); window.history.back(); return; }
@@ -165,6 +171,7 @@
         function render() {
             document.getElementById('pageTitle').innerText = `Buy ${tokenData.name}`;
             document.getElementById('tokenTicker').innerText = tokenData.id;
+            document.getElementById('tokenSuffix').innerText = tokenData.id; // Тикер справа в инпуте
             
             // Иконка
             if(tokenData.image) {
@@ -187,32 +194,40 @@
         }
 
         window.updateButton = function() {
-            const inputVal = getRawAmount();
+            const tokenAmount = getRawAmount(); // Введенное кол-во ТОКЕНОВ
             const btn = document.getElementById('confirmBtn');
-            const err = document.getElementById('errorText');
+            const balanceLabel = document.getElementById('balanceInfo');
             
-            // Расчет сколько получим токенов
-            const tokensToGet = inputVal / tokenData.price;
-            document.getElementById('tokensGet').innerText = formatDisplay(tokensToGet);
-            document.getElementById('btnLabel').innerText = inputVal > 0 ? formatDisplay(inputVal) : "0";
+            // Расчет стоимости в BLYX
+            const cost = tokenAmount * tokenData.price;
+            
+            // Обновляем UI стоимости
+            document.getElementById('costVal').innerText = formatDisplay(cost);
+            // Кнопка Pay показывает стоимость в BLYX
+            document.getElementById('btnLabel').innerText = cost > 0 ? formatDisplay(cost) : "0";
 
+            // Сброс стилей ошибки
+            balanceLabel.className = "";
+            balanceLabel.innerText = `Balance: ${formatDisplay(Math.floor(currentUser.balance))} BLYX`;
             btn.classList.add('btn-disabled');
-            err.innerText = "";
 
-            if(inputVal <= 0) return;
+            if(tokenAmount <= 0) return;
 
-            if(inputVal > currentUser.balance) {
-                err.innerText = "Insufficient BLYX balance";
+            // 1. Проверка Баланса BLYX
+            if(cost > currentUser.balance) {
+                balanceLabel.innerText = "Insufficient BLYX balance";
+                balanceLabel.className = "text-error";
                 return;
             }
 
-            // Проверка 30% лимита (если не создатель)
+            // 2. Проверка Лимита (30% эмиссии)
             const myHoldings = currentUser.portfolio?.[tokenId] || 0;
             const maxAllowed = TOTAL_SUPPLY * 0.30;
-            const isCreator = tokenData.ownerId === currentUser.id.toString(); // ownerId или creatorId, проверьте как в launch.html
+            const isCreator = tokenData.ownerId === currentUser.id.toString(); 
 
-            if (!isCreator && (myHoldings + tokensToGet) > maxAllowed) {
-                err.innerText = `Limit reached (Max 30% of supply)`;
+            if (!isCreator && (myHoldings + tokenAmount) > maxAllowed) {
+                balanceLabel.innerText = `Max limit reached (30%)`;
+                balanceLabel.className = "text-error";
                 return;
             }
 
@@ -220,39 +235,40 @@
         }
 
         window.doBuy = async function() {
-            const inputVal = getRawAmount();
-            if(!inputVal) return;
+            const tokenAmount = getRawAmount(); // Токены
+            if(!tokenAmount) return;
 
-            const tokensToGet = inputVal / tokenData.price;
+            const cost = tokenAmount * tokenData.price; // BLYX
             
-            tg.showConfirm(`Buy ${formatDisplay(tokensToGet)} ${tokenId} for ${formatDisplay(inputVal)} BLYX?`, async (ok) => {
+            // Confirm показывает: Купить X Токенов за Y BLYX
+            tg.showConfirm(`Buy ${formatDisplay(tokenAmount)} ${tokenId} for ${formatDisplay(cost)} BLYX?`, async (ok) => {
                 if(ok) {
                     if(loader) loader.classList.remove('loaded');
                     try {
-                        const newCap = (tokenData.marketCap || 0) + inputVal;
+                        const newCap = (tokenData.marketCap || 0) + cost;
                         const newPrice = newCap / TOTAL_SUPPLY;
 
                         const userRef = doc(db, "users", currentUser.id.toString());
                         const tokenRef = doc(db, "tokens", tokenId);
 
-                        // Обновляем баланс юзера
+                        // Обновляем баланс юзера (списываем BLYX, даем Токены)
                         await updateDoc(userRef, {
-                            balance: increment(-inputVal),
-                            [`portfolio.${tokenId}`]: increment(tokensToGet),
-                            transactions: arrayUnion({ type: 'buy', token: tokenId, amount: tokensToGet, cost: inputVal, price: tokenData.price, date: new Date().toISOString() })
+                            balance: increment(-cost),
+                            [`portfolio.${tokenId}`]: increment(tokenAmount),
+                            transactions: arrayUnion({ type: 'buy', token: tokenId, amount: tokenAmount, cost: cost, price: tokenData.price, date: new Date().toISOString() })
                         });
 
                         // Обновляем токен
                         await updateDoc(tokenRef, {
-                            marketCap: increment(inputVal),
-                            sold: increment(tokensToGet),
+                            marketCap: increment(cost),
+                            sold: increment(tokenAmount),
                             txCount: increment(1),
                             price: newPrice,
                             transactions: arrayUnion({ price: newPrice, date: new Date().toISOString() })
                         });
 
                         tg.showAlert("Success!");
-                        window.history.back(); // Возврат на Crypto Info
+                        window.history.back(); 
                     } catch(e) {
                         if(loader) loader.classList.add('loaded');
                         tg.showAlert("Error: " + e.message);
