@@ -8,35 +8,39 @@
     <link rel="stylesheet" href="style.css">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        /* === GLOBAL LOADER STYLES === */
+        /* Стиль загрузчика */
         #globalLoader {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background-color: #000000; /* Черный фон */
-            z-index: 99999; /* Поверх всего */
+            background-color: #000000;
+            z-index: 99999;
             display: flex;
             justify-content: center;
             align-items: center;
-            transition: opacity 0.5s ease, visibility 0.5s; /* Плавное исчезновение */
+            transition: opacity 0.3s ease, visibility 0.3s;
         }
 
-        /* Скрытое состояние загрузчика */
+        /* Класс для скрытия */
         #globalLoader.loaded {
             opacity: 0;
             visibility: hidden;
             pointer-events: none;
         }
 
-        /* Крутилка как на фото */
+        /* Если мы вернулись в меню, скрываем сразу без анимации */
+        #globalLoader.instant-hide {
+            display: none !important;
+        }
+
         .custom-spinner {
             width: 40px;
             height: 40px;
             border-radius: 50%;
-            border: 4px solid #333; /* Темно-серый круг */
-            border-top-color: #ffffff; /* Белая часть */
+            border: 4px solid #333;
+            border-top-color: #ffffff;
             animation: spin 1s linear infinite;
         }
 
@@ -48,11 +52,21 @@
 </head>
 <body>
 
-<!-- === ЭКРАН ЗАГРУЗКИ (ВИДЕН ПРИ СТАРТЕ) === -->
+<!-- === ЭКРАН ЗАГРУЗКИ === -->
 <div id="globalLoader">
     <div class="custom-spinner"></div>
 </div>
 
+<!-- !!! ВАЖНЫЙ СКРИПТ: ПРОВЕРКА ВОЗВРАТА !!! -->
+<script>
+    // Этот код сработает раньше, чем прогрузится остальная страница
+    // Если в памяти есть метка "app_ready", мы мгновенно убираем загрузчик
+    if (sessionStorage.getItem('app_ready')) {
+        document.getElementById('globalLoader').classList.add('instant-hide');
+    }
+</script>
+
+<!-- Остальной контент -->
 <div class="section-title" style="margin-top: 20px;">News</div>
 <div class="carousel-container" id="newsSlider" style="min-height: 160px;"></div>
 
@@ -71,9 +85,7 @@
     <div class="filter-chip">Month</div>
 </div>
 
-<div class="token-list" id="topTokensList" style="padding-bottom: 120px;">
-    <!-- Текст Loading убрали, так как теперь есть Global Loader -->
-</div>
+<div class="token-list" id="topTokensList" style="padding-bottom: 120px;"></div>
 
 <div class="bottom-nav">
     <div class="nav-item active">
@@ -134,42 +146,29 @@
 
     async function startApp() {
         try {
-            // 1. Инициализируем юзера (кэшируется в user-service)
-            // Мы не ждем окончания await initUser() чтобы начать грузить маркет,
-            // но нам нужен юзер для логики приложения.
             initUser(); 
-            
-            // 2. Инициализация маркета (если нужна)
             await initMarketDataIfNeeded();
 
-            // 3. Подписка на рынок. 
-            // Как только придут данные (из кэша мгновенно или с сервера),
-            // мы уберем экран загрузки.
             subscribeToMarket((tokens) => {
                 renderTopTokens(tokens);
 
-                // ДАННЫЕ ПОЛУЧЕНЫ - УБИРАЕМ ЗАГРУЗЧИК
-                if(loader && !loader.classList.contains('loaded')) {
-                    // Небольшая задержка для плавности, если кэш отработал мгновенно
-                    // или чтобы юзер успел увидеть анимацию
+                // Когда данные пришли:
+                // 1. Ставим метку, что приложение готово (для будущих возвратов)
+                sessionStorage.setItem('app_ready', 'true');
+
+                // 2. Если лоадер еще виден (первый вход) - плавно убираем его
+                if(loader && !loader.classList.contains('instant-hide') && !loader.classList.contains('loaded')) {
                     setTimeout(() => {
                         loader.classList.add('loaded');
                     }, 300); 
                 }
             });
-
-        } catch (e) { 
-            console.error(e);
-            // Если ошибка, все равно убираем лоадер, чтобы не зависло
-            if(loader) loader.classList.add('loaded');
-        }
+        } catch (e) { console.error(e); }
     }
 
     function renderTopTokens(tokens) {
         const container = document.getElementById('topTokensList');
         if(!container) return;
-        
-        // Сортировка по цене
         const sorted = tokens.sort((a,b) => b.price - a.price).slice(0, 5);
 
         container.innerHTML = '';
@@ -206,7 +205,6 @@
         });
     }
 
-    // Запускаем
     startApp();
 </script>
 
