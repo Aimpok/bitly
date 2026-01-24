@@ -62,7 +62,7 @@
             </div>
         </div>
         
-        <!-- Info Text -->
+        <!-- Info Text (Ошибки) -->
         <div id="receiverInfo" style="font-size: 12px; color: #FF3B30; margin-top: -8px; margin-bottom: 15px; margin-left: 10px; min-height: 14px;"></div>
     </div>
 
@@ -140,35 +140,50 @@
         }
         init();
 
+        // === ГЛАВНАЯ ФУНКЦИЯ ПРОВЕРКИ ===
         window.updateButton = function() {
-            const inputVal = getRawAmount(); // Чистое число
+            const inputVal = getRawAmount();
             const btn = document.getElementById('sendBtn');
             const infoBox = document.getElementById('receiverInfo');
             
-            // Проверка лимитов
-            if (inputVal && inputVal >= MIN_TRANSFER && inputVal <= MAX_TRANSFER) {
-                const totalCost = inputVal * (1 + FEE_PERCENT); 
-                // Кнопка показывает число с пробелами
-                document.getElementById('btnAmount').innerText = formatDisplay(parseFloat(totalCost.toFixed(2)));
-                
-                if(receiverData) {
-                    btn.classList.remove('btn-disabled');
-                    if (infoBox.innerText.includes("Limit") || infoBox.innerText.includes("Minimum") || infoBox.innerText.includes("Maximum")) {
-                        infoBox.innerText = "";
-                    }
-                } else {
-                    btn.classList.add('btn-disabled');
-                }
-            } else {
-                document.getElementById('btnAmount').innerText = "0";
-                btn.classList.add('btn-disabled');
-                
-                if (inputVal && inputVal > 0) {
-                    if (inputVal < MIN_TRANSFER) infoBox.innerText = `Minimum transfer is ${formatDisplay(MIN_TRANSFER)} BLYX`;
-                    else if (inputVal > MAX_TRANSFER) infoBox.innerText = `Maximum transfer is ${formatDisplay(MAX_TRANSFER)} BLYX`;
-                } else if (!receiverData) {
-                    infoBox.innerText = "";
-                }
+            // Расчет стоимости
+            const totalCost = inputVal * (1 + FEE_PERCENT);
+            
+            // Обновляем цену на кнопке
+            document.getElementById('btnAmount').innerText = inputVal > 0 ? formatDisplay(parseFloat(totalCost.toFixed(2))) : "0";
+
+            // Сбрасываем кнопку в неактивное состояние
+            btn.classList.add('btn-disabled');
+            // Очищаем ошибки (но если пользователь не найден, это перезапишется ниже или останется пустым, если мы печатаем сумму)
+            // Чтобы не стирать ошибку "User not found", проверим, что мы пишем
+            if (infoBox.innerText.includes("Insufficient") || infoBox.innerText.includes("Minimum") || infoBox.innerText.includes("Maximum")) {
+                infoBox.innerText = "";
+            }
+
+            if (inputVal <= 0) return;
+
+            // 1. ПРОВЕРКА БАЛАНСА (НОВОЕ)
+            if (currentUser && totalCost > currentUser.balance) {
+                infoBox.innerText = "Insufficient BLYX balance";
+                return; // Выходим, кнопка остается серой
+            }
+
+            // 2. ПРОВЕРКА МИН ЛИМИТА
+            if (inputVal < MIN_TRANSFER) {
+                infoBox.innerText = `Minimum transfer is ${formatDisplay(MIN_TRANSFER)} BLYX`;
+                return;
+            }
+
+            // 3. ПРОВЕРКА МАКС ЛИМИТА
+            if (inputVal > MAX_TRANSFER) {
+                infoBox.innerText = `Maximum transfer is ${formatDisplay(MAX_TRANSFER)} BLYX`;
+                return;
+            }
+
+            // 4. ЕСТЬ ЛИ ПОЛУЧАТЕЛЬ
+            if (receiverData) {
+                // Если все проверки пройдены
+                btn.classList.remove('btn-disabled');
             }
         }
 
@@ -180,6 +195,8 @@
             receiverData = null;
             document.getElementById('receiverAvatar').classList.remove('avatar-visible');
             document.getElementById('receiverInfo').innerText = ""; 
+            
+            // Запускаем валидацию кнопки, чтобы она стала серой, так как получатель сброшен
             updateButton(); 
 
             if(usernameLower.length < 3) return;
@@ -209,6 +226,8 @@
                     avatarEl.src = data.photoUrl && data.photoUrl.length > 5 ? data.photoUrl : 'Sprites/GiftIcon.png'; 
                     avatarEl.classList.add('avatar-visible');
                     document.getElementById('receiverInfo').innerText = ""; 
+                    
+                    // Юзер найден, проверяем можно ли включить кнопку
                     updateButton();
                 } else {
                     document.getElementById('receiverInfo').innerText = "User not found";
@@ -226,23 +245,17 @@
             if(!amount) return;
             if(!receiverData) return;
 
-            if (amount < MIN_TRANSFER) {
-                tg.showAlert(`Minimum amount is ${formatDisplay(MIN_TRANSFER)} BLYX`);
-                return;
-            }
-            if (amount > MAX_TRANSFER) {
-                tg.showAlert(`Maximum amount is ${formatDisplay(MAX_TRANSFER)} BLYX`);
-                return;
-            }
-
+            // Финальные проверки перед отправкой (на всякий случай)
             const totalDeduction = amount * (1 + FEE_PERCENT); 
-
             if(totalDeduction > currentUser.balance) { 
-                tg.showAlert(`Insufficient funds! You need ${formatDisplay(totalDeduction.toFixed(2))} BLYX`); 
+                tg.showAlert("Insufficient BLYX balance"); 
                 return; 
             }
+            if (amount < MIN_TRANSFER || amount > MAX_TRANSFER) {
+                tg.showAlert("Check limits");
+                return;
+            }
 
-            // Красивый конфирм с пробелами
             tg.showConfirm(`Send ${formatDisplay(amount)} BLYX to @${receiverData.username}?\nTotal cost: ${formatDisplay(totalDeduction.toFixed(2))} BLYX`, async (ok) => {
                 if(ok) {
                     if(loader) loader.classList.remove('loaded');
@@ -255,6 +268,7 @@
                             const senderDoc = await transaction.get(senderRef);
                             if (!senderDoc.exists()) throw "Error: Sender not found";
                             const currentBalance = senderDoc.data().balance || 0;
+                            
                             if (currentBalance < totalDeduction) throw "Not enough money!";
 
                             const receiverDoc = await transaction.get(receiverRef);
