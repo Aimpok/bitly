@@ -4,10 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Sell P2P</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
+        /* === LOADER STYLES === */
         #globalLoader {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background-color: #000000; z-index: 99999;
@@ -22,10 +23,25 @@
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         
+        /* КНОПКА УДАЛЕНИЯ (ОБНОВЛЕННЫЙ СТИЛЬ) */
         .delete-btn {
-            background: #2a0000; color: #ff4d4d; 
-            border: 1px solid #ff4d4d; border-radius: 16px;
-            height: 50px; font-weight: 700; width: 100%; margin-top: 10px;
+            background: #D93899; /* Розовый цвет */
+            color: #FFFFFF;      /* Белый текст */
+            border: none;        /* Без обводки */
+            border-radius: 16px;
+            height: 56px;        /* Высота как у основной кнопки */
+            font-size: 18px;     /* Размер шрифта как у основной */
+            font-weight: 800;    /* Жирность как у основной */
+            width: 100%;
+            margin-top: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.2s;
+        }
+        .delete-btn:active {
+            opacity: 0.8;
         }
     </style>
 </head>
@@ -46,7 +62,7 @@
             <input type="text" inputmode="decimal" id="priceInput" placeholder="0.00004" oninput="handleInput(this)">
         </div>
 
-        <!-- Amount Input (Disabled in Edit Mode) -->
+        <!-- Amount Input -->
         <label class="launch-label">Amount to sell</label>
         <div class="input-wrapper">
             <input type="text" inputmode="decimal" id="amountInput" placeholder="Amount" oninput="handleInput(this)">
@@ -86,7 +102,7 @@
         tg.setHeaderColor('#000000');
         const loader = document.getElementById('globalLoader');
 
-        // Параметры URL
+        // Получаем параметры
         const params = new URLSearchParams(window.location.search);
         const orderId = params.get('oid'); // Если есть - режим редактирования
         const tokenIdParam = params.get('id'); // Если нет OID, берем ID токена для создания
@@ -97,6 +113,7 @@
         let currentOrder = null;
         let activeTokenId = '';
 
+        // Форматтер с пробелами
         function formatDisplay(num) {
             if (num === undefined || num === null) return "0";
             let parts = num.toString().split(".");
@@ -105,18 +122,31 @@
             return parts[0];
         }
 
+        // Ввод текста с пробелами
         window.handleInput = function(el) {
             let raw = el.value.replace(/[^0-9.]/g, '');
             if ((raw.match(/\./g) || []).length > 1) raw = raw.replace(/\.$/, '');
-            if(raw.endsWith('.')) { el.value = raw; validateForm(); return; }
-            if(!raw) { el.value = ""; validateForm(); return; }
+            
+            if(raw.endsWith('.')) {
+                el.value = raw;
+                validateForm();
+                return;
+            }
+            if(!raw) {
+                el.value = "";
+                validateForm();
+                return;
+            }
+
             const parts = raw.split('.');
             parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, " ");
             if(parts[1] && parts[1].length > 6) parts[1] = parts[1].substring(0,6);
+
             el.value = parts.join('.');
             validateForm();
         }
 
+        // Получить чистое число из инпута
         function getRawValue(id) {
             const val = document.getElementById(id).value;
             return parseFloat(val.replace(/\s/g, '')) || 0;
@@ -131,21 +161,23 @@
                     isEditMode = true;
                     document.getElementById('pageTitle').innerText = "Edit Order";
                     document.getElementById('publishBtn').innerText = "Save Changes";
-                    document.getElementById('deleteBtn').style.display = "block";
+                    document.getElementById('deleteBtn').style.display = "flex"; // Показываем кнопку удаления
 
                     const oSnap = await getDoc(doc(db, "orders", orderId));
-                    if (!oSnap.exists()) { alert("Order not found"); window.history.back(); return; }
-                    
+                    if (!oSnap.exists()) {
+                        alert("Order not found");
+                        window.history.back();
+                        return;
+                    }
                     currentOrder = { id: oSnap.id, ...oSnap.data() };
                     activeTokenId = currentOrder.tokenId;
 
-                    // Заполняем поля
-                    document.getElementById('priceInput').value = currentOrder.price;
-                    document.getElementById('amountInput').value = currentOrder.amount;
-                    document.getElementById('minInput').value = currentOrder.minLimit;
+                    // Заполняем поля старыми данными
+                    document.getElementById('priceInput').value = formatDisplay(currentOrder.price);
+                    document.getElementById('amountInput').value = formatDisplay(currentOrder.amount);
+                    document.getElementById('minInput').value = formatDisplay(currentOrder.minLimit);
                     
-                    // Запрещаем менять кол-во (для простоты)
-                    // Можно разрешить уменьшать, но это усложнит логику возврата
+                    // Блокируем количество (чтобы не усложнять возврат)
                     document.getElementById('amountInput').disabled = true;
                     document.getElementById('amountInput').style.opacity = "0.5";
 
@@ -161,10 +193,14 @@
                     // Подгружаем цену
                     try {
                         const tSnap = await getDoc(doc(db, "tokens", activeTokenId));
-                        if(tSnap.exists()) document.getElementById('priceInput').value = tSnap.data().price.toFixed(6);
+                        if(tSnap.exists()) {
+                            document.getElementById('priceInput').value = tSnap.data().price.toFixed(6);
+                        }
                     } catch(e){}
                 } else {
-                    window.history.back(); return;
+                    // Нет параметров
+                    window.history.back();
+                    return;
                 }
                 
                 validateForm();
@@ -188,7 +224,7 @@
 
             if(amount <= 0 || price <= 0) return;
             
-            // Проверка баланса только при создании
+            // Проверка баланса только если создаем новый
             if(!isEditMode && amount > myBalance) {
                 err.innerText = "Not enough tokens on balance";
                 return;
@@ -212,6 +248,7 @@
             btn.classList.remove('btn-disabled');
         }
 
+        // Общая функция для кнопки (Создать или Сохранить)
         window.handleSubmit = async function() {
             if (isEditMode) updateOrder();
             else createOrder();
@@ -229,8 +266,13 @@
                     if(loader) loader.classList.remove('loaded');
                     try {
                         const userRef = doc(db, "users", currentUser.id.toString());
-                        await updateDoc(userRef, { [`portfolio.${activeTokenId}`]: increment(-amount) });
+                        
+                        // Блокируем токены (списываем с баланса)
+                        await updateDoc(userRef, {
+                            [`portfolio.${activeTokenId}`]: increment(-amount)
+                        });
 
+                        // Создаем ордер
                         await addDoc(collection(db, "orders"), {
                             tokenId: activeTokenId,
                             sellerId: currentUser.id.toString(),
@@ -254,14 +296,17 @@
             });
         }
 
-        // === ОБНОВЛЕНИЕ ОРДЕРА ===
+        // === ОБНОВЛЕНИЕ ОРДЕРА (Только цена и лимиты) ===
         async function updateOrder() {
             const price = getRawValue('priceInput');
             const min = getRawValue('minInput');
-            const amount = currentOrder.amount; // Берем старое, так как поле заблокировано
+            
+            // Кол-во берем из сохраненного объекта, так как инпут заблокирован
+            const amount = currentOrder.amount; 
             const max = price * amount;
 
             if(loader) loader.classList.remove('loaded');
+            
             try {
                 await updateDoc(doc(db, "orders", orderId), {
                     price: price,
@@ -281,6 +326,7 @@
             tg.showConfirm("Delete order and return tokens?", async (ok) => {
                 if(ok) {
                     if(loader) loader.classList.remove('loaded');
+                    
                     try {
                         await runTransaction(db, async (t) => {
                             const oRef = doc(db, "orders", orderId);
@@ -290,12 +336,12 @@
                             if(!oDoc.exists()) throw "Order not found";
                             
                             const data = oDoc.data();
-                            const returnAmount = data.amount;
+                            const returnAmount = data.amount; // Сколько осталось в ордере
 
                             // Удаляем ордер
                             t.delete(oRef);
 
-                            // Возвращаем токены + пишем в историю
+                            // Возвращаем токены пользователю и пишем в историю
                             t.update(uRef, {
                                 [`portfolio.${data.tokenId}`]: increment(returnAmount),
                                 transactions: arrayUnion({
