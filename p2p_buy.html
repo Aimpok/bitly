@@ -31,7 +31,6 @@
 
     <div class="header-nav">
         <button class="back-btn" onclick="window.history.back()"><svg class="icon" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
-        <!-- Динамический заголовок -->
         <div class="header-title" id="pageTitle">Buy</div>
     </div>
 
@@ -57,7 +56,8 @@
         </div>
 
         <div class="input-wrapper">
-            <input type="number" id="amountInput" placeholder="Amount" oninput="updateButton()">
+            <!-- ВАЖНО: type="text" inputmode="decimal" для форматирования пробелов -->
+            <input type="text" inputmode="decimal" id="amountInput" placeholder="Amount" oninput="handleInput(this)">
             <div class="input-suffix" id="tokenSuffix">TOKEN</div>
         </div>
 
@@ -66,8 +66,10 @@
     </div>
 
     <div class="fixed-bottom-bar">
+        <!-- КНОПКА БЕЗ СЛОВА PAY, ТОЛЬКО ЦЕНА И ИКОНКА -->
         <button class="btn-white-large btn-disabled" id="confirmBtn" onclick="doBuy()">
-            Pay <span id="btnCost" style="margin-left:5px;">0</span> <img src="Sprites/Blyx.png" style="width:16px; margin-left:4px; margin-bottom:-2px;">
+            <span id="btnCost">0</span> 
+            <img src="Sprites/Blyx.png" style="width:20px; height:20px; object-fit:contain; margin-left:6px;">
         </button>
     </div>
 
@@ -80,12 +82,64 @@
         tg.expand();
         tg.setHeaderColor('#000000');
         
-        // Ссылка на лоадер
         const loader = document.getElementById('globalLoader');
-
         const orderId = new URLSearchParams(window.location.search).get('oid');
         let orderData = null;
         let currentUser = null;
+
+        // Форматтер для отображения (не для ввода)
+        function formatDisplay(num) {
+            if (num === undefined || num === null) return "0";
+            let parts = num.toString().split(".");
+            parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+            if (parts[1]) return parts[0] + "." + parts[1].substring(0, 6);
+            return parts[0];
+        }
+
+        // Логика форматирования ПРИ ВВОДЕ (input)
+        window.handleInput = function(el) {
+            // 1. Оставляем только цифры и точку
+            let raw = el.value.replace(/[^0-9.]/g, '');
+            
+            // 2. Блокируем вторую точку
+            if ((raw.match(/\./g) || []).length > 1) {
+                raw = raw.replace(/\.$/, '');
+            }
+
+            // 3. Если заканчивается на точку - оставляем как есть, чтобы юзер мог писать дробь
+            if(raw.endsWith('.')) {
+                el.value = raw;
+                // Не вызываем пересчет кнопки пока число неполное, или считаем как целое
+                updateButton(); 
+                return;
+            }
+
+            // 4. Если пусто
+            if(!raw) {
+                el.value = "";
+                updateButton();
+                return;
+            }
+
+            // 5. Форматируем: разделяем на группы
+            const parts = raw.split('.');
+            parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+            
+            // Ограничим дробную часть до 6 знаков
+            if(parts[1] && parts[1].length > 6) {
+                parts[1] = parts[1].substring(0,6);
+            }
+
+            el.value = parts.join('.');
+            updateButton();
+        }
+
+        // Получение чистого числа из инпута (без пробелов)
+        function getRawAmount() {
+            const val = document.getElementById('amountInput').value;
+            // Удаляем пробелы и парсим
+            return parseFloat(val.replace(/\s/g, '')) || 0;
+        }
 
         async function init() {
             try {
@@ -98,47 +152,46 @@
                 }
                 orderData = { id: snap.id, ...snap.data() };
                 render();
-            } catch(e) {
-                console.error(e);
-            }
-            
-            // Скрываем загрузку после получения данных
+            } catch(e) { console.error(e); }
             if(loader) loader.classList.add('loaded');
         }
 
         function render() {
             document.getElementById('pageTitle').innerText = `Buy ${orderData.tokenId}`;
             document.getElementById('tokenSuffix').innerText = orderData.tokenId;
-            document.getElementById('priceVal').innerText = parseFloat(orderData.price).toFixed(6);
+            
+            let displayPrice = orderData.price < 0.01 ? orderData.price.toFixed(8) : orderData.price.toFixed(4);
+            document.getElementById('priceVal').innerText = displayPrice;
             document.getElementById('sellerName').innerText = orderData.sellerName;
-            document.getElementById('availVal').innerText = Math.floor(orderData.amount).toLocaleString();
+            document.getElementById('availVal').innerText = formatDisplay(orderData.amount);
             
             const max = orderData.maxLimit || (orderData.amount * orderData.price);
-            document.getElementById('limitsVal').innerText = `${Math.floor(orderData.minLimit)} - ${Math.floor(max)}`;
+            document.getElementById('limitsVal').innerText = `${formatDisplay(Math.floor(orderData.minLimit))} - ${formatDisplay(Math.floor(max))}`;
         }
 
         window.updateButton = function() {
-            const amount = parseFloat(document.getElementById('amountInput').value) || 0;
+            const amount = getRawAmount(); // Чистое число
             const cost = amount * orderData.price;
             
             const btn = document.getElementById('confirmBtn');
             const err = document.getElementById('errorText');
-            document.getElementById('btnCost').innerText = cost > 0 ? cost.toFixed(2) : "0";
+            
+            // На кнопке показываем цену с пробелами
+            document.getElementById('btnCost').innerText = cost > 0 ? formatDisplay(cost) : "0";
             
             btn.classList.add('btn-disabled');
             err.innerText = "";
 
             if(amount <= 0) return;
 
-            // VALIDATION
             const maxLimit = orderData.maxLimit || (orderData.amount * orderData.price);
             
             if(cost < orderData.minLimit) {
-                err.innerText = `Minimum purchase is ${orderData.minLimit} BLYX`;
+                err.innerText = `Min purchase: ${formatDisplay(orderData.minLimit)} BLYX`;
                 return;
             }
             if(cost > maxLimit) {
-                err.innerText = `Maximum purchase is ${maxLimit.toFixed(2)} BLYX`;
+                err.innerText = `Max purchase: ${formatDisplay(maxLimit)} BLYX`;
                 return;
             }
             if(amount > orderData.amount) {
@@ -154,15 +207,13 @@
         }
 
         window.doBuy = async function() {
-            const amount = parseFloat(document.getElementById('amountInput').value);
+            const amount = getRawAmount();
             if(!amount) return;
             const cost = amount * orderData.price;
 
-            tg.showConfirm(`Pay ${cost.toFixed(2)} BLYX for ${amount} ${orderData.tokenId}?`, async (ok) => {
+            tg.showConfirm(`Pay ${formatDisplay(cost)} BLYX for ${formatDisplay(amount)} ${orderData.tokenId}?`, async (ok) => {
                 if(ok) {
-                    // Включаем загрузку
                     if(loader) loader.classList.remove('loaded');
-
                     try {
                         await runTransaction(db, async (t) => {
                             const orderRef = doc(db, "orders", orderId);
@@ -170,13 +221,11 @@
                             const sellerRef = doc(db, "users", orderData.sellerId);
                             const tokenRef = doc(db, "tokens", orderData.tokenId);
 
-                            // Re-check
                             const oSnap = await t.get(orderRef);
                             if(!oSnap.exists()) throw "Order expired";
                             const currentOrder = oSnap.data();
                             if(currentOrder.amount < amount) throw "Not enough tokens";
 
-                            // Move
                             const newAmount = currentOrder.amount - amount;
                             if(newAmount < 0.000001) t.delete(orderRef);
                             else t.update(orderRef, { amount: newAmount });
@@ -199,14 +248,12 @@
                         tg.showAlert("Success!");
                         window.history.back();
                     } catch(e) {
-                        // Выключаем загрузку при ошибке
                         if(loader) loader.classList.add('loaded');
                         tg.showAlert("Error: " + e);
                     }
                 }
             });
         }
-
         init();
     </script>
 </body>
