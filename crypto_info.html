@@ -140,12 +140,15 @@
     
     let activeCursor = null; 
 
-    // === ИСПРАВЛЕННЫЙ ФОРМАТТЕР (БЕЗ E-5) ===
+    // === ФОРМАТТЕР ЦЕНЫ (Исправлен, без e-5, влезает в экран) ===
     function formatPrice(val) {
         if(!val && val !== 0) return "0";
-        // Принудительно выводим до 10 знаков и обрезаем лишние нули
-        // Это убирает e-5, e-6 и т.д.
-        return val.toFixed(10).replace(/\.?0+$/, "");
+        // Если число очень маленькое, показываем 8 знаков, иначе 4
+        if(val < 0.0001) return val.toFixed(8);
+        if(val < 1) return val.toFixed(6).replace(/\.?0+$/, "");
+        if(val >= 1000000) return (val/1000000).toFixed(2) + "M";
+        if(val >= 1000) return (val/1000).toFixed(2) + "K";
+        return val.toFixed(2);
     }
     
     function formatCompact(num) {
@@ -196,7 +199,6 @@
 
     function updateTimeframeButtons() {
         if (!currentTokenData || !currentTokenData.createdAt) return;
-        
         const created = new Date(currentTokenData.createdAt).getTime();
         const now = Date.now();
         const ageMs = now - created;
@@ -259,8 +261,6 @@
         document.getElementById('holdersCount').innerText = formatCompact(currentTokenData.holdersCount || 1);
         document.getElementById('txCount').innerText = formatCompact(currentTokenData.txCount || 0);
         document.getElementById('marketCapVal').innerText = formatCompact(currentTokenData.marketCap || 0);
-        
-        // Используем новый форматтер
         document.getElementById('tokenPriceDisplay').innerText = formatPrice(currentTokenData.price);
 
         if(currentTokenData.image) {
@@ -309,51 +309,52 @@
         drawRealChart(null);
     }
 
-    // === ГЕНЕРАЦИЯ СВЕЧЕЙ С ЗАПОЛНЕНИЕМ ПУСТОТ ===
+    // === ГЕНЕРАЦИЯ СВЕЧЕЙ (LIMIT 50) ===
+    // Показываем только последние 50 свечей, чтобы они не были палочками
     function generateCandles(transactions, timeframeMinutes) {
         if(!transactions || transactions.length === 0) return [];
         
         const sorted = [...transactions].sort((a,b) => new Date(a.date) - new Date(b.date));
-        
         const intervalMs = timeframeMinutes * 60 * 1000;
         
-        // Начало от первой транзакции
-        const startTime = Math.floor(new Date(sorted[0].date).getTime() / intervalMs) * intervalMs;
-        // Конец - текущее время (чтобы график доходил до правого края)
-        const endTime = Date.now(); 
+        // Берем последние 50 интервалов от текущего момента
+        // Это решит проблему "сжатого" графика
+        const MAX_CANDLES = 50;
+        const endTime = Date.now();
+        // Начало графика = сейчас минус (50 * интервал)
+        // НО не раньше первой транзакции
+        const firstTxTime = new Date(sorted[0].date).getTime();
+        let startTime = endTime - (MAX_CANDLES * intervalMs);
+        if (startTime < firstTxTime) startTime = Math.floor(firstTxTime / intervalMs) * intervalMs;
 
         const candles = [];
-        let lastClose = sorted[0].price; // Цена закрытия предыдущей свечи (для старта берем первую цену)
+        // Находим цену закрытия ДО начала графика (для первой свечи)
+        let lastClose = sorted[0].price;
+        // Пробегаем транзакции до startTime, чтобы найти актуальную цену на начало
+        sorted.forEach(tx => {
+            if(new Date(tx.date).getTime() < startTime) lastClose = tx.price;
+        });
 
-        // Итерируемся по каждому интервалу от старта до сейчас
+        // Строим свечи
         for (let t = startTime; t <= endTime; t += intervalMs) {
-            
-            // Находим все транзакции, которые попали в этот интервал
             const bucketTxs = sorted.filter(tx => {
                 const txTime = new Date(tx.date).getTime();
                 return txTime >= t && txTime < t + intervalMs;
             });
 
             if (bucketTxs.length > 0) {
-                // Если были сделки
                 const prices = bucketTxs.map(tx => tx.price);
-                
-                const open = lastClose; // Открытие = Закрытие предыдущей
-                const close = prices[prices.length - 1]; // Закрытие = последняя сделка
-                
-                // Хай и Лоу считаем с учетом цены открытия!
+                const open = lastClose;
+                const close = prices[prices.length - 1];
                 const high = Math.max(open, ...prices);
                 const low = Math.min(open, ...prices);
-
                 candles.push({ t: t, o: open, h: high, l: low, c: close });
-                lastClose = close; // Обновляем последнюю цену
+                lastClose = close;
             } else {
-                // Если сделок НЕ было -> создаем плоскую свечу (Doji)
-                // Цена осталась прежней
+                // Если нет сделок - плоская свеча
                 candles.push({ t: t, o: lastClose, h: lastClose, l: lastClose, c: lastClose });
             }
         }
-        
         return candles;
     }
 
@@ -373,7 +374,8 @@
         const w = rect.width;
         const h = rect.height;
         
-        const paddingRight = 50; 
+        // УВЕЛИЧЕННЫЙ ОТСТУП СПРАВА (чтобы цена влезала)
+        const paddingRight = 70; 
         const paddingBottom = 20; 
         const chartW = w - paddingRight;
         const chartH = h - paddingBottom;
@@ -392,11 +394,11 @@
             if(c.h > maxP) maxP = c.h; 
         });
         
-        // ZOOM OUT / PADDING
         let range = maxP - minP;
         if(range === 0) range = maxP * 0.01;
 
         const midPoint = (maxP + minP) / 2;
+        // Масштабирование по вертикали
         const visualRange = range * 4; 
         
         const viewMax = midPoint + (visualRange / 2);
@@ -424,7 +426,11 @@
 
         const availableW = chartW;
         const candleSpacing = availableW / candles.length;
-        const candleBodyW = Math.min(5, candleSpacing * 0.7); 
+        // Свечи теперь всегда будут нормальной ширины (т.к. их всего ~50)
+        // Делаем маленький зазор (-1px)
+        const candleBodyW = Math.max(1, candleSpacing - 2); 
+        
+        // Метки времени (примерно 4-5 штук на экран)
         const labelStep = Math.max(1, Math.floor(candles.length / 4));
 
         candles.forEach((c, i) => {
@@ -448,11 +454,14 @@
             const isUp = c.c >= c.o;
             
             ctx.strokeStyle = '#FFFFFF';
+            // Рисуем фитиль
             ctx.beginPath(); ctx.moveTo(xCenter, yH); ctx.lineTo(xCenter, yL); ctx.stroke();
 
             const bodyTop = Math.min(yO, yC);
-            // Минимальная высота свечи 1px, чтобы пустые свечи было видно (как линию)
-            const bodyHeight = Math.max(1, Math.abs(yC - yO)); 
+            // Если открытия=закрытию, рисуем линию толщиной 1px
+            let bodyHeight = Math.abs(yC - yO);
+            if (bodyHeight < 1) bodyHeight = 1;
+
             const xLeft = xCenter - candleBodyW / 2;
 
             if (isUp) {
