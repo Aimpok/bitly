@@ -29,7 +29,6 @@
         .progress-bar-bg {
             width: 100%; height: 6px; background: #333; border-radius: 4px; margin-top: 10px; overflow: hidden;
         }
-        /* БЕЛАЯ ЛИНИЯ ПРОГРЕССА */
         .progress-bar-fill {
             height: 100%; background: #FFFFFF; width: 0%; transition: width 0.3s;
         }
@@ -58,7 +57,6 @@
                     <div id="tokenLetter" style="width:32px; height:32px; border-radius:50%; background:#333; display:flex; align-items:center; justify-content:center; font-weight:700;">?</div>
                     <div>
                         <div style="font-weight:700; font-size:16px;" id="tokenTicker">...</div>
-                        <!-- Убрали надпись Bonding Curve -->
                     </div>
                 </div>
                 <div style="text-align:right;">
@@ -76,20 +74,22 @@
             <div class="progress-bar-bg">
                 <div class="progress-bar-fill" id="progressFill"></div>
             </div>
+            <div style="text-align:right; font-size: 11px; color: #666; margin-top: 4px;">
+                Remaining: <span id="supplyLeft">...</span>
+            </div>
         </div>
 
         <!-- Input -->
         <div class="input-wrapper">
-            <!-- Вводим ТОКЕНЫ -->
-            <input type="text" inputmode="decimal" id="amountInput" placeholder="Amount" oninput="handleInput(this)">
+            <input type="text" inputmode="decimal" id="amountInput" placeholder="Amount (Tokens)" oninput="handleInput(this)">
             <div class="input-suffix" id="tokenSuffix">TOKEN</div>
         </div>
         
         <div style="display:flex; justify-content:space-between; margin-top:10px; padding:0 5px; align-items: flex-start;">
-            <!-- Сюда будет писаться баланс ИЛИ ошибка красным -->
+            <!-- Баланс / Ошибки -->
             <span id="balanceInfo" style="font-size:12px; color:#666;">Checking balance...</span>
             
-            <!-- Справа стоимость -->
+            <!-- Стоимость -->
             <span style="font-size:12px; color:#fff;">Cost: <span id="costVal" style="font-weight:700;">0</span> BLYX</span>
         </div>
     </div>
@@ -115,7 +115,9 @@
         
         let tokenData = null;
         let currentUser = null;
-        const TOTAL_SUPPLY = 1000000000;
+        
+        const TOTAL_SUPPLY = 1000000000; // Ровно 1 миллиард
+        const MIN_COST_BLYX = 100;       // Минимальная покупка 100 BLYX
 
         // Форматтер с пробелами
         function formatDisplay(num) {
@@ -155,7 +157,6 @@
         async function init() {
             try {
                 currentUser = await initUser();
-                // Показываем изначальный баланс
                 document.getElementById('balanceInfo').innerText = `Balance: ${formatDisplay(Math.floor(currentUser.balance))} BLYX`;
 
                 const snap = await getDoc(doc(db, "tokens", tokenId));
@@ -171,9 +172,8 @@
         function render() {
             document.getElementById('pageTitle').innerText = `Buy ${tokenData.name}`;
             document.getElementById('tokenTicker').innerText = tokenData.id;
-            document.getElementById('tokenSuffix').innerText = tokenData.id; // Тикер справа в инпуте
+            document.getElementById('tokenSuffix').innerText = tokenData.id; 
             
-            // Иконка
             if(tokenData.image) {
                 document.getElementById('tokenImg').src = tokenData.image;
                 document.getElementById('tokenImg').style.display = 'block';
@@ -182,45 +182,64 @@
                 document.getElementById('tokenLetter').innerText = tokenData.id[0];
             }
 
-            // Цена
             const price = tokenData.price < 0.01 ? tokenData.price.toFixed(8) : tokenData.price.toFixed(4);
             document.getElementById('priceVal').innerText = price + " BLYX";
 
-            // Прогресс
+            // Расчет прогресса и остатка
             const sold = tokenData.sold || 0;
+            const remaining = TOTAL_SUPPLY - sold;
             const progress = Math.min((sold / TOTAL_SUPPLY) * 100, 100);
+            
             document.getElementById('progressText').innerText = progress.toFixed(2) + "%";
             document.getElementById('progressFill').style.width = progress + "%";
+            document.getElementById('supplyLeft').innerText = formatDisplay(Math.floor(remaining));
         }
 
         window.updateButton = function() {
-            const tokenAmount = getRawAmount(); // Введенное кол-во ТОКЕНОВ
+            const tokenAmount = getRawAmount(); // Ввод в ТОКЕНАХ
             const btn = document.getElementById('confirmBtn');
             const balanceLabel = document.getElementById('balanceInfo');
             
-            // Расчет стоимости в BLYX
+            // Расчет стоимости
             const cost = tokenAmount * tokenData.price;
             
-            // Обновляем UI стоимости
+            // Обновляем UI
             document.getElementById('costVal').innerText = formatDisplay(cost);
-            // Кнопка Pay показывает стоимость в BLYX
             document.getElementById('btnLabel').innerText = cost > 0 ? formatDisplay(cost) : "0";
 
-            // Сброс стилей ошибки
+            // Сброс
             balanceLabel.className = "";
             balanceLabel.innerText = `Balance: ${formatDisplay(Math.floor(currentUser.balance))} BLYX`;
             btn.classList.add('btn-disabled');
 
             if(tokenAmount <= 0) return;
 
-            // 1. Проверка Баланса BLYX
+            // --- ПРОВЕРКА 1: БАЛАНС ---
             if(cost > currentUser.balance) {
                 balanceLabel.innerText = "Insufficient BLYX balance";
                 balanceLabel.className = "text-error";
                 return;
             }
 
-            // 2. Проверка Лимита (30% эмиссии)
+            // --- ПРОВЕРКА 2: МИНИМАЛЬНАЯ СУММА (100 BLYX) ---
+            if (cost < MIN_COST_BLYX) {
+                balanceLabel.innerText = `Minimum purchase is ${MIN_COST_BLYX} BLYX`;
+                balanceLabel.className = "text-error";
+                return;
+            }
+
+            // --- ПРОВЕРКА 3: HARD CAP (РОВНО 1 МЛРД) ---
+            const sold = tokenData.sold || 0;
+            const remainingSupply = TOTAL_SUPPLY - sold;
+            
+            // Используем небольшую погрешность для float, но стремимся к точности
+            if (tokenAmount > remainingSupply) {
+                balanceLabel.innerText = `Only ${formatDisplay(Math.floor(remainingSupply))} tokens left`;
+                balanceLabel.className = "text-error";
+                return;
+            }
+
+            // --- ПРОВЕРКА 4: ЛИМИТ ВЛАДЕНИЯ (30%) ---
             const myHoldings = currentUser.portfolio?.[tokenId] || 0;
             const maxAllowed = TOTAL_SUPPLY * 0.30;
             const isCreator = tokenData.ownerId === currentUser.id.toString(); 
@@ -235,12 +254,11 @@
         }
 
         window.doBuy = async function() {
-            const tokenAmount = getRawAmount(); // Токены
+            const tokenAmount = getRawAmount(); 
             if(!tokenAmount) return;
 
-            const cost = tokenAmount * tokenData.price; // BLYX
+            const cost = tokenAmount * tokenData.price; 
             
-            // Confirm показывает: Купить X Токенов за Y BLYX
             tg.showConfirm(`Buy ${formatDisplay(tokenAmount)} ${tokenId} for ${formatDisplay(cost)} BLYX?`, async (ok) => {
                 if(ok) {
                     if(loader) loader.classList.remove('loaded');
@@ -251,14 +269,12 @@
                         const userRef = doc(db, "users", currentUser.id.toString());
                         const tokenRef = doc(db, "tokens", tokenId);
 
-                        // Обновляем баланс юзера (списываем BLYX, даем Токены)
                         await updateDoc(userRef, {
                             balance: increment(-cost),
                             [`portfolio.${tokenId}`]: increment(tokenAmount),
                             transactions: arrayUnion({ type: 'buy', token: tokenId, amount: tokenAmount, cost: cost, price: tokenData.price, date: new Date().toISOString() })
                         });
 
-                        // Обновляем токен
                         await updateDoc(tokenRef, {
                             marketCap: increment(cost),
                             sold: increment(tokenAmount),
