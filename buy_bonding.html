@@ -104,7 +104,8 @@
     <script type="module">
         import { initUser } from './user-service.js';
         import { db } from './firebase-config.js';
-        import { doc, getDoc, updateDoc, increment, arrayUnion } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        // ДОБАВЛЕН runTransaction для безопасной покупки
+        import { doc, getDoc, runTransaction, arrayUnion, increment } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         const tg = window.Telegram.WebApp;
         tg.expand();
@@ -116,10 +117,9 @@
         let tokenData = null;
         let currentUser = null;
         
-        const TOTAL_SUPPLY = 1000000000; // Ровно 1 миллиард
-        const MIN_COST_BLYX = 100;       // Минимальная покупка 100 BLYX
+        const TOTAL_SUPPLY = 1000000000; // 1 Миллиард общий лимит
+        const MIN_COST_BLYX = 100;       // Мин. покупка 100 BLYX
 
-        // Форматтер с пробелами
         function formatDisplay(num) {
             if (num === undefined || num === null) return "0";
             let parts = num.toString().split(".");
@@ -128,24 +128,14 @@
             return parts[0];
         }
 
-        // Ввод с пробелами
         window.handleInput = function(el) {
             let raw = el.value.replace(/[^0-9.]/g, '');
             if ((raw.match(/\./g) || []).length > 1) raw = raw.replace(/\.$/, '');
-            
-            if(raw.endsWith('.')) {
-                el.value = raw;
-                updateButton(); return;
-            }
-            if(!raw) {
-                el.value = "";
-                updateButton(); return;
-            }
-
+            if(raw.endsWith('.')) { el.value = raw; updateButton(); return; }
+            if(!raw) { el.value = ""; updateButton(); return; }
             const parts = raw.split('.');
             parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, " ");
             if(parts[1] && parts[1].length > 6) parts[1] = parts[1].substring(0,6);
-
             el.value = parts.join('.');
             updateButton();
         }
@@ -165,7 +155,6 @@
                 tokenData = snap.data();
                 render();
             } catch(e) { console.error(e); }
-            
             if(loader) loader.classList.add('loaded');
         }
 
@@ -185,7 +174,7 @@
             const price = tokenData.price < 0.01 ? tokenData.price.toFixed(8) : tokenData.price.toFixed(4);
             document.getElementById('priceVal').innerText = price + " BLYX";
 
-            // Расчет прогресса и остатка
+            // Глобальный счетчик проданных
             const sold = tokenData.sold || 0;
             const remaining = TOTAL_SUPPLY - sold;
             const progress = Math.min((sold / TOTAL_SUPPLY) * 100, 100);
@@ -196,50 +185,46 @@
         }
 
         window.updateButton = function() {
-            const tokenAmount = getRawAmount(); // Ввод в ТОКЕНАХ
+            const tokenAmount = getRawAmount(); 
             const btn = document.getElementById('confirmBtn');
             const balanceLabel = document.getElementById('balanceInfo');
             
-            // Расчет стоимости
             const cost = tokenAmount * tokenData.price;
             
-            // Обновляем UI
             document.getElementById('costVal').innerText = formatDisplay(cost);
             document.getElementById('btnLabel').innerText = cost > 0 ? formatDisplay(cost) : "0";
 
-            // Сброс
             balanceLabel.className = "";
             balanceLabel.innerText = `Balance: ${formatDisplay(Math.floor(currentUser.balance))} BLYX`;
             btn.classList.add('btn-disabled');
 
             if(tokenAmount <= 0) return;
 
-            // --- ПРОВЕРКА 1: БАЛАНС ---
+            // 1. Проверка Баланса
             if(cost > currentUser.balance) {
                 balanceLabel.innerText = "Insufficient BLYX balance";
                 balanceLabel.className = "text-error";
                 return;
             }
 
-            // --- ПРОВЕРКА 2: МИНИМАЛЬНАЯ СУММА (100 BLYX) ---
+            // 2. Мин. сумма покупки
             if (cost < MIN_COST_BLYX) {
                 balanceLabel.innerText = `Minimum purchase is ${MIN_COST_BLYX} BLYX`;
                 balanceLabel.className = "text-error";
                 return;
             }
 
-            // --- ПРОВЕРКА 3: HARD CAP (РОВНО 1 МЛРД) ---
+            // 3. Проверка Глобального Остатка (UI)
             const sold = tokenData.sold || 0;
             const remainingSupply = TOTAL_SUPPLY - sold;
             
-            // Используем небольшую погрешность для float, но стремимся к точности
             if (tokenAmount > remainingSupply) {
                 balanceLabel.innerText = `Only ${formatDisplay(Math.floor(remainingSupply))} tokens left`;
                 balanceLabel.className = "text-error";
                 return;
             }
 
-            // --- ПРОВЕРКА 4: ЛИМИТ ВЛАДЕНИЯ (30%) ---
+            // 4. Проверка Личного Лимита (30%)
             const myHoldings = currentUser.portfolio?.[tokenId] || 0;
             const maxAllowed = TOTAL_SUPPLY * 0.30;
             const isCreator = tokenData.ownerId === currentUser.id.toString(); 
@@ -257,37 +242,79 @@
             const tokenAmount = getRawAmount(); 
             if(!tokenAmount) return;
 
-            const cost = tokenAmount * tokenData.price; 
+            // Приблизительная стоимость для подтверждения (реальная пересчитается в транзакции)
+            const approxCost = tokenAmount * tokenData.price; 
             
-            tg.showConfirm(`Buy ${formatDisplay(tokenAmount)} ${tokenId} for ${formatDisplay(cost)} BLYX?`, async (ok) => {
+            tg.showConfirm(`Buy ${formatDisplay(tokenAmount)} ${tokenId}?`, async (ok) => {
                 if(ok) {
                     if(loader) loader.classList.remove('loaded');
                     try {
-                        const newCap = (tokenData.marketCap || 0) + cost;
-                        const newPrice = newCap / TOTAL_SUPPLY;
-
                         const userRef = doc(db, "users", currentUser.id.toString());
                         const tokenRef = doc(db, "tokens", tokenId);
 
-                        await updateDoc(userRef, {
-                            balance: increment(-cost),
-                            [`portfolio.${tokenId}`]: increment(tokenAmount),
-                            transactions: arrayUnion({ type: 'buy', token: tokenId, amount: tokenAmount, cost: cost, price: tokenData.price, date: new Date().toISOString() })
-                        });
+                        // --- ТРАНЗАКЦИЯ ДЛЯ БЕЗОПАСНОЙ ПОКУПКИ ---
+                        await runTransaction(db, async (t) => {
+                            // 1. Читаем свежие данные токена
+                            const tDoc = await t.get(tokenRef);
+                            if (!tDoc.exists()) throw "Token does not exist!";
+                            const freshTokenData = tDoc.data();
+                            
+                            // 2. Проверяем, не купил ли кто-то токены перед нами
+                            const currentSold = freshTokenData.sold || 0;
+                            const newSold = currentSold + tokenAmount;
+                            
+                            // ЖЕСТКАЯ ПРОВЕРКА НА 1 МЛРД
+                            if (newSold > TOTAL_SUPPLY) {
+                                throw `Not enough tokens! Only ${formatDisplay(TOTAL_SUPPLY - currentSold)} left.`;
+                            }
 
-                        await updateDoc(tokenRef, {
-                            marketCap: increment(cost),
-                            sold: increment(tokenAmount),
-                            txCount: increment(1),
-                            price: newPrice,
-                            transactions: arrayUnion({ price: newPrice, date: new Date().toISOString() })
+                            // 3. Читаем баланс пользователя
+                            const uDoc = await t.get(userRef);
+                            if (!uDoc.exists()) throw "User error";
+                            const userData = uDoc.data();
+                            const currentBalance = userData.balance || 0;
+                            const freshPrice = freshTokenData.price;
+                            const finalCost = tokenAmount * freshPrice;
+
+                            if (currentBalance < finalCost) {
+                                throw "Insufficient funds (Price might have changed).";
+                            }
+
+                            // 4. Логика Bonding Curve (цены)
+                            const newCap = (freshTokenData.marketCap || 0) + finalCost;
+                            const newPrice = newCap / TOTAL_SUPPLY;
+
+                            // 5. Запись изменений
+                            t.update(userRef, {
+                                balance: increment(-finalCost),
+                                [`portfolio.${tokenId}`]: increment(tokenAmount),
+                                transactions: arrayUnion({ 
+                                    type: 'buy', 
+                                    token: tokenId, 
+                                    amount: tokenAmount, 
+                                    cost: finalCost, 
+                                    price: freshPrice, 
+                                    date: new Date().toISOString() 
+                                })
+                            });
+
+                            t.update(tokenRef, {
+                                marketCap: increment(finalCost),
+                                sold: increment(tokenAmount),
+                                txCount: increment(1),
+                                price: newPrice,
+                                transactions: arrayUnion({ 
+                                    price: newPrice, 
+                                    date: new Date().toISOString() 
+                                })
+                            });
                         });
 
                         tg.showAlert("Success!");
                         window.history.back(); 
                     } catch(e) {
                         if(loader) loader.classList.add('loaded');
-                        tg.showAlert("Error: " + e.message);
+                        tg.showAlert("Error: " + e); // e может быть строкой из throw
                     }
                 }
             });
