@@ -28,7 +28,13 @@
             background: #0A0A0A; 
             border: 1px solid #222;
             border-radius: 16px;
+            touch-action: none; /* Важно для свайпов по графику */
+            position: relative;
+            cursor: crosshair;
         }
+        
+        /* Скрываем кнопки, которые не нужны */
+        .time-btn.hidden { display: none !important; }
     </style>
 </head>
 <body>
@@ -82,11 +88,12 @@
 <div class="content-section">
     <!-- CHART -->
     <div id="tab-chart">
-        <div class="chart-controls">
-            <div class="time-btn active" onclick="setFrame(5, '5m')">5m</div> 
-            <div class="time-btn" onclick="setFrame(60, '1h')">1h</div>
-            <div class="time-btn" onclick="setFrame(1440, '1d')">1d</div>
-            <div class="time-btn" onclick="setFrame(10080, '1w')">1w</div>
+        <div class="chart-controls" id="timeframeButtons">
+            <div class="time-btn active" data-val="5" data-lbl="5m" onclick="setFrame(5, '5m', this)">5m</div> 
+            <div class="time-btn" data-val="60" data-lbl="1h" onclick="setFrame(60, '1h', this)">1h</div>
+            <div class="time-btn" data-val="1440" data-lbl="1d" onclick="setFrame(1440, '1d', this)">1d</div>
+            <div class="time-btn" data-val="10080" data-lbl="1w" onclick="setFrame(10080, '1w', this)">1w</div>
+            <div class="time-btn" data-val="43200" data-lbl="1M" onclick="setFrame(43200, '1M', this)">1M</div>
         </div>
         <div class="chart-area"><canvas id="chartCanvas"></canvas></div>
         <div style="height: 120px;"></div>
@@ -139,6 +146,8 @@
     let isP2P = false;
     let currentTimeframe = 5; 
     let timeLabel = '5m';
+    
+    let activeCursor = null; 
 
     // FORMATTERS
     function formatPrice(val) {
@@ -170,7 +179,7 @@
         el.classList.add('active');
         ['chart', 'tx', 'socials'].forEach(id => document.getElementById('tab-' + id).classList.add('hidden'));
         document.getElementById('tab-' + tabName).classList.remove('hidden');
-        if(tabName === 'chart') setTimeout(drawRealChart, 50);
+        if(tabName === 'chart') setTimeout(() => drawRealChart(null), 50);
     }
 
     async function initPage() {
@@ -181,7 +190,8 @@
             if (docSnap.exists()) {
                 currentTokenData = docSnap.data();
                 renderUI();
-                drawRealChart();
+                updateTimeframeButtons(); // Проверяем возраст токена
+                drawRealChart(null);
                 if(loader) loader.classList.add('loaded');
             }
         });
@@ -190,7 +200,91 @@
             currentUserData = user;
             renderHistory();
         });
-        window.addEventListener('resize', drawRealChart);
+        
+        window.addEventListener('resize', () => drawRealChart(activeCursor));
+        setupChartInteractions();
+    }
+
+    // ЛОГИКА СКРЫТИЯ ЛИШНИХ КНОПОК
+    function updateTimeframeButtons() {
+        if (!currentTokenData || !currentTokenData.createdAt) return;
+        
+        const created = new Date(currentTokenData.createdAt).getTime();
+        const now = Date.now();
+        const ageMs = now - created;
+        
+        // 1 час = 3600000 мс
+        // 1 день = 86400000 мс
+        // 1 неделя = 604800000 мс
+        // 1 месяц = 2592000000 мс
+
+        const btns = document.querySelectorAll('.time-btn');
+        let visibleCount = 0;
+
+        btns.forEach(btn => {
+            const val = parseInt(btn.getAttribute('data-val')); // минуты
+            const valMs = val * 60 * 1000; // конвертируем в мс
+            
+            // Показываем кнопку, только если токен существует дольше, чем этот интервал (примерно)
+            // Или хотя бы имеет смысл.
+            // Логика: если токену меньше дня, зачем кнопка 1 неделя?
+            
+            let shouldShow = true;
+            // Если токену меньше 2 часов -> скрыть 1d+
+            if (ageMs < 7200000 && valMs >= 86400000) shouldShow = false;
+            // Если токену меньше 2 дней -> скрыть 1w+
+            if (ageMs < 172800000 && valMs >= 604800000) shouldShow = false;
+            // Если токену меньше 2 недель -> скрыть 1M
+            if (ageMs < 1209600000 && valMs >= 2592000000) shouldShow = false;
+
+            if (shouldShow) {
+                btn.classList.remove('hidden');
+                visibleCount++;
+            } else {
+                btn.classList.add('hidden');
+                // Если активная кнопка скрылась -> переключаем на 5m
+                if(btn.classList.contains('active')) {
+                    btn.classList.remove('active');
+                    document.querySelector('.time-btn[data-val="5"]').click();
+                }
+            }
+        });
+    }
+
+    // --- CHART INTERACTIONS (CROSSHAIR) ---
+    function setupChartInteractions() {
+        const canvas = document.getElementById('chartCanvas');
+        
+        const handleMove = (e) => {
+            e.preventDefault(); 
+            const rect = canvas.getBoundingClientRect();
+            let clientX, clientY;
+            
+            if (e.touches && e.touches.length > 0) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            } else {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+
+            const x = clientX - rect.left;
+            const y = clientY - rect.top;
+            
+            activeCursor = { x, y };
+            drawRealChart(activeCursor);
+        };
+
+        const handleEnd = () => {
+            activeCursor = null;
+            drawRealChart(null);
+        };
+
+        canvas.addEventListener('touchstart', handleMove, {passive: false});
+        canvas.addEventListener('touchmove', handleMove, {passive: false});
+        canvas.addEventListener('touchend', handleEnd);
+        canvas.addEventListener('mousemove', handleMove);
+        canvas.addEventListener('mouseleave', handleEnd);
     }
 
     function renderUI() {
@@ -241,14 +335,12 @@
         }
     }
 
-    window.setFrame = function(min, label) {
+    window.setFrame = function(min, label, btn) {
         currentTimeframe = min;
         timeLabel = label;
-        document.querySelectorAll('.time-btn').forEach(b => {
-            b.classList.remove('active');
-            if(b.innerText === label) b.classList.add('active');
-        });
-        drawRealChart();
+        document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('active'));
+        if(btn) btn.classList.add('active');
+        drawRealChart(null);
     }
 
     function generateCandles(transactions, timeframeMinutes) {
@@ -287,11 +379,10 @@
         return candles;
     }
 
-    function drawRealChart() {
+    function drawRealChart(cursor) {
         const canvas = document.getElementById('chartCanvas');
         if(!canvas || !currentTokenData) return;
         
-        // High DPI Fix
         const dpr = window.devicePixelRatio || 1;
         const rect = canvas.parentElement.getBoundingClientRect();
         
@@ -303,6 +394,7 @@
         
         const w = rect.width;
         const h = rect.height;
+        
         const paddingRight = 50; 
         const paddingBottom = 20; 
         const chartW = w - paddingRight;
@@ -322,9 +414,10 @@
             if(c.h > maxP) maxP = c.h; 
         });
         
+        // Отступы, чтобы свечи не липли
         if(minP === maxP) { minP *= 0.95; maxP *= 1.05; }
         const range = maxP - minP;
-        const paddingY = range * 0.1; 
+        const paddingY = range * 0.2; // 20% отступа
         minP -= paddingY;
         maxP += paddingY;
         
@@ -335,6 +428,8 @@
         ctx.font = "600 10px Inter";
         ctx.textAlign = "left";
         ctx.lineWidth = 1;
+        // Сброс dashed
+        ctx.setLineDash([]);
 
         for(let i=0; i<=steps; i++) {
             const priceVal = maxP - (i * ((maxP - minP)/steps));
@@ -352,10 +447,11 @@
         const candleBodyW = Math.max(2, Math.min(15, candleSpacing * 0.7)); 
         const labelStep = Math.max(1, Math.floor(candles.length / 4));
 
+        // --- CANDLES ---
         candles.forEach((c, i) => {
             const xCenter = i * candleSpacing + (candleSpacing / 2);
             
-            // X-Axis Labels
+            // Axis X Labels
             if(i % labelStep === 0) {
                 ctx.strokeStyle = '#222';
                 ctx.beginPath(); ctx.moveTo(xCenter, 0); ctx.lineTo(xCenter, chartH); ctx.stroke();
@@ -372,28 +468,66 @@
 
             const isUp = c.c >= c.o;
             
-            // Wicks: ALWAYS WHITE
             ctx.strokeStyle = '#FFFFFF';
             ctx.beginPath(); ctx.moveTo(xCenter, yH); ctx.lineTo(xCenter, yL); ctx.stroke();
 
-            // Body
             const bodyTop = Math.min(yO, yC);
             const bodyHeight = Math.max(1, Math.abs(yC - yO));
             const xLeft = xCenter - candleBodyW / 2;
 
             if (isUp) {
-                // UP: Solid White
                 ctx.fillStyle = '#FFFFFF';
                 ctx.fillRect(xLeft, bodyTop, candleBodyW, bodyHeight);
             } else {
-                // DOWN: Black with White Outline
-                ctx.fillStyle = '#000000'; // Match background
+                ctx.fillStyle = '#000000';
                 ctx.strokeStyle = '#FFFFFF';
                 ctx.lineWidth = 1; 
                 ctx.fillRect(xLeft, bodyTop, candleBodyW, bodyHeight);
                 ctx.strokeRect(xLeft, bodyTop, candleBodyW, bodyHeight);
             }
         });
+
+        // --- CROSSHAIR ---
+        if(cursor && cursor.x < chartW && cursor.y < chartH) {
+            // Рисуем пунктирные линии
+            ctx.setLineDash([4, 4]);
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = '#FFFFFF'; // Белая пунктирная линия
+
+            // Вертикальная
+            ctx.beginPath();
+            ctx.moveTo(cursor.x, 0);
+            ctx.lineTo(cursor.x, chartH);
+            ctx.stroke();
+
+            // Горизонтальная
+            ctx.beginPath();
+            ctx.moveTo(0, cursor.y);
+            ctx.lineTo(chartW, cursor.y);
+            ctx.stroke();
+
+            // Reset dash
+            ctx.setLineDash([]);
+
+            // Вычисляем цену в точке Y
+            // y = (maxP - price) * scaleY
+            // price = maxP - (y / scaleY)
+            const priceAtCursor = maxP - (cursor.y / scaleY);
+            
+            // Рисуем плашку с ценой справа
+            const labelText = formatPrice(priceAtCursor);
+            const textWidth = ctx.measureText(labelText).width + 10;
+            const labelH = 18;
+            
+            // Белая плашка
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(chartW, cursor.y - labelH/2, textWidth, labelH);
+            
+            // Черный текст внутри
+            ctx.fillStyle = '#000000';
+            ctx.textAlign = "left";
+            ctx.fillText(labelText, chartW + 5, cursor.y + 4);
+        }
     }
 
     function renderHistory() {
