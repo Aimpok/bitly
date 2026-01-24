@@ -39,7 +39,8 @@
     <div style="padding: 0 16px;">
         <!-- Amount Input -->
         <div class="input-wrapper">
-            <input type="number" id="amountInput" placeholder="Amount" oninput="updateButton()">
+            <!-- Ввод с авто-пробелами -->
+            <input type="text" inputmode="decimal" id="amountInput" placeholder="Amount" oninput="handleInput(this)">
             <div class="input-suffix">
                 <span>BLYX</span>
                 <img src="Sprites/Blyx.png" class="star-icon-small" alt="blyx">
@@ -61,7 +62,7 @@
             </div>
         </div>
         
-        <!-- Info Text (Ошибки поиска юзера или лимитов) -->
+        <!-- Info Text -->
         <div id="receiverInfo" style="font-size: 12px; color: #FF3B30; margin-top: -8px; margin-bottom: 15px; margin-left: 10px; min-height: 14px;"></div>
     </div>
 
@@ -88,37 +89,73 @@
         let receiverData = null;
         let searchTimer = null;
         
-        // КОНСТАНТЫ ЛИМИТОВ
         const FEE_PERCENT = 0.05; // 5%
         const MIN_TRANSFER = 10;
         const MAX_TRANSFER = 100000;
+
+        // === ФОРМАТТЕР (визуально для текста) ===
+        function formatDisplay(num) {
+            if (num === undefined || num === null) return "0";
+            let parts = num.toString().split(".");
+            parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+            if (parts[1]) return parts[0] + "." + parts[1].substring(0, 6);
+            return parts[0];
+        }
+
+        // === ОБРАБОТЧИК ВВОДА (ставит пробелы) ===
+        window.handleInput = function(el) {
+            let raw = el.value.replace(/[^0-9.]/g, '');
+            if ((raw.match(/\./g) || []).length > 1) raw = raw.replace(/\.$/, '');
+            
+            if(raw.endsWith('.')) {
+                el.value = raw;
+                updateButton();
+                return;
+            }
+            if(!raw) {
+                el.value = "";
+                updateButton();
+                return;
+            }
+
+            const parts = raw.split('.');
+            parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+            if(parts[1] && parts[1].length > 6) parts[1] = parts[1].substring(0,6);
+
+            el.value = parts.join('.');
+            updateButton();
+        }
+
+        // === ПОЛУЧИТЬ ЧИСТОЕ ЧИСЛО (без пробелов) ===
+        function getRawAmount() {
+            const val = document.getElementById('amountInput').value;
+            return parseFloat(val.replace(/\s/g, '')) || 0;
+        }
 
         async function init() {
             try {
                 currentUser = await initUser();
             } catch(e) { console.error(e); }
-            
-            // Скрываем лоадер после инициализации
             if(loader) loader.classList.add('loaded');
         }
         init();
 
         window.updateButton = function() {
-            const inputVal = parseFloat(document.getElementById('amountInput').value);
+            const inputVal = getRawAmount(); // Чистое число
             const btn = document.getElementById('sendBtn');
             const infoBox = document.getElementById('receiverInfo');
             
-            // Проверка лимитов для отображения кнопки
-            // Кнопка активна только если сумма в диапазоне [10, 100000]
+            // Проверка лимитов
             if (inputVal && inputVal >= MIN_TRANSFER && inputVal <= MAX_TRANSFER) {
                 const totalCost = inputVal * (1 + FEE_PERCENT); 
-                document.getElementById('btnAmount').innerText = parseFloat(totalCost.toFixed(2));
+                // Кнопка показывает число с пробелами
+                document.getElementById('btnAmount').innerText = formatDisplay(parseFloat(totalCost.toFixed(2)));
                 
-                // Если юзер не найден, очищаем поле ошибки лимитов (чтобы не мешало)
                 if(receiverData) {
                     btn.classList.remove('btn-disabled');
-                    // Если была ошибка лимитов, убираем ее
-                    if (infoBox.innerText.includes("Limit")) infoBox.innerText = "";
+                    if (infoBox.innerText.includes("Limit") || infoBox.innerText.includes("Minimum") || infoBox.innerText.includes("Maximum")) {
+                        infoBox.innerText = "";
+                    }
                 } else {
                     btn.classList.add('btn-disabled');
                 }
@@ -126,12 +163,10 @@
                 document.getElementById('btnAmount').innerText = "0";
                 btn.classList.add('btn-disabled');
                 
-                // Показываем ошибку, если введено число, но оно не подходит
                 if (inputVal && inputVal > 0) {
-                    if (inputVal < MIN_TRANSFER) infoBox.innerText = `Minimum transfer is ${MIN_TRANSFER} BLYX`;
-                    else if (inputVal > MAX_TRANSFER) infoBox.innerText = `Maximum transfer is ${MAX_TRANSFER.toLocaleString()} BLYX`;
+                    if (inputVal < MIN_TRANSFER) infoBox.innerText = `Minimum transfer is ${formatDisplay(MIN_TRANSFER)} BLYX`;
+                    else if (inputVal > MAX_TRANSFER) infoBox.innerText = `Maximum transfer is ${formatDisplay(MAX_TRANSFER)} BLYX`;
                 } else if (!receiverData) {
-                    // Очищаем, если поле пустое
                     infoBox.innerText = "";
                 }
             }
@@ -142,16 +177,14 @@
             const rawVal = el.value.trim();
             let usernameLower = rawVal.replace('@', '').toLowerCase(); 
             
-            // Сброс
             receiverData = null;
             document.getElementById('receiverAvatar').classList.remove('avatar-visible');
             document.getElementById('receiverInfo').innerText = ""; 
-            updateButton(); // Перепроверяем кнопку
+            updateButton(); 
 
             if(usernameLower.length < 3) return;
 
             document.getElementById('searchLoader').style.display = 'block';
-            
             searchTimer = setTimeout(() => searchUser(usernameLower), 500);
         }
 
@@ -172,11 +205,9 @@
                     }
 
                     receiverData = { ...data, docId: userDoc.id };
-                    
                     const avatarEl = document.getElementById('receiverAvatar');
                     avatarEl.src = data.photoUrl && data.photoUrl.length > 5 ? data.photoUrl : 'Sprites/GiftIcon.png'; 
                     avatarEl.classList.add('avatar-visible');
-
                     document.getElementById('receiverInfo').innerText = ""; 
                     updateButton();
                 } else {
@@ -190,31 +221,30 @@
         }
 
         window.doTransfer = async function() {
-            const amount = parseFloat(document.getElementById('amountInput').value);
+            const amount = getRawAmount();
             
             if(!amount) return;
             if(!receiverData) return;
 
-            // ФИНАЛЬНАЯ ПРОВЕРКА ЛИМИТОВ
             if (amount < MIN_TRANSFER) {
-                tg.showAlert(`Minimum amount is ${MIN_TRANSFER} BLYX`);
+                tg.showAlert(`Minimum amount is ${formatDisplay(MIN_TRANSFER)} BLYX`);
                 return;
             }
             if (amount > MAX_TRANSFER) {
-                tg.showAlert(`Maximum amount is ${MAX_TRANSFER.toLocaleString()} BLYX`);
+                tg.showAlert(`Maximum amount is ${formatDisplay(MAX_TRANSFER)} BLYX`);
                 return;
             }
 
             const totalDeduction = amount * (1 + FEE_PERCENT); 
 
             if(totalDeduction > currentUser.balance) { 
-                tg.showAlert(`Insufficient funds! You need ${totalDeduction.toFixed(2)} BLYX`); 
+                tg.showAlert(`Insufficient funds! You need ${formatDisplay(totalDeduction.toFixed(2))} BLYX`); 
                 return; 
             }
 
-            tg.showConfirm(`Send ${amount} BLYX to @${receiverData.username}?\nTotal cost: ${totalDeduction.toFixed(2)} BLYX`, async (ok) => {
+            // Красивый конфирм с пробелами
+            tg.showConfirm(`Send ${formatDisplay(amount)} BLYX to @${receiverData.username}?\nTotal cost: ${formatDisplay(totalDeduction.toFixed(2))} BLYX`, async (ok) => {
                 if(ok) {
-                    // Включаем лоадер
                     if(loader) loader.classList.remove('loaded');
                     
                     try {
@@ -224,14 +254,12 @@
                         await runTransaction(db, async (transaction) => {
                             const senderDoc = await transaction.get(senderRef);
                             if (!senderDoc.exists()) throw "Error: Sender not found";
-
                             const currentBalance = senderDoc.data().balance || 0;
                             if (currentBalance < totalDeduction) throw "Not enough money!";
 
                             const receiverDoc = await transaction.get(receiverRef);
                             if (!receiverDoc.exists()) throw "Error: Receiver not found";
                             
-                            // 1. Списываем у отправителя
                             transaction.update(senderRef, { 
                                 balance: increment(-totalDeduction),
                                 transactions: arrayUnion({
@@ -244,7 +272,6 @@
                                 })
                             });
 
-                            // 2. Начисляем получателю
                             transaction.update(receiverRef, { 
                                 balance: increment(amount),
                                 transactions: arrayUnion({
@@ -260,8 +287,6 @@
                         window.history.back();
 
                     } catch (e) {
-                        console.error(e);
-                        // Убираем лоадер при ошибке
                         if(loader) loader.classList.add('loaded');
                         tg.showAlert("Transaction failed: " + e);
                     }
