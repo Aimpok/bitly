@@ -241,7 +241,6 @@
                     const img = document.getElementById('cropperImg');
                     img.onload = () => {
                         cs = { x: 0, y: 0, s: 1 };
-                        // Min scale to fill circle
                         const minScale = Math.max(CROP_SIZE / img.naturalWidth, CROP_SIZE / img.naturalHeight);
                         cs.s = minScale * 1.2;
                         updateTransform();
@@ -258,11 +257,9 @@
             const img = document.getElementById('cropperImg');
             if (!img.naturalWidth) return;
             
-            // 1. Boundary Zoom
             const minScale = Math.max(CROP_SIZE / img.naturalWidth, CROP_SIZE / img.naturalHeight);
             if (cs.s < minScale) cs.s = minScale;
             
-            // 2. Boundary Pan
             const maxDistX = (img.naturalWidth * cs.s - CROP_SIZE) / 2;
             const maxDistY = (img.naturalHeight * cs.s - CROP_SIZE) / 2;
             if (cs.x > maxDistX) cs.x = maxDistX;
@@ -320,7 +317,7 @@
             closeCropper();
         }
 
-        // --- CALCULATION LOGIC (FIXED) ---
+        // --- CALCULATION LOGIC ---
         window.handleBack = function() {
             if(document.getElementById('step2').style.display === 'block') {
                 document.getElementById('step2').style.display = 'none';
@@ -341,11 +338,8 @@
         window.updateCalc = function() {
             const buyBlyx = parseFloat(document.getElementById('shareInput').value) || 0;
             
-            // Formula: Cap = Virtual + Fee + Buy
             const initialMarketCap = VIRTUAL_LIQUIDITY + CREATION_FEE + buyBlyx;
             const startPrice = initialMarketCap / TOTAL_SUPPLY;
-            
-            // Tokens Recv = Buy / Price
             const tokensToReceive = buyBlyx > 0 ? (buyBlyx / startPrice) : 0;
             
             document.getElementById('tokensRecieveText').innerText = Math.floor(tokensToReceive).toLocaleString();
@@ -372,11 +366,10 @@
             const desc = document.getElementById('tokenDesc').value;
             const buyBlyx = parseFloat(document.getElementById('shareInput').value) || 0;
             
-            // Final Calculation
             const initialMarketCap = VIRTUAL_LIQUIDITY + CREATION_FEE + buyBlyx;
             const startPrice = initialMarketCap / TOTAL_SUPPLY;
             const tokensToReceive = buyBlyx > 0 ? (buyBlyx / startPrice) : 0;
-            const totalCost = CREATION_FEE + buyBlyx;
+            const totalCost = CREATION_FEE + buyBlyx; // Полная стоимость (200 + сколько вложил)
 
             if(tokensToReceive > TOTAL_SUPPLY * 0.3) {
                 tg.showAlert("Reduce buy amount (Max 30%)");
@@ -399,6 +392,7 @@
             tg.showConfirm(`Launch ${ticker}?`, async (ok) => {
                 if(ok) {
                     try {
+                        // Создаем токен
                         await setDoc(tokenRef, {
                             id: ticker,
                             name: name,
@@ -406,8 +400,6 @@
                             image: base64Image,
                             ownerId: currentUser.id,
                             createdAt: new Date().toISOString(),
-                            
-                            // Math Data
                             maxSupply: TOTAL_SUPPLY,
                             marketCap: initialMarketCap, 
                             price: startPrice,           
@@ -419,13 +411,19 @@
                             ]
                         });
 
+                        // Обновляем пользователя
+                        // ИСПРАВЛЕНИЕ: Используем 'buy' и сохраняем 'cost' (totalCost)
+                        // Это заставит Wallet показать иконку Cart.png и отрицательную сумму в BLYX
                         const updates = { balance: increment(-totalCost) };
-                        if(tokensToReceive > 0) {
-                            updates[`portfolio.${ticker}`] = increment(tokensToReceive);
-                            updates.transactions = arrayUnion({
-                                type: 'create_buy', token: ticker, amount: tokensToReceive, price: startPrice, date: new Date().toISOString()
-                            });
-                        }
+                        updates[`portfolio.${ticker}`] = increment(tokensToReceive);
+                        updates.transactions = arrayUnion({
+                            type: 'buy',           // Тип "Покупка" (Cart.png в кошельке)
+                            token: ticker,         // Какой токен
+                            amount: tokensToReceive, // Сколько токенов
+                            cost: totalCost,       // Сколько всего потратил BLYX (Fee + Buy)
+                            price: startPrice,
+                            date: new Date().toISOString()
+                        });
 
                         await updateDoc(userRef, updates);
                         tg.showAlert("Token Launched!");
