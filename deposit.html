@@ -1,17 +1,32 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Deposit</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <!-- Твои стили -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        #globalLoader {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: #000000; z-index: 99999;
+            display: flex; justify(content: center; align-items: center;
+            transition: opacity 0.3s ease, visibility 0.3s;
+        }
+        #globalLoader.loaded { opacity: 0; visibility: hidden; pointer-events: none; }
+        .custom-spinner {
+            width: 40px; height: 40px; border-radius: 50%;
+            border: 4px solid #333; border-top-color: #ffffff;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
 </head>
 <body>
 
-    <!-- Header -->
+    <div id="globalLoader"><div class="custom-spinner"></div></div>
+
     <div class="header-nav">
         <button class="back-btn" onclick="window.history.back()">
             <svg class="icon" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
@@ -19,29 +34,28 @@
         <div class="header-title">Deposit</div>
     </div>
 
-    <!-- Content -->
-    <div style="padding: 20px 16px;">
-        
-        <!-- Input Wrapper -->
+    <div style="padding: 0 16px;">
+        <!-- Amount Input -->
         <div class="input-wrapper">
-            <input type="number" id="amountInput" placeholder="Amount" oninput="updateButton()">
+            <input type="text" inputmode="decimal" id="amountInput" placeholder="Amount" oninput="handleInput(this)">
             <div class="input-suffix">
                 <span>BLYX</span>
                 <img src="Sprites/Blyx.png" class="star-icon-small" alt="blyx">
             </div>
         </div>
-
-        <!-- Info Text -->
-        <div style="display: flex; justify-content: space-between; padding: 0 4px; margin-top: 8px;">
-            <p class="text-sec">Rate: 1 BLYX = 1 Star</p>
-            <p class="text-sec" style="color: #FF3B30;">Min: 50 BLYX</p>
+        
+        <!-- Rate Text (Gray) -->
+        <div style="font-size: 12px; color: #666; margin-top: -8px; margin-bottom: 12px; margin-left: 10px;">
+            Rate: 1 BLYX = 1 Star
         </div>
+
+        <!-- Info Text (Red Error) - Позиция как в трансфере -->
+        <div id="errorInfo" style="font-size: 12px; color: #FF3B30; margin-top: -8px; margin-bottom: 15px; margin-left: 10px; min-height: 14px;"></div>
     </div>
 
-    <!-- Bottom Fixed Panel -->
     <div class="bottom-cost-panel">
         <div class="cost-label">Total Cost</div>
-        <button class="btn-white-large" id="payBtn" onclick="handleDeposit()">
+        <button class="btn-white-large btn-disabled" id="payBtn" onclick="handleDeposit()">
             Pay <span id="btnAmount">0</span>
             <img src="Sprites/star.png" class="star-icon-small" alt="star">
         </button>
@@ -52,71 +66,111 @@
         tg.expand();
         tg.setHeaderColor('#000000');
 
-        // ==========================================
-        // ВСТАВЬ СЮДА ССЫЛКУ НА ТВОЙ VERCEL СЕРВЕР (без / в конце)
+        // === ССЫЛКА НА ТВОЙ БЭКЕНД ===
         const BACKEND_URL = "https://sdadw3easdwewfrd.vercel.app"; 
-        // ==========================================
 
-        const userId = tg.initDataUnsafe?.user?.id;
+        const loader = document.getElementById('globalLoader');
+        const MIN_DEP = 50;
+        const MAX_DEP = 100000;
 
-        function updateButton() {
-            const val = document.getElementById('amountInput').value;
-            document.getElementById('btnAmount').innerText = val ? val : '0';
+        // Убираем лоадер сразу
+        window.onload = () => loader.classList.add('loaded');
+
+        // === ФОРМАТТЕР ===
+        function formatDisplay(num) {
+            if (!num) return "0";
+            let parts = num.toString().split(".");
+            parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+            return parts.join(".");
         }
 
-        async function handleDeposit() {
-            const amount = parseInt(document.getElementById('amountInput').value);
+        // === ОБРАБОТЧИК ВВОДА ===
+        window.handleInput = function(el) {
+            let raw = el.value.replace(/[^0-9.]/g, '');
+            if ((raw.match(/\./g) || []).length > 1) raw = raw.replace(/\.$/, '');
             
-            // ПРОВЕРКА НА МИНИМУМ
-            if (!amount || amount < 50) {
-                tg.showPopup({ 
-                    title: 'Too low amount', 
-                    message: 'The minimum deposit amount is 50 BLYX.' 
-                });
+            const parts = raw.split('.');
+            parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+            if(parts[1] && parts[1].length > 6) parts[1] = parts[1].substring(0,6);
+
+            el.value = parts.join('.');
+            updateButton();
+        }
+
+        function getRawAmount() {
+            const val = document.getElementById('amountInput').value;
+            return parseFloat(val.replace(/\s/g, '')) || 0;
+        }
+
+        // === ВАЛИДАЦИЯ И ОБНОВЛЕНИЕ КНОПКИ ===
+        window.updateButton = function() {
+            const val = getRawAmount();
+            const btn = document.getElementById('payBtn');
+            const errorBox = document.getElementById('errorInfo');
+            const btnAmount = document.getElementById('btnAmount');
+
+            // На кнопке всегда показываем сколько звезд
+            btnAmount.innerText = val > 0 ? formatDisplay(val) : "0";
+
+            // Сбрасываем состояние
+            btn.classList.add('btn-disabled');
+            errorBox.innerText = "";
+
+            if (!val) return;
+
+            // Проверка на минимум
+            if (val < MIN_DEP) {
+                errorBox.innerText = `Minimum deposit is ${MIN_DEP} BLYX`;
                 return;
             }
 
+            // Проверка на максимум
+            if (val > MAX_DEP) {
+                errorBox.innerText = `Maximum deposit is ${formatDisplay(MAX_DEP)} BLYX`;
+                return;
+            }
+
+            // Если всё ок
+            btn.classList.remove('btn-disabled');
+        }
+
+        async function handleDeposit() {
+            const amount = getRawAmount();
+            const userId = tg.initDataUnsafe?.user?.id;
+
+            if (amount < MIN_DEP || amount > MAX_DEP) return;
+
             const btn = document.getElementById('payBtn');
-            const originalText = document.getElementById('btnAmount').innerText;
-            
-            btn.disabled = true;
-            btn.style.opacity = "0.7";
+            btn.classList.add('btn-disabled');
+            loader.classList.remove('loaded');
 
             try {
                 const response = await fetch(`${BACKEND_URL}/create-invoice`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        userId: userId,
-                        amount: amount 
-                    })
+                    body: JSON.stringify({ userId, amount })
                 });
 
                 const data = await response.json();
+                loader.classList.add('loaded');
 
-                if (!data.ok) {
-                    throw new Error(data.error || 'Failed to create invoice');
-                }
+                if (!data.ok) throw new Error(data.error);
 
                 tg.openInvoice(data.link, (status) => {
                     if (status === 'paid') {
                         tg.showPopup({ 
                             title: 'Success!', 
-                            message: `Successfully deposited ${amount} BLYX.` 
-                        }, () => {
-                            window.history.back();
-                        });
+                            message: `Successfully deposited ${formatDisplay(amount)} BLYX.` 
+                        }, () => window.history.back());
                     } else {
-                        btn.disabled = false;
-                        btn.style.opacity = "1";
+                        updateButton();
                     }
                 });
 
             } catch (error) {
-                console.error(error);
+                loader.classList.add('loaded');
                 tg.showAlert("Error: " + error.message);
-                btn.disabled = false;
-                btn.style.opacity = "1";
+                updateButton();
             }
         }
     </script>
