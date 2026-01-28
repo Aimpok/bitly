@@ -1,84 +1,132 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Deposit</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Твои стили -->
     <link rel="stylesheet" href="style.css">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
+
+    <!-- Header -->
     <div class="header-nav">
         <button class="back-btn" onclick="window.history.back()">
             <svg class="icon" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
         </button>
         <div class="header-title">Deposit</div>
     </div>
-    <div style="padding: 0 16px;">
-        <!-- Ввод -->
+
+    <!-- Content -->
+    <div style="padding: 20px 16px;">
+        
+        <!-- Input Wrapper (Вводим сколько хотим BLYX) -->
         <div class="input-wrapper">
             <input type="number" id="amountInput" placeholder="Amount" oninput="updateButton()">
             <div class="input-suffix">
-                <span>STARS</span>
-                <img src="Sprites/star.png" class="star-icon-small" alt="star">
+                <span>BLYX</span>
+                <!-- Иконка Blyx вместо Звезды -->
+                <img src="Sprites/Blyx.png" class="star-icon-small" alt="blyx">
             </div>
         </div>
-        <p style="font-size: 12px; color: #666; padding-left: 10px;">Rate: 1 Star = 10 BLYX</p>
+
+        <!-- Info Text -->
+        <p class="text-sec" style="margin-left: 4px; margin-top: 8px;">Rate: 1 BLYX = 1 Star</p>
     </div>
-    
+
+    <!-- Bottom Fixed Panel -->
     <div class="bottom-cost-panel">
-        <div class="cost-label">Cost</div>
-        <button class="btn-white-large" onclick="handleDeposit()">
-            <span id="btnAmount">0</span>
+        <div class="cost-label">Total Cost</div>
+        <button class="btn-white-large" id="payBtn" onclick="handleDeposit()">
+            Pay <span id="btnAmount">0</span>
+            <!-- На кнопке оставляем звезду, так как оплата в Stars -->
             <img src="Sprites/star.png" class="star-icon-small" alt="star">
         </button>
     </div>
 
-    <script type="module">
-        import { db, getUserRef } from './user-service.js';
-        import { updateDoc, increment, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-        
+    <script>
         const tg = window.Telegram.WebApp;
         tg.expand();
         tg.setHeaderColor('#000000');
+        tg.enableClosingConfirmation();
 
-        window.updateButton = function() {
+        // ==========================================
+        // ВСТАВЬ СЮДА ССЫЛКУ НА ТВОЙ VERCEL СЕРВЕР
+        // Пример: "sdadw3easdwewfrd-o2j0ztwhs-afefs-projects-2f3e45d4.vercel.app"
+        // Без слеша в конце!
+        const BACKEND_URL = "sdadw3easdwewfrd-o2j0ztwhs-afefs-projects-2f3e45d4.vercel.app"; 
+        // ==========================================
+
+        const userId = tg.initDataUnsafe?.user?.id;
+
+        function updateButton() {
             const val = document.getElementById('amountInput').value;
+            // Обновляем кнопку (Курс 1 к 1, поэтому цифры совпадают)
             document.getElementById('btnAmount').innerText = val ? val : '0';
         }
 
-        window.handleDeposit = async function() {
-            const val = parseInt(document.getElementById('amountInput').value);
-            if(!val || val <= 0) return;
+        async function handleDeposit() {
+            const amount = parseInt(document.getElementById('amountInput').value);
+            
+            if (!amount || amount <= 0) {
+                tg.showPopup({ title: 'Error', message: 'Please enter a valid amount' });
+                return;
+            }
 
-            tg.showConfirm(`Purchase ${val} Stars?`, async (ok) => {
-                if(ok) {
-                    try {
-                        const userRef = getUserRef(); // Берем ссылку на текущего юзера из user-service
-                        
-                        // Проверяем, существует ли юзер (на всякий случай)
-                        const snap = await getDoc(userRef);
-                        if (!snap.exists()) {
-                            tg.showAlert("User not found. Please restart app.");
-                            return;
-                        }
+            // Проверка, что ты вставил ссылку
+            if (BACKEND_URL.includes("ТВОЙ-ПРОЕКТ")) {
+                tg.showAlert("Ошибка: Вы не указали ссылку на сервер в коде deposit.html!");
+                return;
+            }
 
-                        // Обновляем реальный баланс в базе
-                        await updateDoc(userRef, {
-                            starsBalance: increment(val),   // + звезды
-                            balance: increment(val * 10)    // + монеты BLYX (курс 1 к 10)
-                        });
+            const btn = document.getElementById('payBtn');
+            const originalText = document.getElementById('btnAmount').innerText;
+            
+            // Блокируем кнопку
+            btn.disabled = true;
+            btn.style.opacity = "0.7";
 
-                        tg.showAlert(`Success! Added ${val} Stars.`);
-                        window.history.back(); // Возвращаемся назад
+            try {
+                // Отправляем запрос на ТВОЙ внешний сервер
+                const response = await fetch(`${BACKEND_URL}/create-invoice`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        userId: userId,
+                        amount: amount 
+                    })
+                });
 
-                    } catch (error) {
-                        console.error(error);
-                        tg.showAlert("Error: " + error.message);
-                    }
+                const data = await response.json();
+
+                if (!data.ok) {
+                    throw new Error(data.error || 'Failed to create invoice');
                 }
-            });
+
+                // Открываем оплату Stars
+                tg.openInvoice(data.link, (status) => {
+                    if (status === 'paid') {
+                        tg.showPopup({ 
+                            title: 'Success!', 
+                            message: `Successfully deposited ${amount} BLYX.` 
+                        }, () => {
+                            window.history.back(); // Успех
+                        });
+                    } else {
+                        // Отмена
+                        btn.disabled = false;
+                        btn.style.opacity = "1";
+                    }
+                });
+
+            } catch (error) {
+                console.error(error);
+                tg.showAlert("Connection Error: " + error.message);
+                btn.disabled = false;
+                btn.style.opacity = "1";
+            }
         }
     </script>
 </body>
