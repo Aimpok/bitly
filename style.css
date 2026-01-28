@@ -443,22 +443,97 @@ button { border: none; }
 .action-btn { flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; height: 80px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; cursor: pointer; transition: background 0.2s; }
 .action-btn:active { background: var(--surface-light); }
 .action-label { font-size: 14px; font-weight: 600; }
+
+/* === PORTFOLIO (FIXED FOR 3 COLUMNS) === */
 .portfolio-section { width: 100%; padding: 0 16px; }
 .portfolio-title { font-size: 18px; font-weight: 700; margin-bottom: 15px; }
-.portfolio-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-.crypto-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; aspect-ratio: 1 / 1; padding: 12px; display: flex; flex-direction: column; justify-content: space-between; position: relative; cursor: pointer; }
-.card-icon-area { flex: 1; display: flex; align-items: center; justify-content: center; }
-.card-icon-img { width: 42px; height: 42px; object-fit: cover; border-radius: 50%; }
-.token-icon-fallback {
-    width: 42px; height: 42px; border-radius: 50%; background: #333;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 18px; font-weight: 700; color: white;
+
+.portfolio-grid { 
+    display: grid; 
+    grid-template-columns: repeat(3, 1fr); /* 3 колонки */
+    gap: 8px; /* Меньший отступ */
+    width: 100%;
 }
-.card-info { display: flex; flex-direction: column; gap: 4px; width: 100%; }
-.token-name { font-size: 13px; font-weight: 700; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.card-row { display: flex; justify-content: space-between; align-items: flex-end; }
-.price-tag { font-size: 11px; color: white; font-weight: 600; display: flex; align-items: center; gap: 2px; }
-.token-amount { font-size: 11px; color: var(--text-sec); font-weight: 500; }
+
+.crypto-card { 
+    background: var(--surface); 
+    border: 1px solid var(--border); 
+    border-radius: 16px; 
+    padding: 10px 8px; /* Уменьшенные внутренние отступы */
+    display: flex; 
+    flex-direction: column; 
+    justify-content: space-between; 
+    position: relative; 
+    cursor: pointer;
+    width: 100% !important; /* Принудительная ширина */
+    min-width: 0; /* Чтобы не вылезало за пределы */
+}
+
+.card-icon-area { 
+    flex: 1; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    margin-bottom: 6px;
+}
+
+.card-icon-img { 
+    width: 36px; /* Уменьшенная иконка */
+    height: 36px; 
+    object-fit: cover; 
+    border-radius: 50%; 
+}
+
+.token-icon-fallback {
+    width: 36px; 
+    height: 36px; 
+    border-radius: 50%; 
+    background: #333;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 700; color: white;
+}
+
+.card-info { 
+    display: flex; 
+    flex-direction: column; 
+    width: 100%; 
+    text-align: left;
+}
+
+.token-name { 
+    font-size: 11px; 
+    font-weight: 700; 
+    color: white; 
+    white-space: nowrap; 
+    overflow: hidden; 
+    text-overflow: ellipsis; 
+    margin-bottom: 4px;
+}
+
+/* Цена и количество друг под другом */
+.card-row { 
+    display: flex; 
+    flex-direction: column; 
+    align-items: flex-start;
+    gap: 2px;
+}
+
+.price-tag { 
+    font-size: 10px; 
+    color: white; 
+    font-weight: 600; 
+    display: flex; 
+    align-items: center; 
+    gap: 2px; 
+}
+
+.token-amount { 
+    font-size: 10px; 
+    color: var(--text-sec); 
+    font-weight: 500; 
+}
+
+/* === END PORTFOLIO FIX === */
 
 .market-header { display: flex; justify-content: space-between; align-items: center; padding: 20px 16px 10px; width: 100%; }
 .market-title-big { font-size: 20px; font-weight: 700; color: white; }
