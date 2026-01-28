@@ -23,10 +23,10 @@
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* СТИЛЬ КНОПКИ УДАЛИТЬ (КАК BUY) */
+        /* СТИЛЬ КНОПКИ УДАЛИТЬ */
         .btn-delete-top {
             background: #1c1c1c;
-            color: #FFFFFF;
+            color: #FF3B30;
             border: none;
             border-radius: 20px;
             padding: 6px 16px;
@@ -39,29 +39,31 @@
         .btn-delete-top:active {
             background: #333;
         }
+        .error-text {
+            color: #FF3B30;
+            font-size: 12px;
+            margin-top: 10px;
+            min-height: 18px;
+            font-weight: 500;
+        }
     </style>
 </head>
 <body>
 
-    <!-- ЗАГРУЗЧИК -->
     <div id="globalLoader"><div class="custom-spinner"></div></div>
 
     <div class="header-nav">
         <button class="back-btn" onclick="window.history.back()"><svg class="icon" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
         <div class="header-title" id="pageTitle">Create Order</div>
-        
-        <!-- Кнопка удаления справа сверху -->
         <button class="btn-delete-top" id="deleteBtn" style="display:none;" onclick="handleDelete()">Delete</button>
     </div>
 
     <div style="padding: 0 16px;">
-        <!-- Price Input -->
         <label class="launch-label">Price per 1 token (BLYX)</label>
         <div class="input-wrapper">
             <input type="text" inputmode="decimal" id="priceInput" placeholder="0.00004" oninput="handleInput(this)">
         </div>
 
-        <!-- Amount Input -->
         <label class="launch-label">Amount to sell</label>
         <div class="input-wrapper">
             <input type="text" inputmode="decimal" id="amountInput" placeholder="Amount" oninput="handleInput(this)">
@@ -70,7 +72,6 @@
             Available: <span id="availBal">0</span>
         </div>
 
-        <!-- Min Limit Only -->
         <label class="launch-label">Min Limit (BLYX)</label>
         <div class="input-wrapper">
             <input type="text" inputmode="decimal" id="minInput" value="100" placeholder="Min BLYX" oninput="handleInput(this)">
@@ -80,19 +81,17 @@
             Max Limit: <span id="maxLimitText">Auto (All)</span>
         </div>
 
-        <!-- Error Text -->
         <div id="errorText" class="error-text"></div>
     </div>
 
     <div class="fixed-bottom-bar">
-        <!-- Кнопка с жирным шрифтом 800 -->
         <button class="btn-white-large btn-disabled" style="font-weight: 800;" id="publishBtn" onclick="handleSubmit()">Publish Order</button>
     </div>
 
     <script type="module">
         import { initUser } from './user-service.js';
         import { db } from './firebase-config.js';
-        import { doc, getDoc, updateDoc, addDoc, deleteDoc, collection, increment, runTransaction, arrayUnion } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { doc, getDoc, updateDoc, collection, increment, runTransaction, arrayUnion, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         const tg = window.Telegram.WebApp;
         tg.expand();
@@ -109,7 +108,6 @@
         let currentOrder = null;
         let activeTokenId = '';
 
-        // Форматтер для отображения с пробелами
         function formatDisplay(num) {
             if (num === undefined || num === null) return "0";
             let parts = num.toString().split(".");
@@ -118,21 +116,11 @@
             return parts[0];
         }
 
-        // Ввод текста с пробелами
         window.handleInput = function(el) {
             let raw = el.value.replace(/[^0-9.]/g, '');
             if ((raw.match(/\./g) || []).length > 1) raw = raw.replace(/\.$/, '');
-            
-            if(raw.endsWith('.')) {
-                el.value = raw;
-                validateForm();
-                return;
-            }
-            if(!raw) {
-                el.value = "";
-                validateForm();
-                return;
-            }
+            if(raw.endsWith('.')) { el.value = raw; validateForm(); return; }
+            if(!raw) { el.value = ""; validateForm(); return; }
 
             const parts = raw.split('.');
             parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, " ");
@@ -142,7 +130,6 @@
             validateForm();
         }
 
-        // Получить чистое число из инпута
         function getRawValue(id) {
             const val = document.getElementById(id).value;
             return parseFloat(val.replace(/\s/g, '')) || 0;
@@ -160,16 +147,16 @@
 
                     const oSnap = await getDoc(doc(db, "orders", orderId));
                     if (!oSnap.exists()) {
-                        alert("Order not found");
+                        tg.showAlert("Order not found");
                         window.history.back();
                         return;
                     }
                     currentOrder = { id: oSnap.id, ...oSnap.data() };
                     activeTokenId = currentOrder.tokenId;
 
-                    document.getElementById('priceInput').value = formatDisplay(currentOrder.price);
-                    document.getElementById('amountInput').value = formatDisplay(currentOrder.amount);
-                    document.getElementById('minInput').value = formatDisplay(currentOrder.minLimit);
+                    document.getElementById('priceInput').value = currentOrder.price;
+                    document.getElementById('amountInput').value = currentOrder.amount;
+                    document.getElementById('minInput').value = currentOrder.minLimit;
                     
                     document.getElementById('amountInput').disabled = true;
                     document.getElementById('amountInput').style.opacity = "0.5";
@@ -179,14 +166,12 @@
                     isEditMode = false;
                     activeTokenId = tokenIdParam;
                     myBalance = currentUser.portfolio?.[activeTokenId] || 0;
-                    document.getElementById('availBal').innerText = formatDisplay(Math.floor(myBalance));
+                    document.getElementById('availBal').innerText = formatDisplay(myBalance);
                     
-                    try {
-                        const tSnap = await getDoc(doc(db, "tokens", activeTokenId));
-                        if(tSnap.exists()) {
-                            document.getElementById('priceInput').value = tSnap.data().price.toFixed(6);
-                        }
-                    } catch(e){}
+                    const tSnap = await getDoc(doc(db, "tokens", activeTokenId));
+                    if(tSnap.exists()) {
+                        document.getElementById('priceInput').value = tSnap.data().price;
+                    }
                 } else {
                     window.history.back();
                     return;
@@ -194,7 +179,6 @@
                 
                 validateForm();
             } catch(e){ console.error(e); }
-            
             if(loader) loader.classList.add('loaded');
         }
 
@@ -212,26 +196,10 @@
             err.innerText = "";
 
             if(amount <= 0 || price <= 0) return;
-            
-            if(!isEditMode && amount > myBalance) {
-                err.innerText = "Not enough tokens on balance";
-                return;
-            }
-            
-            if(totalValue < 100) {
-                err.innerText = `Total value (${formatDisplay(totalValue)}) < 100 BLYX`;
-                return;
-            }
-
-            if(min < 100) {
-                err.innerText = "Minimum limit must be at least 100 BLYX";
-                return;
-            }
-
-            if(min > totalValue) {
-                err.innerText = `Min limit > total value`;
-                return;
-            }
+            if(!isEditMode && amount > myBalance) { err.innerText = "Not enough tokens on balance"; return; }
+            if(totalValue < 100) { err.innerText = `Total value (${formatDisplay(totalValue)}) < 100 BLYX`; return; }
+            if(min < 100) { err.innerText = "Minimum limit must be at least 100 BLYX"; return; }
+            if(min > totalValue) { err.innerText = `Min limit > total value`; return; }
 
             btn.classList.remove('btn-disabled');
         }
@@ -247,19 +215,37 @@
             const min = getRawValue('minInput');
             const max = price * amount;
 
-            tg.showConfirm(`Sell ${formatDisplay(amount)} ${activeTokenId}?\nTokens will be locked.`, async (ok) => {
-                if(ok) {
-                    if(loader) loader.classList.remove('loaded');
-                    try {
+            tg.showConfirm(`Sell ${formatDisplay(amount)} ${activeTokenId}? Tokens will be locked.`, async (ok) => {
+                if(!ok) return;
+                if(loader) loader.classList.remove('loaded');
+                try {
+                    await runTransaction(db, async (transaction) => {
                         const userRef = doc(db, "users", currentUser.id.toString());
-                        await updateDoc(userRef, {
+                        const tokenRef = doc(db, "tokens", activeTokenId);
+                        const orderRef = doc(collection(db, "orders"));
+
+                        const uSnap = await transaction.get(userRef);
+                        const currentBalance = uSnap.data().portfolio?.[activeTokenId] || 0;
+
+                        if (currentBalance < amount) throw "Insufficient tokens";
+
+                        // --- ЛОГИКА ХОЛДЕРОВ ---
+                        // Если после блокировки в ордер баланс становится 0 -> -1 холдер
+                        let holderChange = 0;
+                        if (Math.abs(currentBalance - amount) < 0.000001) {
+                            holderChange = -1;
+                        }
+
+                        // 1. Блокируем токены у юзера
+                        transaction.update(userRef, {
                             [`portfolio.${activeTokenId}`]: increment(-amount)
                         });
 
-                        await addDoc(collection(db, "orders"), {
+                        // 2. Создаем ордер
+                        transaction.set(orderRef, {
                             tokenId: activeTokenId,
                             sellerId: currentUser.id.toString(),
-                            sellerName: currentUser.username || "Anon",
+                            sellerName: currentUser.username || "User",
                             sellerAvatar: currentUser.photoUrl || "", 
                             price: price,
                             amount: amount,
@@ -269,12 +255,17 @@
                             sellerRep: currentUser.tradesCount || 0
                         });
 
-                        tg.showAlert("Order created!");
-                        window.history.back();
-                    } catch(e) {
-                        if(loader) loader.classList.add('loaded');
-                        tg.showAlert("Error: " + e.message);
-                    }
+                        // 3. Обновляем счетчик холдеров в токене
+                        transaction.update(tokenRef, {
+                            holdersCount: increment(holderChange)
+                        });
+                    });
+
+                    tg.showAlert("Order created!");
+                    window.history.back();
+                } catch(e) {
+                    if(loader) loader.classList.add('loaded');
+                    tg.showAlert("Error: " + e);
                 }
             });
         }
@@ -282,11 +273,9 @@
         async function updateOrder() {
             const price = getRawValue('priceInput');
             const min = getRawValue('minInput');
-            const amount = currentOrder.amount; 
-            const max = price * amount;
+            const max = price * currentOrder.amount;
 
             if(loader) loader.classList.remove('loaded');
-            
             try {
                 await updateDoc(doc(db, "orders", orderId), {
                     price: price,
@@ -303,39 +292,53 @@
 
         window.handleDelete = async function() {
             tg.showConfirm("Delete order and return tokens?", async (ok) => {
-                if(ok) {
-                    if(loader) loader.classList.remove('loaded');
-                    
-                    try {
-                        await runTransaction(db, async (t) => {
-                            const oRef = doc(db, "orders", orderId);
-                            const uRef = doc(db, "users", currentUser.id.toString());
-                            
-                            const oDoc = await t.get(oRef);
-                            if(!oDoc.exists()) throw "Order not found";
-                            
-                            const data = oDoc.data();
-                            const returnAmount = data.amount;
+                if(!ok) return;
+                if(loader) loader.classList.remove('loaded');
+                try {
+                    await runTransaction(db, async (transaction) => {
+                        const oRef = doc(db, "orders", orderId);
+                        const uRef = doc(db, "users", currentUser.id.toString());
+                        const tRef = doc(db, "tokens", activeTokenId);
 
-                            t.delete(oRef);
+                        const oDoc = await transaction.get(oRef);
+                        if(!oDoc.exists()) throw "Order not found";
+                        
+                        const orderData = oDoc.data();
+                        const uDoc = await transaction.get(uRef);
+                        const currentBalance = uDoc.data().portfolio?.[activeTokenId] || 0;
 
-                            t.update(uRef, {
-                                [`portfolio.${data.tokenId}`]: increment(returnAmount),
-                                transactions: arrayUnion({
-                                    type: 'cancel_order',
-                                    token: data.tokenId,
-                                    amount: returnAmount,
-                                    date: new Date().toISOString()
-                                })
-                            });
+                        // --- ЛОГИКА ХОЛДЕРОВ ---
+                        // Если возвращаем токены на пустой баланс -> +1 холдер
+                        let holderChange = 0;
+                        if (currentBalance === 0) {
+                            holderChange = 1;
+                        }
+
+                        // 1. Удаляем ордер
+                        transaction.delete(oRef);
+
+                        // 2. Возвращаем токены юзеру
+                        transaction.update(uRef, {
+                            [`portfolio.${activeTokenId}`]: increment(orderData.amount),
+                            transactions: arrayUnion({
+                                type: 'cancel_order',
+                                token: activeTokenId,
+                                amount: orderData.amount,
+                                date: new Date().toISOString()
+                            })
                         });
 
-                        tg.showAlert("Order deleted. Tokens returned.");
-                        window.history.back();
-                    } catch(e) {
-                        if(loader) loader.classList.add('loaded');
-                        tg.showAlert("Error: " + e);
-                    }
+                        // 3. Обновляем счетчик холдеров
+                        transaction.update(tRef, {
+                            holdersCount: increment(holderChange)
+                        });
+                    });
+
+                    tg.showAlert("Order deleted. Tokens returned.");
+                    window.history.back();
+                } catch(e) {
+                    if(loader) loader.classList.add('loaded');
+                    tg.showAlert("Error: " + e);
                 }
             });
         }
