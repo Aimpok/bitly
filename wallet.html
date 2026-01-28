@@ -21,7 +21,7 @@
 </head>
 <body>
 
-    <!-- Total Assets Header -->
+    <!-- Total Assets Header (Теперь только чистый баланс Blyx) -->
     <div class="balance-card">
         <div class="balance-label">Total Assets</div>
         <div class="balance-val" style="display: flex; align-items: center; gap: 8px;">
@@ -97,18 +97,31 @@
         let currentUserData = null;
 
         // UTILS
+        // Функция для полного отображения баланса без сокращений типа "1k"
+        function formatFull(num) {
+            if (!num && num !== 0) return "0";
+            return num.toLocaleString('en-US', { 
+                minimumFractionDigits: 0, 
+                maximumFractionDigits: 2 
+            });
+        }
+
+        // Оставляем compact для маленьких подписей в карточках, где мало места
         function formatCompact(num) {
-            if (!num) return "0";
+            if (!num && num !== 0) return "0";
             return Intl.NumberFormat('en-US', { notation: "compact", maximumFractionDigits: 2 }).format(num);
         }
+
         function formatPrice(val) {
             if(!val && val !== 0) return "0";
             return val < 0.01 ? val.toFixed(8).replace(/\.?0+$/, "") : val.toFixed(4);
         }
+
         function formatDate(iso) {
             const d = new Date(iso);
             return d.getDate() + ' ' + d.toLocaleString('en', {month:'short'});
         }
+
         function formatTime(iso) {
             const d = new Date(iso);
             return d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
@@ -139,16 +152,9 @@
 
         function renderTotalAssets() {
             if(!currentUserData) return;
+            // Теперь берем ТОЛЬКО чистый баланс Blyx, не прибавляя токены
             let total = currentUserData.balance || 0;
-            const port = currentUserData.portfolio || {};
-            for(let t in port) {
-                const amt = port[t];
-                if(amt > 0) {
-                    const tData = currentMarket.find(x => x.id === t);
-                    if(tData) total += (amt * tData.price);
-                }
-            }
-            document.getElementById('totalAssetsDisplay').innerText = formatCompact(total);
+            document.getElementById('totalAssetsDisplay').innerText = formatFull(total);
         }
 
         function renderPortfolio() {
@@ -178,16 +184,16 @@
                         <span class="token-name">${tInfo.name}</span>
                         <div class="card-row">
                             <span class="price-tag">${formatPrice(tInfo.price)} <img src="Sprites/Blyx.png" style="width:10px; height:10px; margin-left:2px;"></span>
-                            <span class="token-amount">x${formatCompact(amt)}</span>
+                            <span class="token-amount">x${formatFull(amt)}</span>
                         </div>
                     </div>`;
                 grid.appendChild(card);
             });
         }
 
-        // === ГЕНЕРАЦИЯ КАРТОЧЕК В СТИЛЕ МАРКЕТА (NEW) ===
         async function renderGoods() {
             const list = document.getElementById('goodsList');
+            if(!currentUserData) return;
             const q = query(collection(db, "orders"), where("sellerId", "==", currentUserData.id.toString()));
             const snap = await getDocs(q);
             list.innerHTML = "";
@@ -197,18 +203,14 @@
             }
             snap.forEach(d => {
                 const o = {id: d.id, ...d.data()};
-                
-                // Аватарка (моя)
                 let avatarHtml = `<div class="oc-avatar" style="background:#333;"></div>`;
                 if(o.sellerAvatar) avatarHtml = `<img src="${o.sellerAvatar}" class="oc-avatar-img">`;
 
                 const item = document.createElement('div');
-                item.className = 'order-card'; // Используем класс из style.css
-                
-                // HTML полностью совпадает с маркетом, но кнопка ведет на редактирование
+                item.className = 'order-card';
                 item.innerHTML = `
                     <div class="oc-header">
-                        <div class="oc-price">${formatPrice(o.price)} <img src="Sprites/Blyx.png" style="width:16px;"></div>
+                        <div class="oc-price">${formatFull(o.price)} <img src="Sprites/Blyx.png" style="width:16px;"></div>
                         <button class="oc-buy-btn" style="background:#333; color:#fff;" onclick="location.href='p2p_sell.html?oid=${o.id}'">Edit</button>
                     </div>
                     <div class="oc-user-row">
@@ -219,9 +221,9 @@
                         </div>
                     </div>
                     <div class="oc-limits-row">
-                        <span>Avail: <span class="oc-val">${formatCompact(o.amount)} ${o.tokenId}</span></span>
+                        <span>Avail: <span class="oc-val">${formatFull(o.amount)} ${o.tokenId}</span></span>
                         <span style="display:flex; align-items:center; gap:2px;">
-                            Lim: <span class="oc-val">${formatCompact(o.minLimit)}</span>
+                            Lim: <span class="oc-val">${formatFull(o.minLimit)}</span>
                             <img src="Sprites/Blyx.png" style="width:10px; height:10px;">
                         </span>
                     </div>
@@ -246,70 +248,56 @@
                 let sub = 'balance';
                 let amountHtml = '';
 
-                // 1. REPLENISH
                 if(tx.type === 'replenish' || tx.type === 'deposit') {
                     title = 'Replenishment';
                     icon = 'Sprites/Wallet.png'; 
                     sub = 'balance';
-                    amountHtml = `+${formatCompact(tx.amount)} <img src="Sprites/Blyx.png" class="wh-coin-icon">`;
+                    amountHtml = `+${formatFull(tx.amount)} <img src="Sprites/Blyx.png" class="wh-coin-icon">`;
                 }
-                
-                // 2. TRANSFER IN (Gift)
                 else if(tx.type === 'transfer_in' || tx.type === 'receive') {
                     title = 'Gift';
                     icon = 'Sprites/Gift.png';
                     sub = `from @${tx.fromUser || 'user'}`;
-                    
                     if(tx.token && tx.token !== 'BLYX') {
                          const tInfo = currentMarket.find(x => x.id === tx.token);
                          const imgUrl = tInfo ? tInfo.image : '';
-                         amountHtml = `+${formatCompact(tx.amount)} ${tx.token} ${imgUrl ? `<img src="${imgUrl}" class="wh-coin-icon">` : ''}`;
+                         amountHtml = `+${formatFull(tx.amount)} ${tx.token} ${imgUrl ? `<img src="${imgUrl}" class="wh-coin-icon">` : ''}`;
                     } else {
-                         amountHtml = `+${formatCompact(tx.amount)} <img src="Sprites/Blyx.png" class="wh-coin-icon">`;
+                         amountHtml = `+${formatFull(tx.amount)} <img src="Sprites/Blyx.png" class="wh-coin-icon">`;
                     }
                 }
-
-                // 3. TRANSFER OUT (Send)
                 else if(tx.type === 'transfer_out' || tx.type === 'send') {
                     title = 'Transfer';
                     icon = 'Sprites/Cart.png';
                     sub = `to @${tx.toUser || 'user'}`;
                     if(tx.token && tx.token !== 'BLYX') {
-                         amountHtml = `-${formatCompact(tx.amount)} ${tx.token}`; 
+                         amountHtml = `-${formatFull(tx.amount)} ${tx.token}`; 
                     } else {
-                         amountHtml = `-${formatCompact(tx.amount)} <img src="Sprites/Blyx.png" class="wh-coin-icon">`;
+                         amountHtml = `-${formatFull(tx.amount)} <img src="Sprites/Blyx.png" class="wh-coin-icon">`;
                     }
                 }
-
-                // 4. PURCHASE (Покупка у робота ИЛИ P2P) - Трата BLYX
                 else if(tx.type === 'buy' || tx.type === 'p2p_buy') {
                     title = 'Purchase';
                     icon = 'Sprites/Cart.png';
                     sub = 'balance';
-                    // Потрачено BLYX
                     let spent = tx.total || tx.cost || (tx.amount * tx.price) || 0;
-                    amountHtml = `-${formatCompact(spent)} <img src="Sprites/Blyx.png" class="wh-coin-icon">`;
+                    amountHtml = `-${formatFull(spent)} <img src="Sprites/Blyx.png" class="wh-coin-icon">`;
                 }
-
-                // 5. SALE (Продажа робота или P2P) - Доход BLYX
                 else if(tx.type === 'sell' || tx.type === 'p2p_sold') {
                     title = 'Sold'; 
                     icon = 'Sprites/Sell.png'; 
                     sub = 'portfolio';
                     let earned = tx.total || (tx.amount * tx.price) || 0;
-                    amountHtml = `+${formatCompact(earned)} <img src="Sprites/Blyx.png" class="wh-coin-icon">`;
+                    amountHtml = `+${formatFull(earned)} <img src="Sprites/Blyx.png" class="wh-coin-icon">`;
                 }
-
-                // 6. ОТМЕНА ОРДЕРА (Возврат токенов)
                 else if(tx.type === 'cancel_order') {
                     title = 'Order Cancelled';
                     icon = 'Sprites/Wallet.png'; 
                     sub = 'Refund';
-                    amountHtml = `+${formatCompact(tx.amount)} ${tx.token}`;
+                    amountHtml = `+${formatFull(tx.amount)} ${tx.token}`;
                 }
-                
                 else {
-                    amountHtml = `${formatCompact(tx.amount)}`;
+                    amountHtml = `${formatFull(tx.amount)}`;
                 }
 
                 const dateStr = formatDate(tx.date) + ' ' + formatTime(tx.date);
