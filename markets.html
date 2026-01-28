@@ -7,8 +7,27 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        /* Лоадер как в Index */
+        #globalLoader {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: #000000; z-index: 99999;
+            display: flex; justify-content: center; align-items: center;
+            transition: opacity 0.3s ease, visibility 0.3s;
+        }
+        #globalLoader.loaded { opacity: 0; visibility: hidden; pointer-events: none; }
+        .custom-spinner {
+            width: 40px; height: 40px; border-radius: 50%;
+            border: 4px solid #333; border-top-color: #ffffff;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
 </head>
 <body>
+
+<!-- Лоадер -->
+<div id="globalLoader"><div class="custom-spinner"></div></div>
 
 <!-- Header -->
 <div class="market-header">
@@ -55,6 +74,9 @@
     tg.expand();
     tg.setHeaderColor('#000000');
 
+    // Лоадер
+    const loader = document.getElementById('globalLoader');
+
     let allTokens = []; 
 
     // FORMATTER
@@ -64,13 +86,20 @@
     }
 
     async function initMarkets() {
-        await initUser();
-        await initMarketDataIfNeeded(); 
+        try {
+            await initUser();
+            await initMarketDataIfNeeded(); 
 
-        subscribeToMarket((tokens) => {
-            allTokens = tokens; 
-            filterMarkets();    
-        });
+            subscribeToMarket((tokens) => {
+                allTokens = tokens; 
+                filterMarkets(); 
+                
+                // Убираем лоадер когда данные пришли
+                if(loader && !loader.classList.contains('loaded')) {
+                    loader.classList.add('loaded');
+                }
+            });
+        } catch(e) { console.error(e); }
     }
 
     const listContainer = document.getElementById('marketList');
@@ -84,11 +113,22 @@
              return;
         }
 
+        // Сортировка: сначала новые или самые дорогие (по желанию, сейчас как пришли)
+        // items.sort((a,b) => b.price - a.price);
+
         items.forEach(coin => {
-            const isPositive = coin.change >= 0;
+            // === ИСПРАВЛЕНИЕ ОТОБРАЖЕНИЯ % ===
+            // 1. Берем значение из базы. Если его нет — ставим 0.
+            let changeVal = (coin.change !== undefined && coin.change !== null) ? coin.change : 0;
+            
+            // 2. Определяем цвет и знак
+            const isPositive = changeVal >= 0;
             const changeClass = isPositive ? 'color-green' : 'color-red';
             const sign = isPositive ? '+' : '';
             
+            // 3. Форматируем до 2 знаков (например "5.43")
+            const displayChange = Math.abs(changeVal).toFixed(2);
+
             // Иконка или Буква
             let iconHtml = '';
             if (coin.image) {
@@ -115,7 +155,8 @@
                         ${displayPrice}
                         <img src="Sprites/Blyx.png" style="width: 14px; height: 14px; object-fit: contain;">
                     </div>
-                    <div class="market-change ${changeClass}">${sign}${coin.change}%</div>
+                    <!-- ВЫВОДИМ КРАСИВЫЙ ПРОЦЕНТ -->
+                    <div class="market-change ${changeClass}">${sign}${displayChange}%</div>
                 </div>
             </div>
             `;
