@@ -22,18 +22,20 @@
     <!-- Content -->
     <div style="padding: 20px 16px;">
         
-        <!-- Input Wrapper (Вводим сколько хотим BLYX) -->
+        <!-- Input Wrapper -->
         <div class="input-wrapper">
             <input type="number" id="amountInput" placeholder="Amount" oninput="updateButton()">
             <div class="input-suffix">
                 <span>BLYX</span>
-                <!-- Иконка Blyx вместо Звезды -->
                 <img src="Sprites/Blyx.png" class="star-icon-small" alt="blyx">
             </div>
         </div>
 
         <!-- Info Text -->
-        <p class="text-sec" style="margin-left: 4px; margin-top: 8px;">Rate: 1 BLYX = 1 Star</p>
+        <div style="display: flex; justify-content: space-between; padding: 0 4px; margin-top: 8px;">
+            <p class="text-sec">Rate: 1 BLYX = 1 Star</p>
+            <p class="text-sec" style="color: #FF3B30;">Min: 50 BLYX</p>
+        </div>
     </div>
 
     <!-- Bottom Fixed Panel -->
@@ -41,7 +43,6 @@
         <div class="cost-label">Total Cost</div>
         <button class="btn-white-large" id="payBtn" onclick="handleDeposit()">
             Pay <span id="btnAmount">0</span>
-            <!-- На кнопке оставляем звезду, так как оплата в Stars -->
             <img src="Sprites/star.png" class="star-icon-small" alt="star">
         </button>
     </div>
@@ -50,12 +51,9 @@
         const tg = window.Telegram.WebApp;
         tg.expand();
         tg.setHeaderColor('#000000');
-        tg.enableClosingConfirmation();
 
         // ==========================================
-        // ВСТАВЬ СЮДА ССЫЛКУ НА ТВОЙ VERCEL СЕРВЕР
-        // Пример: "sdadw3easdwewfrd-o2j0ztwhs-afefs-projects-2f3e45d4.vercel.app"
-        // Без слеша в конце!
+        // ВСТАВЬ СЮДА ССЫЛКУ НА ТВОЙ VERCEL СЕРВЕР (без / в конце)
         const BACKEND_URL = "https://sdadw3easdwewfrd.vercel.app"; 
         // ==========================================
 
@@ -63,33 +61,28 @@
 
         function updateButton() {
             const val = document.getElementById('amountInput').value;
-            // Обновляем кнопку (Курс 1 к 1, поэтому цифры совпадают)
             document.getElementById('btnAmount').innerText = val ? val : '0';
         }
 
         async function handleDeposit() {
             const amount = parseInt(document.getElementById('amountInput').value);
             
-            if (!amount || amount <= 0) {
-                tg.showPopup({ title: 'Error', message: 'Please enter a valid amount' });
-                return;
-            }
-
-            // Проверка, что ты вставил ссылку
-            if (BACKEND_URL.includes("ТВОЙ-ПРОЕКТ")) {
-                tg.showAlert("Ошибка: Вы не указали ссылку на сервер в коде deposit.html!");
+            // ПРОВЕРКА НА МИНИМУМ
+            if (!amount || amount < 50) {
+                tg.showPopup({ 
+                    title: 'Too low amount', 
+                    message: 'The minimum deposit amount is 50 BLYX.' 
+                });
                 return;
             }
 
             const btn = document.getElementById('payBtn');
             const originalText = document.getElementById('btnAmount').innerText;
             
-            // Блокируем кнопку
             btn.disabled = true;
             btn.style.opacity = "0.7";
 
             try {
-                // Отправляем запрос на ТВОЙ внешний сервер
                 const response = await fetch(`${BACKEND_URL}/create-invoice`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -105,17 +98,15 @@
                     throw new Error(data.error || 'Failed to create invoice');
                 }
 
-                // Открываем оплату Stars
                 tg.openInvoice(data.link, (status) => {
                     if (status === 'paid') {
                         tg.showPopup({ 
                             title: 'Success!', 
                             message: `Successfully deposited ${amount} BLYX.` 
                         }, () => {
-                            window.history.back(); // Успех
+                            window.history.back();
                         });
                     } else {
-                        // Отмена
                         btn.disabled = false;
                         btn.style.opacity = "1";
                     }
@@ -123,7 +114,7 @@
 
             } catch (error) {
                 console.error(error);
-                tg.showAlert("Connection Error: " + error.message);
+                tg.showAlert("Error: " + error.message);
                 btn.disabled = false;
                 btn.style.opacity = "1";
             }
