@@ -33,7 +33,6 @@
             cursor: crosshair;
         }
         
-        /* Скрываем кнопки, если они не нужны (логика осталась, но кнопки переделаны) */
         .time-btn.hidden { display: none !important; }
     </style>
 </head>
@@ -84,7 +83,6 @@
 <div class="content-section">
     <div id="tab-chart">
         <div class="chart-controls" id="timeframeButtons">
-            <!-- Кнопки теперь передают КЛЮЧ конфигурации -->
             <div class="time-btn active" onclick="setFrame('5m', this)">5m</div> 
             <div class="time-btn" onclick="setFrame('1h', this)">1h</div>
             <div class="time-btn" onclick="setFrame('1d', this)">1d</div>
@@ -114,11 +112,44 @@
 
 <!-- Bottom Nav -->
 <div class="bottom-nav">
-    <div class="nav-item" onclick="location.href='index.html'"><svg class="icon" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg></div>
-    <div class="nav-item" onclick="location.href='markets.html'"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg></div>
-    <div class="nav-trade-circle" onclick="location.href='markets.html'"><svg class="icon" style="color:black;" viewBox="0 0 24 24"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg></div>
-    <div class="nav-item" onclick="location.href='transfer.html'"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg></div>
-    <div class="nav-item" onclick="location.href='wallet.html'"><svg class="icon" viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg></div>
+    <!-- 1. Home -->
+    <div class="nav-item" onclick="location.href='index.html'">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+    </div>
+
+    <!-- 2. Earn (Монетка $) -->
+    <div class="nav-item" onclick="location.href='Earn.html'">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="9"></circle>
+            <text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" font-size="10" font-weight="800" fill="currentColor" stroke="none" style="font-family: Arial;">$</text>
+        </svg>
+    </div>
+
+    <!-- 3. Markets (Центральная кнопка) -->
+    <div class="nav-trade-circle" onclick="location.href='markets.html'">
+        <svg class="icon" style="color:black;" viewBox="0 0 24 24">
+            <polyline points="17 1 21 5 17 9"></polyline>
+            <path d="M3 11V9a4 4 0 0 1 4-4h14"></path>
+            <polyline points="7 23 3 19 7 15"></polyline>
+            <path d="M21 13v2a4 4 0 0 1-4 4H3"></path>
+        </svg>
+    </div>
+
+    <!-- 4. Messages (Колокольчик) -->
+    <div class="nav-item" onclick="location.href='messages.html'">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+        </svg>
+    </div>
+
+    <!-- 5. Wallet -->
+    <div class="nav-item" onclick="location.href='wallet.html'">
+        <svg class="icon" viewBox="0 0 24 24">
+            <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
+            <line x1="1" y1="10" x2="23" y2="10"></line>
+        </svg>
+    </div>
 </div>
 
 <script type="module">
@@ -138,21 +169,17 @@
     let currentUserData = null;
     let isP2P = false;
     
-    // КОНФИГУРАЦИЯ ТАЙМФРЕЙМОВ (СТРОГО ПО ТЗ)
-    // range: сколько минут ВСЕГО на экране
-    // step: сколько минут занимает ОДНА свеча
     const CHART_CONFIG = {
-        '5m': { range: 5, step: 1 },        // 5 свечей
-        '1h': { range: 60, step: 12 },      // 5 свечей (60/12 = 5)
-        '1d': { range: 1440, step: 60 },    // 24 свечи
-        '1w': { range: 10080, step: 1440 }, // 7 свечей
-        '1y': { range: 525600, step: 43200 }// 12 свечей (примерно месяц)
+        '5m': { range: 5, step: 1 },
+        '1h': { range: 60, step: 12 },
+        '1d': { range: 1440, step: 60 },
+        '1w': { range: 10080, step: 1440 },
+        '1y': { range: 525600, step: 43200 }
     };
 
     let currentConfigKey = '5m';
     let activeCursor = null; 
 
-    // FORMATTERS
     function formatPrice(val) {
         if(!val && val !== 0) return "0";
         if(val < 0.0001) return val.toFixed(8);
@@ -171,10 +198,7 @@
         const d = new Date(timestamp);
         const h = d.getHours().toString().padStart(2,'0');
         const m = d.getMinutes().toString().padStart(2,'0');
-        
-        // Для коротких - время
         if(mode === '5m' || mode === '1h') return `${h}:${m}`;
-        // Для длинных - дата
         const day = d.getDate();
         const mon = d.toLocaleString('en', {month:'short'});
         return `${day} ${mon}`;
@@ -196,7 +220,6 @@
             if (docSnap.exists()) {
                 currentTokenData = docSnap.data();
                 renderUI();
-                updateTimeframeButtons(); 
                 drawRealChart(null);
                 if(loader) loader.classList.add('loaded');
             }
@@ -211,27 +234,8 @@
         setupChartInteractions();
     }
 
-    function updateTimeframeButtons() {
-        if (!currentTokenData || !currentTokenData.createdAt) return;
-        const created = new Date(currentTokenData.createdAt).getTime();
-        const now = Date.now();
-        const ageMs = now - created;
-        
-        const btns = document.querySelectorAll('.time-btn');
-        // Показываем кнопки, если токен существует хотя бы 10% от этого времени (примерно)
-        // Чтобы не показывать "1 год" для токена которому 5 минут
-        btns.forEach(btn => {
-            const key = btn.innerText.toLowerCase(); 
-            // Упрощенная логика: показываем всё, или скрываем совсем старые
-            // Но чтобы не усложнять, пока оставим все кнопки, 
-            // график просто покажет пустоту слева (как на биржах)
-            btn.classList.remove('hidden');
-        });
-    }
-
     function setupChartInteractions() {
         const canvas = document.getElementById('chartCanvas');
-        
         const handleMove = (e) => {
             e.preventDefault(); 
             const rect = canvas.getBoundingClientRect();
@@ -246,12 +250,10 @@
             activeCursor = { x, y };
             drawRealChart(activeCursor);
         };
-
         const handleEnd = () => {
             activeCursor = null;
             drawRealChart(null);
         };
-
         canvas.addEventListener('touchstart', handleMove, {passive: false});
         canvas.addEventListener('touchmove', handleMove, {passive: false});
         canvas.addEventListener('touchend', handleEnd);
@@ -312,51 +314,29 @@
         drawRealChart(null);
     }
 
-    // === НОВАЯ ГЕНЕРАЦИЯ: СТРОГО ПО СЕТКЕ ===
     function generateCandles(transactions) {
         if(!transactions || transactions.length === 0) return [];
-        
         const sorted = [...transactions].sort((a,b) => new Date(a.date) - new Date(b.date));
         const cfg = CHART_CONFIG[currentConfigKey];
-        
-        const intervalMs = cfg.step * 60 * 1000; // Размер одной свечи в мс
-        const totalRangeMs = cfg.range * 60 * 1000; // Общее время графика
-        
+        const intervalMs = cfg.step * 60 * 1000;
+        const totalRangeMs = cfg.range * 60 * 1000;
         const now = Date.now();
-        // Начало графика ВСЕГДА = Сейчас минус Диапазон
-        // Это гарантирует фиксированное число свечей на экране
         const chartStartTime = now - totalRangeMs;
-        
-        // Время создания токена
         const tokenCreatedTime = new Date(currentTokenData.createdAt).getTime();
-
         const candles = [];
         let lastClose = sorted[0].price; 
-        
-        // Найдем цену закрытия перед началом графика (если график в середине истории)
-        // Если график начинается раньше создания токена, lastClose будет первой ценой
         sorted.forEach(tx => {
             if(new Date(tx.date).getTime() < chartStartTime) lastClose = tx.price;
         });
-
-        // Идем шагами от chartStartTime до now
-        // Округляем старт до шага
         const loopStart = Math.floor(chartStartTime / intervalMs) * intervalMs;
-        
         for (let t = loopStart; t < now; t += intervalMs) {
-            // Если этот временной слот РАНЬШЕ создания токена - рисуем NULL (пустоту)
-            // Иначе рисуем свечу
-            
             if (t + intervalMs < tokenCreatedTime) {
-                // Время еще не пришло для токена
-                candles.push(null); // Пустышка
+                candles.push(null);
             } else {
-                // Токен уже существует
                 const bucketTxs = sorted.filter(tx => {
                     const txTime = new Date(tx.date).getTime();
                     return txTime >= t && txTime < t + intervalMs;
                 });
-
                 if (bucketTxs.length > 0) {
                     const prices = bucketTxs.map(tx => tx.price);
                     const open = lastClose;
@@ -366,7 +346,6 @@
                     candles.push({ t: t, o: open, h: high, l: low, c: close });
                     lastClose = close;
                 } else {
-                    // Нет сделок, цена не менялась -> Плоская свеча
                     candles.push({ t: t, o: lastClose, h: lastClose, l: lastClose, c: lastClose });
                 }
             }
@@ -377,35 +356,23 @@
     function drawRealChart(cursor) {
         const canvas = document.getElementById('chartCanvas');
         if(!canvas || !currentTokenData) return;
-        
         const dpr = window.devicePixelRatio || 1;
         const rect = canvas.parentElement.getBoundingClientRect();
-        
         canvas.width = rect.width * dpr;
         canvas.height = rect.height * dpr;
-        
         const ctx = canvas.getContext('2d');
         ctx.scale(dpr, dpr);
-        
         const w = rect.width;
         const h = rect.height;
-        
         const paddingRight = 70; 
         const paddingBottom = 20; 
         const chartW = w - paddingRight;
         const chartH = h - paddingBottom;
-
         ctx.clearRect(0,0,w,h);
-
         const txs = currentTokenData.transactions || [];
-        // Если вообще нет транзакций, не рисуем
         if(txs.length === 0) return;
-
         const candles = generateCandles(txs);
-        // Если массив пустой или одни null
         if(candles.length === 0) return;
-
-        // Ищем мин/макс ТОЛЬКО среди существующих свечей (не null)
         let minP = Infinity, maxP = -Infinity;
         let hasData = false;
         candles.forEach(c => { 
@@ -415,120 +382,76 @@
                 hasData = true;
             }
         });
-        
         if(!hasData) {
-            // Если данные еще не начались (весь график в прошлом)
-            // Просто берем текущую цену для оси
             minP = txs[0].price; 
             maxP = txs[0].price;
         }
-
         let range = maxP - minP;
         if(range === 0) range = maxP * 0.01;
-
         const midPoint = (maxP + minP) / 2;
         const visualRange = range * 4; 
-        
         const viewMax = midPoint + (visualRange / 2);
         const viewMin = midPoint - (visualRange / 2);
-        
         const scaleY = chartH / (viewMax - viewMin);
 
-        // --- GRID ---
         const steps = 5;
         ctx.font = "600 10px Inter";
         ctx.textAlign = "left";
-        ctx.lineWidth = 1;
-        ctx.setLineDash([]);
-
         for(let i=0; i<=steps; i++) {
             const priceVal = viewMax - (i * ((viewMax - viewMin)/steps));
             const y = i * (chartH / steps);
-            
             ctx.strokeStyle = '#222';
             ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(chartW, y); ctx.stroke();
-            
             ctx.fillStyle = '#666';
             ctx.fillText(formatPrice(priceVal), chartW + 6, y + 4);
         }
 
-        // --- CANDLE WIDTH ---
-        // Ширина рассчитывается исходя из количества слотов (candles.length)
-        // Так как это число фиксировано конфигом (напр. 24 для 1d), 
-        // свечи всегда будут одинаковой нормальной ширины.
         const candleSpacing = chartW / candles.length;
-        const candleBodyW = Math.max(1, candleSpacing - 2); // Отступ 2px между свечами
-        
-        // Подписи времени: ставим каждые N свечей
+        const candleBodyW = Math.max(1, candleSpacing - 2); 
         const labelStep = Math.ceil(candles.length / 5);
 
         candles.forEach((c, i) => {
             const xCenter = i * candleSpacing + (candleSpacing / 2);
-            
-            // Если свеча NULL (еще не существовал токен), пропускаем отрисовку тела
-            // НО рисуем сетку времени, если надо
             if(c) {
                 const yH = (viewMax - c.h) * scaleY;
                 const yL = (viewMax - c.l) * scaleY;
                 const yO = (viewMax - c.o) * scaleY;
                 const yC = (viewMax - c.c) * scaleY;
-
                 const isUp = c.c >= c.o;
-                
                 ctx.strokeStyle = '#FFFFFF';
                 ctx.beginPath(); ctx.moveTo(xCenter, yH); ctx.lineTo(xCenter, yL); ctx.stroke();
-
                 const bodyTop = Math.min(yO, yC);
                 let bodyHeight = Math.abs(yC - yO);
                 if (bodyHeight < 1) bodyHeight = 1; 
-
                 const xLeft = xCenter - candleBodyW / 2;
-
                 if (isUp) {
                     ctx.fillStyle = '#FFFFFF';
                     ctx.fillRect(xLeft, bodyTop, candleBodyW, bodyHeight);
                 } else {
                     ctx.fillStyle = '#000000';
                     ctx.strokeStyle = '#FFFFFF';
-                    ctx.lineWidth = 1; 
                     ctx.fillRect(xLeft, bodyTop, candleBodyW, bodyHeight);
                     ctx.strokeRect(xLeft, bodyTop, candleBodyW, bodyHeight);
                 }
             }
-
-            // Time Labels
-            if(i % labelStep === 0 && c) { // Рисуем метку только если есть данные (можно убрать && c если нужна пустая сетка)
-                ctx.strokeStyle = '#222';
-                ctx.beginPath(); ctx.moveTo(xCenter, 0); ctx.lineTo(xCenter, chartH); ctx.stroke();
-                
+            if(i % labelStep === 0 && c) { 
                 ctx.fillStyle = '#666';
                 ctx.textAlign = "center";
-                // Используем время интервала
-                // Для 5м берем время начала бакета
-                const t = c ? c.t : (Date.now() - (candles.length - i)*60000); 
+                const t = c.t; 
                 ctx.fillText(formatTimeAxis(t, currentConfigKey), xCenter, h - 5);
             }
         });
 
-        // --- CROSSHAIR ---
         if(cursor && cursor.x < chartW && cursor.y < chartH) {
             ctx.setLineDash([4, 4]);
-            ctx.lineWidth = 1;
             ctx.strokeStyle = '#FFFFFF';
-
             ctx.beginPath(); ctx.moveTo(cursor.x, 0); ctx.lineTo(cursor.x, chartH); ctx.stroke();
             ctx.beginPath(); ctx.moveTo(0, cursor.y); ctx.lineTo(chartW, cursor.y); ctx.stroke();
-
             ctx.setLineDash([]);
-
             const priceAtCursor = viewMax - (cursor.y / scaleY);
             const labelText = formatPrice(priceAtCursor);
-            const textWidth = ctx.measureText(labelText).width + 12;
-            const labelH = 20;
-            
             ctx.fillStyle = '#FFFFFF';
-            ctx.fillRect(chartW, cursor.y - labelH/2, textWidth, labelH);
-            
+            ctx.fillRect(chartW, cursor.y - 10, 65, 20);
             ctx.fillStyle = '#000000';
             ctx.font = "bold 11px Inter";
             ctx.textAlign = "left";
