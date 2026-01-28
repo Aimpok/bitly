@@ -32,8 +32,6 @@
         .progress-bar-fill {
             height: 100%; background: #FFFFFF; width: 0%; transition: width 0.3s;
         }
-        
-        /* Класс для красного текста ошибки */
         .text-error { color: #FF3B30 !important; font-weight: 600; }
     </style>
 </head>
@@ -86,10 +84,7 @@
         </div>
         
         <div style="display:flex; justify-content:space-between; margin-top:10px; padding:0 5px; align-items: flex-start;">
-            <!-- Баланс / Ошибки -->
             <span id="balanceInfo" style="font-size:12px; color:#666;">Checking balance...</span>
-            
-            <!-- Стоимость -->
             <span style="font-size:12px; color:#fff;">Cost: <span id="costVal" style="font-weight:700;">0</span> BLYX</span>
         </div>
     </div>
@@ -104,7 +99,6 @@
     <script type="module">
         import { initUser } from './user-service.js';
         import { db } from './firebase-config.js';
-        // ДОБАВЛЕН runTransaction для безопасной покупки
         import { doc, getDoc, runTransaction, arrayUnion, increment } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         const tg = window.Telegram.WebApp;
@@ -117,8 +111,8 @@
         let tokenData = null;
         let currentUser = null;
         
-        const TOTAL_SUPPLY = 1000000000; // 1 Миллиард общий лимит
-        const MIN_COST_BLYX = 100;       // Мин. покупка 100 BLYX
+        const TOTAL_SUPPLY = 1000000000; 
+        const MIN_COST_BLYX = 100;
 
         function formatDisplay(num) {
             if (num === undefined || num === null) return "0";
@@ -127,6 +121,33 @@
             if (parts[1]) return parts[0] + "." + parts[1].substring(0, 6);
             return parts[0];
         }
+
+        // === 1. ФУНКЦИЯ РАСЧЕТА ПРОЦЕНТОВ (НОВАЯ) ===
+        function calculateChange(transactions, currentPrice) {
+            if (!transactions || transactions.length === 0) return 0;
+
+            const now = Date.now();
+            const oneDayAgo = now - (24 * 60 * 60 * 1000);
+
+            // Сортируем от новых к старым
+            const sorted = [...transactions].sort((a, b) => new Date(b.date) - new Date(a.date));
+            
+            // Если токену меньше суток, берем самую первую цену (создания)
+            let startPrice = sorted[sorted.length - 1].price; 
+
+            // Ищем первую сделку, которая была <= 24 часа назад
+            for (let tx of sorted) {
+                const txTime = new Date(tx.date).getTime();
+                if (txTime <= oneDayAgo) {
+                    startPrice = tx.price;
+                    break; 
+                }
+            }
+
+            if (!startPrice || startPrice === 0) return 0;
+            return ((currentPrice - startPrice) / startPrice) * 100;
+        }
+        // ============================================
 
         window.handleInput = function(el) {
             let raw = el.value.replace(/[^0-9.]/g, '');
@@ -174,7 +195,6 @@
             const price = tokenData.price < 0.01 ? tokenData.price.toFixed(8) : tokenData.price.toFixed(4);
             document.getElementById('priceVal').innerText = price + " BLYX";
 
-            // Глобальный счетчик проданных
             const sold = tokenData.sold || 0;
             const remaining = TOTAL_SUPPLY - sold;
             const progress = Math.min((sold / TOTAL_SUPPLY) * 100, 100);
@@ -200,21 +220,16 @@
 
             if(tokenAmount <= 0) return;
 
-            // 1. Проверка Баланса
             if(cost > currentUser.balance) {
                 balanceLabel.innerText = "Insufficient BLYX balance";
                 balanceLabel.className = "text-error";
                 return;
             }
-
-            // 2. Мин. сумма покупки
             if (cost < MIN_COST_BLYX) {
                 balanceLabel.innerText = `Minimum purchase is ${MIN_COST_BLYX} BLYX`;
                 balanceLabel.className = "text-error";
                 return;
             }
-
-            // 3. Проверка Глобального Остатка (UI)
             const sold = tokenData.sold || 0;
             const remainingSupply = TOTAL_SUPPLY - sold;
             
@@ -223,8 +238,6 @@
                 balanceLabel.className = "text-error";
                 return;
             }
-
-            // 4. Проверка Личного Лимита (30%)
             const myHoldings = currentUser.portfolio?.[tokenId] || 0;
             const maxAllowed = TOTAL_SUPPLY * 0.30;
             const isCreator = tokenData.ownerId === currentUser.id.toString(); 
@@ -242,7 +255,6 @@
             const tokenAmount = getRawAmount(); 
             if(!tokenAmount) return;
 
-            // Приблизительная стоимость для подтверждения (реальная пересчитается в транзакции)
             const approxCost = tokenAmount * tokenData.price; 
             
             tg.showConfirm(`Buy ${formatDisplay(tokenAmount)} ${tokenId}?`, async (ok) => {
@@ -252,23 +264,20 @@
                         const userRef = doc(db, "users", currentUser.id.toString());
                         const tokenRef = doc(db, "tokens", tokenId);
 
-                        // --- ТРАНЗАКЦИЯ ДЛЯ БЕЗОПАСНОЙ ПОКУПКИ ---
                         await runTransaction(db, async (t) => {
-                            // 1. Читаем свежие данные токена
+                            // 1. Читаем данные токена
                             const tDoc = await t.get(tokenRef);
                             if (!tDoc.exists()) throw "Token does not exist!";
                             const freshTokenData = tDoc.data();
                             
-                            // 2. Проверяем, не купил ли кто-то токены перед нами
                             const currentSold = freshTokenData.sold || 0;
                             const newSold = currentSold + tokenAmount;
                             
-                            // ЖЕСТКАЯ ПРОВЕРКА НА 1 МЛРД
                             if (newSold > TOTAL_SUPPLY) {
                                 throw `Not enough tokens! Only ${formatDisplay(TOTAL_SUPPLY - currentSold)} left.`;
                             }
 
-                            // 3. Читаем баланс пользователя
+                            // 2. Читаем баланс
                             const uDoc = await t.get(userRef);
                             if (!uDoc.exists()) throw "User error";
                             const userData = uDoc.data();
@@ -280,11 +289,23 @@
                                 throw "Insufficient funds (Price might have changed).";
                             }
 
-                            // 4. Логика Bonding Curve (цены)
+                            // 3. Считаем новую цену
                             const newCap = (freshTokenData.marketCap || 0) + finalCost;
                             const newPrice = newCap / TOTAL_SUPPLY;
 
-                            // 5. Запись изменений
+                            // 4. === СЧИТАЕМ ИЗМЕНЕНИЕ % ===
+                            const oldTxs = freshTokenData.transactions || [];
+                            // Создаем объект новой транзакции (для записи и для расчета)
+                            const newTxData = { 
+                                price: newPrice, 
+                                date: new Date().toISOString() 
+                            };
+                            // Объединяем для математики
+                            const allTxsForCalc = [...oldTxs, newTxData];
+                            const newChangePercent = calculateChange(allTxsForCalc, newPrice);
+                            // =============================
+
+                            // 5. Запись изменений Юзеру
                             t.update(userRef, {
                                 balance: increment(-finalCost),
                                 [`portfolio.${tokenId}`]: increment(tokenAmount),
@@ -298,15 +319,14 @@
                                 })
                             });
 
+                            // 6. Запись изменений Токену
                             t.update(tokenRef, {
                                 marketCap: increment(finalCost),
                                 sold: increment(tokenAmount),
                                 txCount: increment(1),
                                 price: newPrice,
-                                transactions: arrayUnion({ 
-                                    price: newPrice, 
-                                    date: new Date().toISOString() 
-                                })
+                                change: newChangePercent, // <--- ЗАПИСЫВАЕМ ПОЛЕ CHANGE
+                                transactions: arrayUnion(newTxData)
                             });
                         });
 
@@ -314,7 +334,7 @@
                         window.history.back(); 
                     } catch(e) {
                         if(loader) loader.classList.add('loaded');
-                        tg.showAlert("Error: " + e); // e может быть строкой из throw
+                        tg.showAlert("Error: " + e); 
                     }
                 }
             });
