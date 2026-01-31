@@ -8,14 +8,13 @@
     <link rel="stylesheet" href="style.css">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        /* Базовые стили страницы */
         body {
             background-color: #000;
             color: #fff;
             margin: 0 auto;
             max-width: 480px;
             font-family: 'Inter', sans-serif;
-            padding-bottom: 100px !important; /* Отступ под навигацию */
+            padding-bottom: 100px !important;
         }
 
         .wh-coin-icon { width: 18px; height: 18px; object-fit: contain; border-radius: 50%; }
@@ -23,7 +22,7 @@
         .hidden { display: none !important; }
         .wh-item { border-bottom: 1px solid #111 !important; }
 
-        /* --- НОВАЯ ПАНЕЛЬ НАВИГАЦИИ (ФИКСИРОВАННАЯ) --- */
+        /* --- ПАНЕЛЬ НАВИГАЦИИ --- */
         .bottom-nav {
             position: fixed !important;
             bottom: 0 !important;
@@ -35,7 +34,6 @@
             transform: none !important; 
             border: none !important;     
             border-radius: 0 !important; 
-            box-shadow: none !important; 
             background: #000000 !important; 
             display: grid !important;
             grid-template-columns: repeat(5, 1fr) !important;
@@ -77,7 +75,6 @@
 </head>
 <body>
 
-<!-- Total Assets Header -->
 <div class="balance-card">
     <div class="balance-label">Total Assets</div>
     <div class="balance-val" style="display: flex; align-items: center; gap: 8px;">
@@ -86,10 +83,9 @@
     </div>
 </div>
 
-<!-- Actions -->
 <div class="actions-row">
     <div class="action-btn" onclick="location.href='deposit.html'">
-        <svg class="icon" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="#fff"/></svg>
+        <svg class="icon" viewBox="0 0 24 24"><path d="M12 5v14" stroke="#fff"/></svg>
         <span class="action-label">Deposit</span>
     </div>
     <div class="action-btn" onclick="location.href='transfer.html'">
@@ -98,30 +94,25 @@
     </div>
 </div>
 
-<!-- Tabs -->
 <div class="tabs-scroll">
     <div class="tab-link active" onclick="switchTab('portfolio', this)">Portfolio</div>
     <div class="tab-link" onclick="switchTab('goods', this)">Goods</div>
     <div class="tab-link" onclick="switchTab('history', this)">History</div>
 </div>
 
-<!-- CONTENT -->
 <div style="padding: 0 16px;">
-    <!-- 1. PORTFOLIO -->
     <div id="tab-portfolio">
         <div class="portfolio-grid" id="portfolioGrid">
             <div style="color: #666; font-size: 14px; text-align:center; grid-column:1/-1;">Loading...</div>
         </div>
     </div>
 
-    <!-- 2. GOODS -->
     <div id="tab-goods" class="hidden">
         <div id="goodsList">
             <div style="color: #666; font-size: 14px; text-align: center; padding: 20px;">No active sell orders</div>
         </div>
     </div>
 
-    <!-- 3. HISTORY -->
     <div id="tab-history" class="hidden">
         <div id="historyList">
             <div style="color: #666; font-size: 14px; text-align: center; padding: 20px;">No transactions</div>
@@ -129,7 +120,6 @@
     </div>
 </div>
 
-<!-- Bottom Nav -->
 <div class="bottom-nav">
     <div class="nav-item" onclick="location.href='index.html'">
         <svg class="icon" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
@@ -174,7 +164,6 @@
     let currentMarket = [];
     let currentUserData = null;
 
-    // --- ФОРМАТИРОВАНИЕ ---
     function formatFull(num) {
         if (!num && num !== 0) return "0";
         return num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
@@ -298,25 +287,21 @@
                 tokenIconUrl = foundToken?.image || 'Sprites/GiftIcon.png';
             }
 
-            let color = '#fff';
             let prefix = '';
             let finalAmt = tx.amount;
 
             if(tx.type === 'replenish' || tx.type === 'deposit') {
-                title = 'Replenishment'; mainIcon = 'Sprites/Wallet.png'; sub = 'To balance';
-                color = '#4CAF50'; prefix = '+';
+                title = 'Replenishment'; mainIcon = 'Sprites/Wallet.png'; sub = 'To balance'; prefix = '+';
             } else if(tx.type === 'transfer_in' || tx.type === 'receive') {
-                title = 'Gift'; mainIcon = 'Sprites/Gift.png'; sub = `from @${tx.fromUser || 'user'}`;
-                color = '#4CAF50'; prefix = '+';
+                title = 'Gift'; mainIcon = 'Sprites/Gift.png'; sub = `from @${tx.fromUser || 'user'}`; prefix = '+';
             } else if(tx.type === 'transfer_out' || tx.type === 'send') {
-                title = 'Transfer'; mainIcon = 'Sprites/Cart.png'; sub = `to @${tx.toUser || 'user'}`;
-                color = '#FF5252'; prefix = '-';
+                title = 'Transfer'; mainIcon = 'Sprites/Cart.png'; sub = `to @${tx.toUser || 'user'}`; prefix = '-';
             } else if(tx.type === 'buy' || tx.type === 'p2p_buy') {
-                title = 'Purchase'; mainIcon = 'Sprites/Cart.png'; sub = 'Market';
-                color = '#FF5252'; prefix = '-'; finalAmt = tx.total || tx.amount; tokenIconUrl = 'Sprites/Blyx.png';
+                title = 'Purchase'; mainIcon = 'Sprites/Cart.png'; sub = 'Market'; prefix = '-'; finalAmt = tx.total || tx.amount; tokenIconUrl = 'Sprites/Blyx.png';
             } else if(tx.type === 'sell' || tx.type === 'p2p_sold') {
-                title = 'Sold'; mainIcon = 'Sprites/Sell.png'; sub = 'Market';
-                color = '#4CAF50'; prefix = '+'; finalAmt = tx.total || tx.amount; tokenIconUrl = 'Sprites/Blyx.png';
+                title = 'Sold'; mainIcon = 'Sprites/Sell.png'; sub = 'Market'; prefix = '+'; finalAmt = tx.total || tx.amount; tokenIconUrl = 'Sprites/Blyx.png';
+            } else {
+                prefix = tx.amount >= 0 ? '+' : '-';
             }
 
             const dateStr = formatDate(tx.date) + ' ' + formatTime(tx.date);
@@ -328,13 +313,13 @@
                         <img src="${mainIcon}" style="width:24px; height:24px;">
                     </div>
                     <div>
-                        <div style="font-weight:600; font-size:15px;">${title}</div>
+                        <div style="font-weight:600; font-size:15px; color:#fff;">${title}</div>
                         <div style="font-size:12px; color:#666;">${sub}</div>
                     </div>
                 </div>
                 <div style="text-align:right;">
                     <div style="display:flex; align-items:center; justify-content:flex-end; gap:6px;">
-                        <span style="font-weight:700; font-size:16px; color:${color};">
+                        <span style="font-weight:700; font-size:16px; color:#fff;">
                             ${prefix}${formatFull(Math.abs(finalAmt))}
                         </span>
                         <img src="${tokenIconUrl}" style="width:18px; height:18px; border-radius:50%;">
