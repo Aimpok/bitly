@@ -8,11 +8,10 @@
     <link rel="stylesheet" href="style.css">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        /* Исправление выравнивания фильтров */
         .market-filters {
             display: flex;
             gap: 8px;
-            padding: 10px 16px; /* Отступы как у всего остального контента */
+            padding: 10px 16px; 
             overflow-x: auto;
             scrollbar-width: none;
             align-items: center;
@@ -45,7 +44,7 @@
         <button class="btn-launch-pill" style="margin-left: auto;" onclick="goToSell()">+ Sell</button>
     </div>
 
-    <!-- Обновленные фильтры -->
+    <!-- Фильтры -->
     <div class="market-filters">
         <div class="m-filter-btn active" onclick="filterOrders('cheap', this)">Cheapest</div>
         <div class="m-filter-btn" onclick="filterOrders('new', this)">Newest</div>
@@ -103,7 +102,6 @@
             let result = [...allOrders];
 
             if (type === 'mine') {
-                // Фильтруем только свои заказы
                 result = result.filter(o => String(o.sellerId) === String(currentUser.id));
             } else if (type === 'cheap') {
                 result.sort((a,b) => a.price - b.price);
@@ -137,6 +135,8 @@
 
                 const el = document.createElement('div');
                 el.className = 'order-card';
+                
+                // УБРАНЫ ПРОЦЕНТЫ ИЗ СТАТИСТИКИ НИЖЕ
                 el.innerHTML = `
                     <div class="oc-header">
                         <div class="oc-price">${formatPrice(o.price)} <img src="Sprites/Blyx.png" style="width:16px;"></div>
@@ -146,7 +146,7 @@
                         ${avatarHtml}
                         <div>
                             <div class="oc-username">${o.sellerName}${isMine ? ' (You)' : ''}</div>
-                            <div class="oc-stats">${tradesShow}, 100%</div>
+                            <div class="oc-stats">${tradesShow}</div> 
                         </div>
                     </div>
                     <div class="oc-limits-row">
