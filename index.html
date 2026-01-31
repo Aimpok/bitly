@@ -25,22 +25,6 @@
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* === ПАНЕЛЬ НАВИГАЦИИ === */
-        .bottom-nav {
-            position: fixed !important; bottom: 0 !important; left: 0 !important; right: 0 !important;
-            width: 100% !important; max-width: 480px !important; margin: 0 auto !important;
-            background: #000000 !important; display: grid !important;
-            grid-template-columns: repeat(5, 1fr) !important;
-            height: 70px !important; padding-bottom: env(safe-area-inset-bottom, 20px) !important;
-            z-index: 9999 !important; border-top: 1px solid #111;
-        }
-        .nav-item { opacity: 0.5; display: flex; justify-content: center; align-items: center; transition: 0.2s; }
-        .nav-item.active { opacity: 1 !important; }
-        .nav-trade-circle {
-            width: 48px; height: 48px; background: #ffffff !important; border-radius: 50%;
-            display: flex; justify-content: center; align-items: center; transform: translateY(-5px);
-        }
-
         /* === ЭКРАН ПРИВЕТСТВИЯ (PRIVACY OVERLAY) === */
         #privacyOverlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -159,6 +143,7 @@
     const privacyOverlay = document.getElementById('privacyOverlay');
     let cachedTokens = [];
     let currentPeriod = 'week';
+    let isPrivacyAcceptedInSession = false;
 
     // --- ЛОГИКА ПРИНЯТИЯ ПРАВИЛ ---
     window.toggleContinueBtn = function() {
@@ -173,14 +158,26 @@
         if(btn.classList.contains('btn-locked')) return;
         
         btn.innerText = 'Wait...';
+        btn.disabled = true;
+
         try {
+            // Сохраняем согласие в FIREBASE (на аккаунт)
             await acceptPrivacyInDB();
-            localStorage.setItem('privacy_accepted', 'true');
+            isPrivacyAcceptedInSession = true;
+            
+            // Прячем оверлей
             privacyOverlay.style.display = 'none';
-            // Если рынок еще не загружен, лоадер останется
+            
+            // Если рынок уже загружен в фоне — убираем лоадер
+            if (cachedTokens.length > 0) {
+                loader.classList.add('loaded');
+            } else {
+                loader.classList.remove('instant-hide');
+            }
         } catch (e) {
             btn.innerText = 'Continue';
-            alert('Error. Try again.');
+            btn.disabled = false;
+            alert('Error saving to cloud. Try again.');
         }
     }
 
@@ -194,42 +191,42 @@
 
     async function startApp() {
         try {
-            // 1. Инициализация юзера
+            // 1. Инициализация юзера (тянет данные из Firebase)
             const userData = await initUser();
+            isPrivacyAcceptedInSession = userData.privacyAccepted;
 
-            // 2. Проверка приветственного экрана
-            const localAccepted = localStorage.getItem('privacy_accepted');
-            if (!userData.privacyAccepted && !localAccepted) {
+            // 2. Проверка: нужно ли показывать приветствие?
+            if (!isPrivacyAcceptedInSession) {
+                // Если в базе false — показываем оверлей и убираем лоадер (чтобы не крутился поверх)
                 loader.classList.add('instant-hide');
                 privacyOverlay.style.display = 'flex';
-                // Проверяем галочку при возврате назад
                 toggleContinueBtn();
-            } else {
-                localStorage.setItem('privacy_accepted', 'true');
             }
 
-            // 3. Рынок
+            // 3. Загрузка контента (в любом случае подгружаем рынок в фоне)
             await initMarketDataIfNeeded();
             renderNews();
 
             subscribeToMarket((tokens) => {
                 cachedTokens = tokens;
                 renderTopTokens(tokens);
-                sessionStorage.setItem('app_ready', 'true');
                 
-                // Прячем лоадер если оверлей не висит
-                if(privacyOverlay.style.display !== 'flex') {
+                // Скрываем основной лоадер только если правила приняты
+                if(isPrivacyAcceptedInSession) {
                     setTimeout(() => { loader.classList.add('loaded'); }, 300);
                 }
             });
-        } catch (e) { console.error(e); }
+        } catch (e) { 
+            console.error("Critical Start Error:", e);
+            loader.innerHTML = '<div style="color:white">Connection Error. Restart app.</div>';
+        }
     }
 
     function renderNews() {
         const slider = document.getElementById('newsSlider');
         if (!slider || typeof stocksData === 'undefined') return;
         slider.innerHTML = ''; 
-        stocksData.forEach((stock, index) => {
+        stocksData.forEach((stock) => {
             const card = document.createElement('div');
             card.className = 'news-card';
             card.innerHTML = `
@@ -255,7 +252,7 @@
             else if (currentPeriod === 'year') change *= 12.5;
 
             const isPos = change >= 0;
-            const icon = token.image ? `<img src="${token.image}" style="width:100%;height:100%;object-fit:cover;">` : token.id[0];
+            const icon = token.image ? `<img src="${token.image}" style="width:100%;height:100%;object-fit:cover;">` : (token.id ? token.id[0] : '?');
             
             container.innerHTML += `
             <div class="token-item" onclick="location.href='crypto_info.html?id=${token.id}'">
@@ -277,7 +274,7 @@
         });
     }
 
-    // Слушатель для восстановления состояния кнопки при возврате назад
+    // Обработка возврата со страницы правил
     window.addEventListener('pageshow', () => {
         if (privacyOverlay.style.display === 'flex') {
             toggleContinueBtn();
