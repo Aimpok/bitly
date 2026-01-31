@@ -27,7 +27,7 @@
         /* Стиль для активного чипа (белый) */
         .filter-chip { cursor: pointer; }
 
-        /* --- НОВАЯ ПАНЕЛЬ НАВИГАЦИИ (ФИКСИРОВАННАЯ) --- */
+        /* --- НОВАЯ ПАНЕЛЬ НАВИГАЦИИ (как в Wallet) --- */
         .bottom-nav {
             position: fixed !important;
             bottom: 0 !important;
@@ -60,7 +60,6 @@
             opacity: 0.5;
             transition: opacity 0.2s;
             margin: 0 !important;
-            cursor: pointer;
         }
 
         .nav-item.active { opacity: 1 !important; }
@@ -76,14 +75,11 @@
             align-items: center !important;
             transform: translateY(-5px) !important; 
             margin: 0 !important;
-            cursor: pointer;
         }
 
-        .icon { width: 24px; height: 24px; }
-
         body {
-            padding-bottom: 100px !important; /* Отступ для контента */
-            background-color: #000;
+            padding-bottom: 100px !important; /* Отступ чтобы контент не перекрывался */
+            background: #000;
             color: #fff;
         }
     </style>
@@ -123,26 +119,26 @@
 </div>
 
 <!-- Список токенов -->
-<div class="token-list" id="topTokensList" style="padding-bottom: 120px;">
+<div class="token-list" id="topTokensList">
     <div style="text-align: center; color: #555; padding: 20px;">Loading...</div>
 </div>
 
-<!-- --- НОВАЯ ПАНЕЛЬ НАВИГАЦИИ (ОБНОВЛЕННАЯ СТРУКТУРА) --- -->
+<!-- Bottom Nav (НОВЫЙ ДИЗАЙН) -->
 <div class="bottom-nav">
-    <!-- 1. Home (Активна) -->
+    <!-- 1. HOME (АКТИВНАЯ) -->
     <div class="nav-item active">
         <svg class="icon" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
     </div>
-
-    <!-- 2. Earn -->
+    
+    <!-- 2. EARN -->
     <div class="nav-item" onclick="location.href='Earn.html'">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="9"></circle>
             <text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" font-size="10" font-weight="800" fill="currentColor" stroke="none">$</text>
         </svg>
     </div>
-
-    <!-- 3. Markets (Центральный круг) -->
+    
+    <!-- 3. MARKETS (КРУГ) -->
     <div class="nav-trade-circle" onclick="location.href='markets.html'">
         <svg class="icon" style="color:black;" viewBox="0 0 24 24">
             <polyline points="17 1 21 5 17 9"></polyline>
@@ -151,16 +147,16 @@
             <path d="M21 13v2a4 4 0 0 1-4 4H3"></path>
         </svg>
     </div>
-
-    <!-- 4. Messages -->
+    
+    <!-- 4. MESSAGES -->
     <div class="nav-item" onclick="location.href='messages.html'">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
             <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
         </svg>
     </div>
-
-    <!-- 5. Wallet -->
+    
+    <!-- 5. WALLET -->
     <div class="nav-item" onclick="location.href='wallet.html'">
         <svg class="icon" viewBox="0 0 24 24">
             <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
@@ -176,7 +172,7 @@
     tg.expand();
     tg.setHeaderColor('#000000');
 
-    // News Slider Logic (БЕЗ ИЗМЕНЕНИЙ)
+    // News Slider Logic
     const slider = document.getElementById('newsSlider');
     function renderStocks() {
         if (!slider || typeof stocksData === 'undefined') return;
@@ -207,14 +203,18 @@
     import { initUser, subscribeToMarket, initMarketDataIfNeeded } from './user-service.js';
     
     const loader = document.getElementById('globalLoader');
-    let cachedTokens = []; 
-    let currentPeriod = 'week'; 
+    let cachedTokens = []; // Храним токены здесь
+    let currentPeriod = 'week'; // Текущий период
 
-    // --- ЛОГИКА ФИЛЬТРАЦИИ И РЕНДЕРА (БЕЗ ИЗМЕНЕНИЙ) ---
+    // --- ФУНКЦИЯ ПЕРЕКЛЮЧЕНИЯ ФИЛЬТРА ---
     window.setFilter = function(period, el) {
         currentPeriod = period;
+        
+        // Обновляем визуально кнопки
         document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
         el.classList.add('active');
+
+        // Перерисовываем список с новыми данными
         if(cachedTokens.length > 0) {
             renderTopTokens(cachedTokens);
         }
@@ -226,7 +226,7 @@
             await initMarketDataIfNeeded();
 
             subscribeToMarket((tokens) => {
-                cachedTokens = tokens; 
+                cachedTokens = tokens; // Сохраняем данные
                 renderTopTokens(tokens);
 
                 sessionStorage.setItem('app_ready', 'true');
@@ -241,13 +241,19 @@
         const container = document.getElementById('topTokensList');
         if(!container) return;
         
+        // Сортируем по цене (или по маркеткапу) и берем ТОП 100
         const sorted = tokens.sort((a,b) => b.price - a.price).slice(0, 100);
+
         container.innerHTML = '';
         
         sorted.forEach(token => {
             let displayChangeVal = token.change || 0;
-            if (currentPeriod === 'month') { displayChangeVal = displayChangeVal * 4.2; } 
-            else if (currentPeriod === 'year') { displayChangeVal = displayChangeVal * 12.5; }
+
+            if (currentPeriod === 'month') {
+                displayChangeVal = displayChangeVal * 4.2; 
+            } else if (currentPeriod === 'year') {
+                displayChangeVal = displayChangeVal * 12.5; 
+            }
 
             const isPositive = displayChangeVal >= 0;
             const changeClass = isPositive ? 'color-green' : 'color-red';
