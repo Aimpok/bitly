@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Terms & Privacy</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body {
+            background-color: #000;
+            color: #fff;
+            padding-bottom: 40px;
+        }
+        
+        /* Текст правил из TXT файла */
+        #rules-content {
+            white-space: pre-wrap; /* Сохраняет абзацы и переносы из TXT */
+            color: #aaa;
+            font-size: 14px;
+            line-height: 1.6;
+            margin-top: 20px;
+        }
+
+        .loading-text {
+            color: #555;
+            font-style: italic;
+            text-align: center;
+            margin-top: 50px;
+        }
+
+        .error-text {
+            color: #ff3b30;
+            text-align: center;
+            margin-top: 50px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ВЕРХНЯЯ ПАНЕЛЬ -->
+    <div class="header-nav">
+        <!-- Кнопка назад возвращает на страницу приветствия -->
+        <button class="back-btn" onclick="goBack()">
+            <svg class="icon" viewBox="0 0 24 24" width="24" height="24">
+                <path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </button>
+        <div class="header-title">Terms & Privacy</div>
+    </div>
+
+    <!-- КОНТЕНТ -->
+    <div class="content-section" style="padding: 0 20px;">
+        <div id="rules-content">
+            <div class="loading-text">Loading latest terms...</div>
+        </div>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        tg.setHeaderColor('#000000');
+
+        // Настройки GitHub (замените на свои данные)
+        const GITHUB_USER = 'Bitlyy';
+        const GITHUB_REPO = 'privacypolicy';
+        const FILE_NAME = 'rules_latest.txt'; // Имя файла на Гитхабе
+
+        // Функция возврата
+        function goBack() {
+            // Если вы используете отдельный файл приветствия (например welcome.html)
+            // то лучше явно указать переход, чтобы не потерять состояние галочки
+            if (window.history.length > 1) {
+                window.history.back();
+            } else {
+                location.href = 'welcome.html'; 
+            }
+        }
+
+        // Загрузка правил с GitHub
+        async function fetchRules() {
+            const container = document.getElementById('rules-content');
+            
+            // Прямая ссылка на RAW файл
+            const url = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/main/${FILE_NAME}`;
+
+            try {
+                // Добавляем timestamp, чтобы избежать кэширования старой версии файла
+                const response = await fetch(url + '?t=' + new Date().getTime());
+                
+                if (!response.ok) throw new Error('Could not load file');
+
+                const text = await response.text();
+                container.innerText = text; // Вставляем чистый текст
+                
+            } catch (error) {
+                console.error('Rules loading error:', error);
+                container.innerHTML = `
+                    <div class="error-text">
+                        <b>Failed to load terms.</b><br>
+                        Please check your internet connection.
+                    </div>
+                `;
+            }
+        }
+
+        // Запускаем загрузку при открытии
+        fetchRules();
+    </script>
+</body>
+</html>

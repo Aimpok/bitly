@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Welcome</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+
+    <div class="privacy-container">
+        <!-- Иконка изменена на bitlyicon.png -->
+        <img src="Sprites/bitlyicon.png" class="brand-icon" alt="Bitly" onerror="this.src='Sprites/CoinIcon.png'">
+        
+        <div class="welcome-title">Welcome to Bitly</div>
+        <div class="welcome-sub">
+            Trade. Exchange. Grow. Everything for fast deals and earning points in one place.
+        </div>
+    </div>
+
+    <!-- Фиксированная нижняя панель -->
+    <div class="fixed-bottom-bar" style="bottom: 30px;">
+        
+        <!-- ЧЕКБОКС С ВСТРОЕННОЙ ССЫЛКОЙ -->
+        <label class="checkbox-row" style="margin-bottom: 20px; align-items: flex-start;">
+            <input type="checkbox" id="policyCheckbox" onchange="toggleButton()">
+            <span class="checkmark" style="margin-top: 2px;"></span>
+            
+            <span class="checkbox-text">
+                I have read and agree to the 
+                <!-- При клике открываем правила, stopPropagation чтобы не ставилась галочка -->
+                <span class="privacy-link" onclick="openRules(event)">Privacy Policy & Terms of Use</span>
+            </span>
+        </label>
+
+        <!-- Кнопка Продолжить (Заблокирована по умолчанию) -->
+        <button id="continueBtn" class="btn-buy-floating btn-locked" onclick="acceptAndStart()">
+            Continue
+        </button>
+    </div>
+
+    <script>
+    const tg = window.Telegram.WebApp;
+    tg.expand();
+    tg.setHeaderColor('#000000');
+
+    // Функция открытия правил
+    function openRules(e) {
+        e.preventDefault(); 
+        e.stopPropagation();
+        location.href = 'rules.html';
+    }
+
+    // Логика кнопки
+    function toggleButton() {
+        const chk = document.getElementById('policyCheckbox');
+        const btn = document.getElementById('continueBtn');
+        if(chk && chk.checked) {
+            btn.classList.remove('btn-locked');
+        } else if (btn) {
+            btn.classList.add('btn-locked');
+        }
+    }
+
+    // ВЫЗЫВАЕМ ФУНКЦИЮ СРАЗУ ПРИ ЗАГРУЗКЕ
+    // Это проверит, стоит ли галочка (если пользователь вернулся назад)
+    toggleButton();
+
+    // Принятие и вход
+    function acceptAndStart() {
+        localStorage.setItem('privacy_accepted', 'true');
+        location.replace('index.html');
+    }
+</script>
+</body>
+</html>
