@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Home</title>
+    <title>Bitly - Home</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        /* Стиль загрузчика */
+        /* === ГЛОБАЛЬНЫЙ ЛОАДЕР === */
         #globalLoader {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background-color: #000000; z-index: 99999;
@@ -17,277 +17,272 @@
         }
         #globalLoader.loaded { opacity: 0; visibility: hidden; pointer-events: none; }
         #globalLoader.instant-hide { display: none !important; }
+        
         .custom-spinner {
             width: 40px; height: 40px; border-radius: 50%;
             border: 4px solid #333; border-top-color: #ffffff;
             animation: spin 1s linear infinite;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        
-        /* Стиль для активного чипа (белый) */
-        .filter-chip { cursor: pointer; }
 
-        /* --- НОВАЯ ПАНЕЛЬ НАВИГАЦИИ (как в Wallet) --- */
+        /* === ПАНЕЛЬ НАВИГАЦИИ === */
         .bottom-nav {
-            position: fixed !important;
-            bottom: 0 !important;
-            left: 0 !important;
-            right: 0 !important;
-            width: 100% !important; 
-            max-width: 480px !important; 
-            margin: 0 auto !important;   
-            transform: none !important; 
-            border: none !important;     
-            border-radius: 0 !important; 
-            box-shadow: none !important; 
-            background: #000000 !important; 
-            display: grid !important;
+            position: fixed !important; bottom: 0 !important; left: 0 !important; right: 0 !important;
+            width: 100% !important; max-width: 480px !important; margin: 0 auto !important;
+            background: #000000 !important; display: grid !important;
             grid-template-columns: repeat(5, 1fr) !important;
-            align-items: center !important;
-            justify-items: center !important;
-            height: 70px !important;
-            padding-bottom: env(safe-area-inset-bottom, 20px) !important; 
-            z-index: 9999 !important;
-            box-sizing: border-box !important;
+            height: 70px !important; padding-bottom: env(safe-area-inset-bottom, 20px) !important;
+            z-index: 9999 !important; border-top: 1px solid #111;
         }
-
-        .nav-item {
-            width: 100% !important;
-            height: 100% !important;
-            display: flex !important;
-            justify-content: center !important;
-            align-items: center !important;
-            opacity: 0.5;
-            transition: opacity 0.2s;
-            margin: 0 !important;
-        }
-
+        .nav-item { opacity: 0.5; display: flex; justify-content: center; align-items: center; transition: 0.2s; }
         .nav-item.active { opacity: 1 !important; }
-
         .nav-trade-circle {
-            position: static !important; 
-            width: 48px !important;
-            height: 48px !important;
-            background: #ffffff !important;
-            border-radius: 50% !important;
-            display: flex !important;
-            justify-content: center !important;
-            align-items: center !important;
-            transform: translateY(-5px) !important; 
-            margin: 0 !important;
+            width: 48px; height: 48px; background: #ffffff !important; border-radius: 50%;
+            display: flex; justify-content: center; align-items: center; transform: translateY(-5px);
         }
 
-        body {
-            padding-bottom: 100px !important; /* Отступ чтобы контент не перекрывался */
-            background: #000;
-            color: #fff;
+        /* === ЭКРАН ПРИВЕТСТВИЯ (PRIVACY OVERLAY) === */
+        #privacyOverlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; z-index: 100000;
+            display: none; flex-direction: column; align-items: center; justify-content: center;
+            padding: 40px 24px; text-align: center; box-sizing: border-box;
         }
+        .brand-icon { width: 90px; height: 90px; margin-bottom: 24px; filter: drop-shadow(0 0 20px rgba(255,255,255,0.1)); }
+        .welcome-title { font-size: 28px; font-weight: 800; margin-bottom: 12px; color: #fff; text-align: center; width: 100%; }
+        .welcome-sub { font-size: 15px; color: #888; line-height: 1.5; margin-bottom: 40px; max-width: 280px; }
+        
+        /* Чекбокс зона */
+        .fixed-bottom-bar-privacy { width: 100%; max-width: 400px; margin-top: auto; padding-bottom: 40px; }
+        .checkbox-row { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 20px; cursor: pointer; text-align: left; }
+        .checkbox-row input { position: absolute; opacity: 0; width: 0; height: 0; }
+        .checkmark { 
+            height: 18px; width: 18px; background-color: #000; border: 2px solid #333; 
+            border-radius: 5px; position: relative; flex-shrink: 0; margin-top: 2px;
+        }
+        .checkbox-row input:checked ~ .checkmark { background-color: #fff; border-color: #fff; }
+        .checkmark:after {
+            content: ""; position: absolute; display: none; left: 5px; top: 2px;
+            width: 4px; height: 8px; border: solid black; border-width: 0 2.5px 2.5px 0; transform: rotate(45deg);
+        }
+        .checkbox-row input:checked ~ .checkmark:after { display: block; }
+        .checkbox-text { font-size: 12px; color: #888; line-height: 1.4; user-select: none; }
+        .privacy-link { color: #fff; text-decoration: underline; font-weight: 600; }
+
+        body { padding-bottom: 100px; background: #000; color: #fff; margin: 0; }
     </style>
 </head>
 <body>
 
+<!-- === ЭКРАН ПРИВЕТСТВИЯ === -->
+<div id="privacyOverlay">
+    <img src="Sprites/bitlyicon.png" class="brand-icon" alt="Logo">
+    <div class="welcome-title">Welcome to Bitly</div>
+    <div class="welcome-sub">
+        Your gateway to social tokens.<br>Trade, earn, and launch securely.
+    </div>
+
+    <div class="fixed-bottom-bar-privacy">
+        <label class="checkbox-row">
+            <input type="checkbox" id="policyCheckbox" onchange="toggleContinueBtn()">
+            <span class="checkmark"></span>
+            <span class="checkbox-text">
+                I have read and agree to the 
+                <span class="privacy-link" onclick="event.preventDefault(); location.href='rules.html'">Privacy Policy & Terms of Use</span>
+            </span>
+        </label>
+
+        <button id="continueBtn" class="btn-white-large btn-locked" onclick="handleAcceptPrivacy()" style="width: 100%;">
+            Continue
+        </button>
+    </div>
+</div>
+
 <!-- === ЭКРАН ЗАГРУЗКИ === -->
 <div id="globalLoader"><div class="custom-spinner"></div></div>
 
-<script>
-    if (sessionStorage.getItem('app_ready')) {
-        document.getElementById('globalLoader').classList.add('instant-hide');
-    }
-</script>
+<!-- Контент главной страницы -->
+<div id="mainAppContent">
+    <div class="section-title" style="margin-top: 20px;">News</div>
+    <div class="carousel-container" id="newsSlider" style="min-height: 160px;"></div>
 
-<!-- News -->
-<div class="section-title" style="margin-top: 20px;">News</div>
-<div class="carousel-container" id="newsSlider" style="min-height: 160px;"></div>
-
-<!-- Banner -->
-<div class="launch-card" onclick="location.href='launch.html'">
-    <div class="launch-text">
-        <h3>Launch your token!</h3>
-        <p>Reach #1 on the leaderboard.</p>
+    <div class="launch-card" onclick="location.href='launch.html'">
+        <div class="launch-text">
+            <h3>Launch your token!</h3>
+            <p>Reach #1 on the leaderboard.</p>
+        </div>
+        <img src="Sprites/CoinIcon.png" class="coin-icon-3d" alt="coin">
     </div>
-    <img src="Sprites/CoinIcon.png" class="coin-icon-3d" alt="coin">
+
+    <div class="section-title">Top 100</div>
+
+    <div class="filter-chips">
+        <div class="filter-chip active" onclick="setFilter('week', this)">Week</div>
+        <div class="filter-chip" onclick="setFilter('month', this)">Month</div>
+        <div class="filter-chip" onclick="setFilter('year', this)">Year</div>
+    </div>
+
+    <div class="token-list" id="topTokensList">
+        <div style="text-align: center; color: #555; padding: 40px;">Searching assets...</div>
+    </div>
 </div>
 
-<!-- Header Top 100 -->
-<div class="section-title">Top 100</div>
-
-<!-- Кликабельные фильтры -->
-<div class="filter-chips">
-    <div class="filter-chip active" onclick="setFilter('week', this)">Week</div>
-    <div class="filter-chip" onclick="setFilter('month', this)">Month</div>
-    <div class="filter-chip" onclick="setFilter('year', this)">Year</div>
-</div>
-
-<!-- Список токенов -->
-<div class="token-list" id="topTokensList">
-    <div style="text-align: center; color: #555; padding: 20px;">Loading...</div>
-</div>
-
-<!-- Bottom Nav (НОВЫЙ ДИЗАЙН) -->
+<!-- Bottom Nav -->
 <div class="bottom-nav">
-    <!-- 1. HOME (АКТИВНАЯ) -->
     <div class="nav-item active">
         <svg class="icon" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
     </div>
-    
-    <!-- 2. EARN -->
     <div class="nav-item" onclick="location.href='Earn.html'">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="9"></circle>
-            <text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" font-size="10" font-weight="800" fill="currentColor" stroke="none">$</text>
-        </svg>
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"></circle><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" font-size="10" font-weight="800" fill="currentColor" stroke="none">$</text></svg>
     </div>
-    
-    <!-- 3. MARKETS (КРУГ) -->
     <div class="nav-trade-circle" onclick="location.href='markets.html'">
-        <svg class="icon" style="color:black;" viewBox="0 0 24 24">
-            <polyline points="17 1 21 5 17 9"></polyline>
-            <path d="M3 11V9a4 4 0 0 1 4-4h14"></path>
-            <polyline points="7 23 3 19 7 15"></polyline>
-            <path d="M21 13v2a4 4 0 0 1-4 4H3"></path>
-        </svg>
+        <svg class="icon" style="color:black;" viewBox="0 0 24 24"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
     </div>
-    
-    <!-- 4. MESSAGES -->
     <div class="nav-item" onclick="location.href='messages.html'">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-        </svg>
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
     </div>
-    
-    <!-- 5. WALLET -->
     <div class="nav-item" onclick="location.href='wallet.html'">
-        <svg class="icon" viewBox="0 0 24 24">
-            <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
-            <line x1="1" y1="10" x2="23" y2="10"></line>
-        </svg>
+        <svg class="icon" viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
     </div>
 </div>
 
 <script src="stocks.js"></script>
 
-<script>
+<script type="module">
+    import { initUser, subscribeToMarket, initMarketDataIfNeeded, acceptPrivacyInDB } from './user-service.js';
+    
     const tg = window.Telegram.WebApp;
     tg.expand();
     tg.setHeaderColor('#000000');
 
-    // News Slider Logic
-    const slider = document.getElementById('newsSlider');
-    function renderStocks() {
-        if (!slider || typeof stocksData === 'undefined') return;
-        slider.innerHTML = ''; 
-        stocksData.forEach((stock, index) => {
-            const card = document.createElement('div');
-            card.className = 'news-card';
-            let dotsHtml = '<div class="carousel-dots">';
-            stocksData.forEach((_, i) => dotsHtml += `<div class="dot ${i === index ? 'active' : ''}"></div>`);
-            dotsHtml += '</div>';
-
-            card.innerHTML = `
-                <img src="${stock.bgImage}" class="news-bg" alt="bg">
-                <div class="news-content">
-                    <div class="news-title">${stock.title}</div>
-                    <div class="action-btn-small" onclick="location.href='${stock.btnLink}'">${stock.btnText}</div>
-                </div>
-                <img src="${stock.iconImage}" class="banner-icon" alt="icon">
-                ${dotsHtml}
-            `;
-            slider.appendChild(card);
-        });
-    }
-    renderStocks();
-</script>
-
-<script type="module">
-    import { initUser, subscribeToMarket, initMarketDataIfNeeded } from './user-service.js';
-    
     const loader = document.getElementById('globalLoader');
-    let cachedTokens = []; // Храним токены здесь
-    let currentPeriod = 'week'; // Текущий период
+    const privacyOverlay = document.getElementById('privacyOverlay');
+    let cachedTokens = [];
+    let currentPeriod = 'week';
 
-    // --- ФУНКЦИЯ ПЕРЕКЛЮЧЕНИЯ ФИЛЬТРА ---
+    // --- ЛОГИКА ПРИНЯТИЯ ПРАВИЛ ---
+    window.toggleContinueBtn = function() {
+        const chk = document.getElementById('policyCheckbox');
+        const btn = document.getElementById('continueBtn');
+        if(chk.checked) btn.classList.remove('btn-locked');
+        else btn.classList.add('btn-locked');
+    }
+
+    window.handleAcceptPrivacy = async function() {
+        const btn = document.getElementById('continueBtn');
+        if(btn.classList.contains('btn-locked')) return;
+        
+        btn.innerText = 'Wait...';
+        try {
+            await acceptPrivacyInDB();
+            localStorage.setItem('privacy_accepted', 'true');
+            privacyOverlay.style.display = 'none';
+            // Если рынок еще не загружен, лоадер останется
+        } catch (e) {
+            btn.innerText = 'Continue';
+            alert('Error. Try again.');
+        }
+    }
+
+    // Фильтры
     window.setFilter = function(period, el) {
         currentPeriod = period;
-        
-        // Обновляем визуально кнопки
         document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
         el.classList.add('active');
-
-        // Перерисовываем список с новыми данными
-        if(cachedTokens.length > 0) {
-            renderTopTokens(cachedTokens);
-        }
+        if(cachedTokens.length > 0) renderTopTokens(cachedTokens);
     }
 
     async function startApp() {
         try {
-            initUser(); 
+            // 1. Инициализация юзера
+            const userData = await initUser();
+
+            // 2. Проверка приветственного экрана
+            const localAccepted = localStorage.getItem('privacy_accepted');
+            if (!userData.privacyAccepted && !localAccepted) {
+                loader.classList.add('instant-hide');
+                privacyOverlay.style.display = 'flex';
+                // Проверяем галочку при возврате назад
+                toggleContinueBtn();
+            } else {
+                localStorage.setItem('privacy_accepted', 'true');
+            }
+
+            // 3. Рынок
             await initMarketDataIfNeeded();
+            renderNews();
 
             subscribeToMarket((tokens) => {
-                cachedTokens = tokens; // Сохраняем данные
+                cachedTokens = tokens;
                 renderTopTokens(tokens);
-
                 sessionStorage.setItem('app_ready', 'true');
-                if(loader && !loader.classList.contains('instant-hide') && !loader.classList.contains('loaded')) {
-                    setTimeout(() => { loader.classList.add('loaded'); }, 300); 
+                
+                // Прячем лоадер если оверлей не висит
+                if(privacyOverlay.style.display !== 'flex') {
+                    setTimeout(() => { loader.classList.add('loaded'); }, 300);
                 }
             });
         } catch (e) { console.error(e); }
     }
 
+    function renderNews() {
+        const slider = document.getElementById('newsSlider');
+        if (!slider || typeof stocksData === 'undefined') return;
+        slider.innerHTML = ''; 
+        stocksData.forEach((stock, index) => {
+            const card = document.createElement('div');
+            card.className = 'news-card';
+            card.innerHTML = `
+                <img src="${stock.bgImage}" class="news-bg">
+                <div class="news-content">
+                    <div class="news-title">${stock.title}</div>
+                    <div class="action-btn-small" onclick="location.href='${stock.btnLink}'">${stock.btnText}</div>
+                </div>
+                <img src="${stock.iconImage}" class="banner-icon">
+            `;
+            slider.appendChild(card);
+        });
+    }
+
     function renderTopTokens(tokens) {
         const container = document.getElementById('topTokensList');
         if(!container) return;
-        
-        // Сортируем по цене (или по маркеткапу) и берем ТОП 100
-        const sorted = tokens.sort((a,b) => b.price - a.price).slice(0, 100);
-
+        const sorted = [...tokens].sort((a,b) => b.price - a.price).slice(0, 100);
         container.innerHTML = '';
-        
         sorted.forEach(token => {
-            let displayChangeVal = token.change || 0;
+            let change = token.change || 0;
+            if (currentPeriod === 'month') change *= 4.2;
+            else if (currentPeriod === 'year') change *= 12.5;
 
-            if (currentPeriod === 'month') {
-                displayChangeVal = displayChangeVal * 4.2; 
-            } else if (currentPeriod === 'year') {
-                displayChangeVal = displayChangeVal * 12.5; 
-            }
-
-            const isPositive = displayChangeVal >= 0;
-            const changeClass = isPositive ? 'color-green' : 'color-red';
-            const sign = isPositive ? '+' : '';
-            const displayChangeStr = Math.abs(displayChangeVal).toFixed(2);
+            const isPos = change >= 0;
+            const icon = token.image ? `<img src="${token.image}" style="width:100%;height:100%;object-fit:cover;">` : token.id[0];
             
-            let iconHtml;
-            if (token.image) {
-                iconHtml = `<img src="${token.image}" style="width:100%; height:100%; object-fit:cover;">`;
-            } else {
-                iconHtml = token.id[0]; 
-            }
-            
-            const itemHtml = `
+            container.innerHTML += `
             <div class="token-item" onclick="location.href='crypto_info.html?id=${token.id}'">
                 <div class="token-left">
-                    <div class="token-icon-circle">${iconHtml}</div>
+                    <div class="token-icon-circle">${icon}</div>
                     <div class="token-info-text">
                         <span class="t-name">${token.id}</span>
-                        <span class="t-sub" style="font-size:10px;">${currentPeriod.charAt(0).toUpperCase() + currentPeriod.slice(1)} vol</span>
+                        <span class="t-sub" style="font-size:10px;">${currentPeriod} vol</span>
                     </div>
                 </div>
                 <div class="token-right">
-                    <div class="t-price" style="display: flex; align-items: center; justify-content: flex-end; gap: 4px;">
+                    <div class="t-price" style="display:flex;align-items:center;gap:4px;">
                         ${parseFloat(token.price).toFixed(6)}
-                        <img src="Sprites/Blyx.png" style="width: 16px; height: 16px; object-fit: contain;">
+                        <img src="Sprites/Blyx.png" style="width:16px;">
                     </div>
-                    <div class="t-change ${changeClass}">${sign}${displayChangeStr}%</div>
+                    <div class="t-change ${isPos?'color-green':'color-red'}">${isPos?'+':''}${change.toFixed(2)}%</div>
                 </div>
-            </div>
-            `;
-            container.innerHTML += itemHtml;
+            </div>`;
         });
     }
+
+    // Слушатель для восстановления состояния кнопки при возврате назад
+    window.addEventListener('pageshow', () => {
+        if (privacyOverlay.style.display === 'flex') {
+            toggleContinueBtn();
+        }
+    });
 
     startApp();
 </script>
