@@ -33,10 +33,9 @@
             padding: 40px 24px; text-align: center; box-sizing: border-box;
         }
         .brand-icon { width: 90px; height: 90px; margin-bottom: 24px; filter: drop-shadow(0 0 20px rgba(255,255,255,0.1)); }
-        .welcome-title { font-size: 28px; font-weight: 800; margin-bottom: 12px; color: #fff; text-align: center; width: 100%; }
+        .welcome-title { font-size: 28px; font-weight: 800; margin-bottom: 12px; color: #fff; }
         .welcome-sub { font-size: 15px; color: #888; line-height: 1.5; margin-bottom: 40px; max-width: 280px; }
         
-        /* Чекбокс зона */
         .fixed-bottom-bar-privacy { width: 100%; max-width: 400px; margin-top: auto; padding-bottom: 40px; }
         .checkbox-row { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 20px; cursor: pointer; text-align: left; }
         .checkbox-row input { position: absolute; opacity: 0; width: 0; height: 0; }
@@ -53,6 +52,53 @@
         .checkbox-text { font-size: 12px; color: #888; line-height: 1.4; user-select: none; }
         .privacy-link { color: #fff; text-decoration: underline; font-weight: 600; }
 
+        /* === ВЫРАВНИВАНИЕ СПИСКА ТОКЕНОВ === */
+        .token-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            border-bottom: 1px solid #111;
+        }
+        .token-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .token-right {
+            text-align: right;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end; /* Все к правому краю */
+        }
+        .t-price {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-weight: 600;
+            font-size: 15px;
+        }
+        .t-price img {
+            width: 16px;
+            height: 16px;
+        }
+
+        /* === ПАНЕЛЬ НАВИГАЦИИ === */
+        .bottom-nav {
+            position: fixed !important; bottom: 0 !important; left: 0 !important; right: 0 !important;
+            width: 100% !important; max-width: 480px !important; margin: 0 auto !important;
+            background: #000000 !important; display: grid !important;
+            grid-template-columns: repeat(5, 1fr) !important;
+            height: 70px !important; padding-bottom: env(safe-area-inset-bottom, 20px) !important;
+            z-index: 9999 !important; border-top: 1px solid #111;
+        }
+        .nav-item { opacity: 0.5; display: flex; justify-content: center; align-items: center; transition: 0.2s; }
+        .nav-item.active { opacity: 1 !important; }
+        .nav-trade-circle {
+            width: 48px; height: 48px; background: #ffffff !important; border-radius: 50%;
+            display: flex; justify-content: center; align-items: center; transform: translateY(-5px);
+        }
+
         body { padding-bottom: 100px; background: #000; color: #fff; margin: 0; }
     </style>
 </head>
@@ -62,9 +108,7 @@
 <div id="privacyOverlay">
     <img src="Sprites/bitlyicon.png" class="brand-icon" alt="Logo">
     <div class="welcome-title">Welcome to Bitly</div>
-    <div class="welcome-sub">
-        Your gateway to social tokens.<br>Trade, earn, and launch securely.
-    </div>
+    <div class="welcome-sub">Your gateway to social tokens.<br>Trade, earn, and launch securely.</div>
 
     <div class="fixed-bottom-bar-privacy">
         <label class="checkbox-row">
@@ -75,7 +119,6 @@
                 <span class="privacy-link" onclick="event.preventDefault(); location.href='rules.html'">Privacy Policy & Terms of Use</span>
             </span>
         </label>
-
         <button id="continueBtn" class="btn-white-large btn-locked" onclick="handleAcceptPrivacy()" style="width: 100%;">
             Continue
         </button>
@@ -161,27 +204,18 @@
         btn.disabled = true;
 
         try {
-            // Сохраняем согласие в FIREBASE (на аккаунт)
             await acceptPrivacyInDB();
             isPrivacyAcceptedInSession = true;
-            
-            // Прячем оверлей
             privacyOverlay.style.display = 'none';
-            
-            // Если рынок уже загружен в фоне — убираем лоадер
-            if (cachedTokens.length > 0) {
-                loader.classList.add('loaded');
-            } else {
-                loader.classList.remove('instant-hide');
-            }
+            if (cachedTokens.length > 0) loader.classList.add('loaded');
+            else loader.classList.remove('instant-hide');
         } catch (e) {
             btn.innerText = 'Continue';
             btn.disabled = false;
-            alert('Error saving to cloud. Try again.');
+            alert('Error saving. Try again.');
         }
     }
 
-    // Фильтры
     window.setFilter = function(period, el) {
         currentPeriod = period;
         document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
@@ -191,42 +225,33 @@
 
     async function startApp() {
         try {
-            // 1. Инициализация юзера (тянет данные из Firebase)
             const userData = await initUser();
             isPrivacyAcceptedInSession = userData.privacyAccepted;
 
-            // 2. Проверка: нужно ли показывать приветствие?
             if (!isPrivacyAcceptedInSession) {
-                // Если в базе false — показываем оверлей и убираем лоадер (чтобы не крутился поверх)
                 loader.classList.add('instant-hide');
                 privacyOverlay.style.display = 'flex';
                 toggleContinueBtn();
             }
 
-            // 3. Загрузка контента (в любом случае подгружаем рынок в фоне)
             await initMarketDataIfNeeded();
             renderNews();
 
             subscribeToMarket((tokens) => {
                 cachedTokens = tokens;
                 renderTopTokens(tokens);
-                
-                // Скрываем основной лоадер только если правила приняты
                 if(isPrivacyAcceptedInSession) {
                     setTimeout(() => { loader.classList.add('loaded'); }, 300);
                 }
             });
-        } catch (e) { 
-            console.error("Critical Start Error:", e);
-            loader.innerHTML = '<div style="color:white">Connection Error. Restart app.</div>';
-        }
+        } catch (e) { console.error(e); }
     }
 
     function renderNews() {
         const slider = document.getElementById('newsSlider');
         if (!slider || typeof stocksData === 'undefined') return;
         slider.innerHTML = ''; 
-        stocksData.forEach((stock) => {
+        stocksData.forEach((stock, index) => {
             const card = document.createElement('div');
             card.className = 'news-card';
             card.innerHTML = `
@@ -244,8 +269,10 @@
     function renderTopTokens(tokens) {
         const container = document.getElementById('topTokensList');
         if(!container) return;
+        
         const sorted = [...tokens].sort((a,b) => b.price - a.price).slice(0, 100);
         container.innerHTML = '';
+
         sorted.forEach(token => {
             let change = token.change || 0;
             if (currentPeriod === 'month') change *= 4.2;
@@ -259,27 +286,20 @@
                 <div class="token-left">
                     <div class="token-icon-circle">${icon}</div>
                     <div class="token-info-text">
-                        <span class="t-name">${token.id}</span>
-                        <span class="t-sub" style="font-size:10px;">${currentPeriod} vol</span>
+                        <div class="t-name">${token.id}</div>
+                        <div class="t-sub" style="font-size:10px; color:#888;">${currentPeriod} vol</div>
                     </div>
                 </div>
                 <div class="token-right">
-                    <div class="t-price" style="display:flex;align-items:center;gap:4px;">
+                    <div class="t-price">
                         ${parseFloat(token.price).toFixed(6)}
-                        <img src="Sprites/Blyx.png" style="width:16px;">
+                        <img src="Sprites/Blyx.png">
                     </div>
                     <div class="t-change ${isPos?'color-green':'color-red'}">${isPos?'+':''}${change.toFixed(2)}%</div>
                 </div>
             </div>`;
         });
     }
-
-    // Обработка возврата со страницы правил
-    window.addEventListener('pageshow', () => {
-        if (privacyOverlay.style.display === 'flex') {
-            toggleContinueBtn();
-        }
-    });
 
     startApp();
 </script>
