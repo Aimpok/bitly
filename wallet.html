@@ -8,14 +8,22 @@
     <link rel="stylesheet" href="style.css">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        /* Стили из НОВОГО кода для позиционирования */
-        .wh-amount { color: #FFFFFF !important; }
-        .wh-coin-icon { width: 16px; height: 16px; object-fit: contain; vertical-align: middle; margin-left: 4px; border-radius: 50%; }
+        /* Базовые стили страницы */
+        body {
+            background-color: #000;
+            color: #fff;
+            margin: 0 auto;
+            max-width: 480px;
+            font-family: 'Inter', sans-serif;
+            padding-bottom: 100px !important; /* Отступ под навигацию */
+        }
+
+        .wh-coin-icon { width: 18px; height: 18px; object-fit: contain; border-radius: 50%; }
         .tabs-scroll { margin-bottom: 20px; border-bottom: none !important; }
         .hidden { display: none !important; }
-        .wh-item { border: none !important; }
+        .wh-item { border-bottom: 1px solid #111 !important; }
 
-        /* --- ИСПРАВЛЕННАЯ ПАНЕЛЬ НАВИГАЦИИ (НОВЫЙ ДИЗАЙН) --- */
+        /* --- НОВАЯ ПАНЕЛЬ НАВИГАЦИИ (ФИКСИРОВАННАЯ) --- */
         .bottom-nav {
             position: fixed !important;
             bottom: 0 !important;
@@ -47,13 +55,12 @@
             align-items: center !important;
             opacity: 0.5;
             transition: opacity 0.2s;
-            margin: 0 !important;
+            cursor: pointer;
         }
 
         .nav-item.active { opacity: 1 !important; }
 
         .nav-trade-circle {
-            position: static !important; 
             width: 48px !important;
             height: 48px !important;
             background: #ffffff !important;
@@ -62,14 +69,10 @@
             justify-content: center !important;
             align-items: center !important;
             transform: translateY(-5px) !important; 
-            margin: 0 !important;
+            cursor: pointer;
         }
 
-        body {
-            padding-bottom: 100px !important; /* Чтобы контент не перекрывался */
-            background: #000;
-            color: #fff;
-        }
+        .icon { width: 24px; height: 24px; stroke: currentColor; fill: none; stroke-width: 2; }
     </style>
 </head>
 <body>
@@ -86,11 +89,11 @@
 <!-- Actions -->
 <div class="actions-row">
     <div class="action-btn" onclick="location.href='deposit.html'">
-        <svg class="icon" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+        <svg class="icon" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="#fff"/></svg>
         <span class="action-label">Deposit</span>
     </div>
     <div class="action-btn" onclick="location.href='transfer.html'">
-        <svg class="icon" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        <svg class="icon" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7" stroke="#fff"/></svg>
         <span class="action-label">Send</span>
     </div>
 </div>
@@ -126,13 +129,13 @@
     </div>
 </div>
 
-<!-- Bottom Nav (НОВЫЙ ДИЗАЙН СОХРАНЕН) -->
+<!-- Bottom Nav -->
 <div class="bottom-nav">
     <div class="nav-item" onclick="location.href='index.html'">
         <svg class="icon" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
     </div>
     <div class="nav-item" onclick="location.href='Earn.html'">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <svg class="icon" viewBox="0 0 24 24">
             <circle cx="12" cy="12" r="9"></circle>
             <text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" font-size="10" font-weight="800" fill="currentColor" stroke="none">$</text>
         </svg>
@@ -146,7 +149,7 @@
         </svg>
     </div>
     <div class="nav-item" onclick="location.href='messages.html'">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <svg class="icon" viewBox="0 0 24 24">
             <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
             <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
         </svg>
@@ -171,7 +174,7 @@
     let currentMarket = [];
     let currentUserData = null;
 
-    // --- ВОЗВРАЩЕННЫЕ СТАРЫЕ МЕТОДЫ ФОРМАТИРОВАНИЯ ---
+    // --- ФОРМАТИРОВАНИЕ ---
     function formatFull(num) {
         if (!num && num !== 0) return "0";
         return num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
@@ -203,8 +206,7 @@
         await initUser();
         subscribeToMarket((tokens) => {
             currentMarket = tokens;
-            if(currentUserData) renderPortfolio(); 
-            if(currentUserData) renderTotalAssets();
+            if(currentUserData) { renderPortfolio(); renderTotalAssets(); }
         });
         subscribeToUser((user) => {
             currentUserData = user;
@@ -220,7 +222,6 @@
         document.getElementById('totalAssetsDisplay').innerText = formatFull(currentUserData.balance || 0);
     }
 
-    // --- ВОЗВРАЩЕННЫЙ СТАРЫЙ МЕТОД ПОРТФОЛИО ---
     function renderPortfolio() {
         const grid = document.getElementById('portfolioGrid');
         const port = currentUserData?.portfolio || {};
@@ -250,7 +251,6 @@
         });
     }
 
-    // --- ВОЗВРАЩЕННЫЙ СТАРЫЙ МЕТОД ТОВАРОВ (С ЛИМИТАМИ И АВАТАРАМИ) ---
     async function renderGoods() {
         const list = document.getElementById('goodsList');
         if(!currentUserData) return;
@@ -261,7 +261,6 @@
             const o = {id: d.id, ...d.data()};
             let avatarHtml = `<div class="oc-avatar" style="background:#333;"></div>`;
             if(o.sellerAvatar) avatarHtml = `<img src="${o.sellerAvatar}" class="oc-avatar-img">`;
-
             list.insertAdjacentHTML('beforeend', `
                 <div class="order-card" style="margin-bottom:12px;">
                     <div class="oc-header">
@@ -277,53 +276,56 @@
                     </div>
                     <div class="oc-limits-row">
                         <span>Avail: <span class="oc-val">${formatFull(o.amount)} ${o.tokenId}</span></span>
-                        <span style="display:flex; align-items:center; gap:2px;">
-                            Lim: <span class="oc-val">${formatFull(o.minLimit)}</span>
-                            <img src="Sprites/Blyx.png" style="width:10px; height:10px;">
-                        </span>
+                        <span>Lim: <span class="oc-val">${formatFull(o.minLimit)}</span> <img src="Sprites/Blyx.png" style="width:10px;"></span>
                     </div>
                 </div>`);
         });
     }
 
-    // --- ВОЗВРАЩЕННЫЙ СТАРЫЙ МЕТОД ИСТОРИИ (С ИКОНКАМИ И ТИПАМИ) ---
     function renderHistory() {
         const list = document.getElementById('historyList');
         const txs = (currentUserData?.transactions || []).slice().reverse();
         list.innerHTML = txs.length === 0 ? '<div style="text-align:center;color:#666;padding:20px;">No transactions</div>' : "";
         
         txs.forEach(tx => {
-            let icon = 'Sprites/Cart.png'; 
+            let mainIcon = 'Sprites/Cart.png'; 
             let title = 'Transaction';
             let sub = 'balance';
-            let amountHtml = '';
+            
+            let tokenIconUrl = 'Sprites/Blyx.png'; 
+            if (tx.token && tx.token !== 'BLYX') {
+                const foundToken = currentMarket.find(t => t.id === tx.token);
+                tokenIconUrl = foundToken?.image || 'Sprites/GiftIcon.png';
+            }
+
+            let color = '#fff';
+            let prefix = '';
+            let finalAmt = tx.amount;
 
             if(tx.type === 'replenish' || tx.type === 'deposit') {
-                title = 'Replenishment'; icon = 'Sprites/Wallet.png'; sub = 'balance';
-                amountHtml = `+${formatFull(tx.amount)} <img src="Sprites/Blyx.png" class="wh-coin-icon">`;
+                title = 'Replenishment'; mainIcon = 'Sprites/Wallet.png'; sub = 'To balance';
+                color = '#4CAF50'; prefix = '+';
             } else if(tx.type === 'transfer_in' || tx.type === 'receive') {
-                title = 'Gift'; icon = 'Sprites/Gift.png'; sub = `from @${tx.fromUser || 'user'}`;
-                amountHtml = `+${formatFull(tx.amount)} ${tx.token || 'BLYX'}`;
+                title = 'Gift'; mainIcon = 'Sprites/Gift.png'; sub = `from @${tx.fromUser || 'user'}`;
+                color = '#4CAF50'; prefix = '+';
             } else if(tx.type === 'transfer_out' || tx.type === 'send') {
-                title = 'Transfer'; icon = 'Sprites/Cart.png'; sub = `to @${tx.toUser || 'user'}`;
-                amountHtml = `-${formatFull(tx.amount)} ${tx.token || 'BLYX'}`;
+                title = 'Transfer'; mainIcon = 'Sprites/Cart.png'; sub = `to @${tx.toUser || 'user'}`;
+                color = '#FF5252'; prefix = '-';
             } else if(tx.type === 'buy' || tx.type === 'p2p_buy') {
-                title = 'Purchase'; icon = 'Sprites/Cart.png'; sub = 'balance';
-                amountHtml = `-${formatFull(tx.total || tx.amount)} <img src="Sprites/Blyx.png" class="wh-coin-icon">`;
+                title = 'Purchase'; mainIcon = 'Sprites/Cart.png'; sub = 'Market';
+                color = '#FF5252'; prefix = '-'; finalAmt = tx.total || tx.amount; tokenIconUrl = 'Sprites/Blyx.png';
             } else if(tx.type === 'sell' || tx.type === 'p2p_sold') {
-                title = 'Sold'; icon = 'Sprites/Sell.png'; sub = 'portfolio';
-                amountHtml = `+${formatFull(tx.total || tx.amount)} <img src="Sprites/Blyx.png" class="wh-coin-icon">`;
-            } else {
-                amountHtml = `${tx.amount > 0 ? '+' : ''}${formatFull(tx.amount)}`;
+                title = 'Sold'; mainIcon = 'Sprites/Sell.png'; sub = 'Market';
+                color = '#4CAF50'; prefix = '+'; finalAmt = tx.total || tx.amount; tokenIconUrl = 'Sprites/Blyx.png';
             }
 
             const dateStr = formatDate(tx.date) + ' ' + formatTime(tx.date);
 
             list.insertAdjacentHTML('beforeend', `
-            <div class="wh-item" style="padding:12px 0; display:flex; justify-content:space-between; align-items:center;">
+            <div class="wh-item" style="padding:14px 0; display:flex; justify-content:space-between; align-items:center;">
                 <div style="display:flex; align-items:center; gap:12px;">
-                    <div style="background:#1c1c1c; border-radius:10px; padding:8px; display:flex;">
-                        <img src="${icon}" style="width:20px; height:20px;">
+                    <div style="background:#1c1c1c; border-radius:12px; width:44px; height:44px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                        <img src="${mainIcon}" style="width:24px; height:24px;">
                     </div>
                     <div>
                         <div style="font-weight:600; font-size:15px;">${title}</div>
@@ -331,8 +333,13 @@
                     </div>
                 </div>
                 <div style="text-align:right;">
-                    <div style="font-weight:700; font-size:15px;">${amountHtml}</div>
-                    <div style="font-size:11px; color:#444;">${dateStr}</div>
+                    <div style="display:flex; align-items:center; justify-content:flex-end; gap:6px;">
+                        <span style="font-weight:700; font-size:16px; color:${color};">
+                            ${prefix}${formatFull(Math.abs(finalAmt))}
+                        </span>
+                        <img src="${tokenIconUrl}" style="width:18px; height:18px; border-radius:50%;">
+                    </div>
+                    <div style="font-size:11px; color:#444; margin-top:4px;">${dateStr}</div>
                 </div>
             </div>`);
         });
