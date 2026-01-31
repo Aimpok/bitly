@@ -13,22 +13,21 @@ const tg = window.Telegram.WebApp;
 try {
     const navEntries = performance.getEntriesByType("navigation");
     if (navEntries.length > 0 && navEntries[0].type === 'reload') {
-        // Если это обновление страницы (свайп вниз или кнопка) — чистим всё
-        console.log("Page Reloaded: Clearing Cache");
+        // Если пользователь обновил страницу пальцем вниз — чистим кэш сессии
+        console.log("Page Reloaded: Clearing Session Cache");
         sessionStorage.clear();
-    } else {
-        console.log("Page Navigated: Keeping Cache");
     }
 } catch (e) {
-    console.log("Nav API not supported, skipping cache clear logic");
+    console.log("Nav API not supported");
 }
 
 // ==========================================
-// 2. ФУНКЦИИ ПОЛЬЗОВАТЕЛЯ
+// 2. ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
 // ==========================================
 
 export function getTgUser() {
     if (!tg.initDataUnsafe || !tg.initDataUnsafe.user) {
+        // Данные для тестов в обычном браузере
         return { 
             id: 'test_user_777', 
             username: 'TestBuilder', 
@@ -44,15 +43,42 @@ export function getUserRef() {
     return doc(db, "users", user.id.toString());
 }
 
-// Инициализация с мгновенным возвратом из кэша
+/**
+ * Сохраняет статус принятия правил в Firebase
+ */
+export async function acceptPrivacyInDB() {
+    const user = getTgUser();
+    const userRef = getUserRef();
+    
+    try {
+        // Обновляем в базе данных
+        await updateDoc(userRef, { privacyAccepted: true });
+        
+        // Обновляем в локальном кэше сессии
+        const cached = sessionStorage.getItem(`user_${user.id}`);
+        if (cached) {
+            const data = JSON.parse(cached);
+            data.privacyAccepted = true;
+            sessionStorage.setItem(`user_${user.id}`, JSON.stringify(data));
+        }
+        console.log("Privacy status updated in DB");
+    } catch (e) {
+        console.error("Error updating privacy status:", e);
+        throw e;
+    }
+}
+
+// ==========================================
+// 3. ИНИЦИАЛИЗАЦИЯ ПОЛЬЗОВАТЕЛЯ
+// ==========================================
+
 export async function initUser() {
     const user = getTgUser();
     const userRef = getUserRef();
 
-    // 1. ПРОВЕРКА КЭША (Мгновенная загрузка)
+    // 1. Проверяем кэш для мгновенного отклика UI
     const cachedUser = sessionStorage.getItem(`user_${user.id}`);
     
-    // Подготовка свежих данных из телеграм
     const safeUsername = user.username || 'Anon';
     const freshTgData = {
         username: safeUsername,
@@ -61,13 +87,13 @@ export async function initUser() {
         photoUrl: user.photo_url || '' 
     };
 
-    // Фоновая функция обновления (запускается всегда, но не блокирует UI если есть кэш)
+    // Функция загрузки/создания данных
     const fetchAndCache = async () => {
         const snap = await getDoc(userRef);
         let finalData;
 
         if (!snap.exists()) {
-            // Новый юзер
+            // Регистрация нового пользователя
             finalData = {
                 id: user.id,
                 ...freshTgData,
@@ -77,48 +103,45 @@ export async function initUser() {
                 tradeRating: 100,
                 createdAt: new Date().toISOString(),
                 portfolio: {},
-                transactions: []   
+                transactions: [],
+                privacyAccepted: false // По умолчанию не принято
             };
             await setDoc(userRef, finalData);
         } else {
-            // Старый юзер
+            // Обновляем только данные из телеграма (аватар, ник), не трогая баланс и privacyAccepted
             await updateDoc(userRef, freshTgData);
             finalData = { ...snap.data(), ...freshTgData };
         }
         
-        // Сохраняем в SessionStorage
         sessionStorage.setItem(`user_${user.id}`, JSON.stringify(finalData));
         return finalData;
     };
 
-    // ЛОГИКА ВОЗВРАТА:
     if (cachedUser) {
-        // Если есть кэш — возвращаем его МГНОВЕННО, а запрос делаем в фоне
-        // (чтобы обновить кэш для следующего раза)
+        // Если есть кэш — возвращаем его сразу, а базу обновляем в фоне
         fetchAndCache().catch(console.error); 
         return JSON.parse(cachedUser);
     } else {
-        // Если кэша нет (первый вход) — ждем загрузку
+        // Если кэша нет — ждем завершения запроса
         return await fetchAndCache();
     }
 }
 
-// Подписка на юзера (с поддержкой кэша)
+/**
+ * Подписка на изменения данных пользователя в реальном времени
+ */
 export function subscribeToUser(callback) {
     const user = getTgUser();
     const userRef = getUserRef();
     
-    // 1. Сразу отдаем кэш, если есть
+    // Сначала отдаем кэш
     const cachedUser = sessionStorage.getItem(`user_${user.id}`);
-    if (cachedUser) {
-        callback(JSON.parse(cachedUser));
-    }
+    if (cachedUser) callback(JSON.parse(cachedUser));
 
-    // 2. Слушаем реальные изменения
+    // Слушаем изменения в Firestore
     return onSnapshot(userRef, (docSnap) => {
         if (docSnap.exists()) {
             const data = { id: docSnap.id, ...docSnap.data() };
-            // Обновляем кэш при любом изменении в базе
             sessionStorage.setItem(`user_${user.id}`, JSON.stringify(data));
             callback(data);
         }
@@ -126,34 +149,33 @@ export function subscribeToUser(callback) {
 }
 
 // ==========================================
-// 3. ФУНКЦИИ РЫНКА (MARKET)
+// 4. РАБОТА С РЫНКОМ (ТОКЕНЫ)
 // ==========================================
 
 export async function initMarketDataIfNeeded() {
-    // В данном проекте токены создаются пользователями, 
-    // поэтому предзагрузка не требуется, оставляем пустым для совместимости.
+    // Резервная функция для предзагрузки общих данных (если нужно)
+    return true;
 }
 
-// Подписка на рынок (с кэшем)
+/**
+ * Подписка на список всех токенов
+ */
 export function subscribeToMarket(callback) {
     const tokensRef = collection(db, "tokens");
 
-    // 1. Сразу отдаем кэш, если есть
+    // Мгновенный возврат из кэша
     const cachedMarket = sessionStorage.getItem('market_data');
     if (cachedMarket) {
-        // Парсим и сразу рисуем список (пользователь не видит спиннер)
         callback(JSON.parse(cachedMarket));
     }
 
-    // 2. Слушаем реальные изменения
+    // Живое обновление списка
     return onSnapshot(tokensRef, (snapshot) => {
         const tokens = [];
         snapshot.forEach(doc => {
             tokens.push({ id: doc.id, ...doc.data() });
         });
 
-        // Проверяем, изменились ли данные, чтобы зря не перерисовывать (опционально)
-        // Но для простоты — обновляем кэш и UI
         sessionStorage.setItem('market_data', JSON.stringify(tokens));
         callback(tokens);
     });
