@@ -8,15 +8,7 @@
     <link rel="stylesheet" href="style.css">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        /* === ОБЩИЕ СТИЛИ === */
-        body {
-            background-color: #000;
-            color: #fff;
-            margin: 0;
-            font-family: 'Inter', sans-serif;
-            -webkit-tap-highlight-color: transparent;
-        }
-        
+        /* Доп стили */
         .label-row {
             display: flex; 
             justify-content: space-between; 
@@ -30,7 +22,7 @@
             color: #555;
         }
         
-        /* CROPPER STYLES (ОБРЕЗКА ФОТО) */
+        /* CROPPER STYLES */
         .cropper-overlay {
             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
             background: #000; z-index: 10000;
@@ -48,6 +40,12 @@
             user-select: none;
             -webkit-user-drag: none;
         }
+        .cropper-mask {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            background: radial-gradient(circle 120px at center, transparent 120px, rgba(0,0,0,0.8) 121px);
+            pointer-events: none;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
         .cropper-circle-guide {
             position: absolute;
             width: 240px; height: 240px;
@@ -64,37 +62,26 @@
             border-top: 1px solid #222;
         }
 
-        /* === LOADER STYLES (ЗАГРУЗЧИК) === */
+        /* === LOADER STYLES (ДОБАВЛЕНО) === */
         #globalLoader {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background-color: #000000; z-index: 99999;
-            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            display: flex; justify-content: center; align-items: center;
             transition: opacity 0.3s ease, visibility 0.3s;
         }
         #globalLoader.loaded { opacity: 0; visibility: hidden; pointer-events: none; }
-        
         .custom-spinner {
             width: 40px; height: 40px; border-radius: 50%;
             border: 4px solid #333; border-top-color: #ffffff;
             animation: spin 1s linear infinite;
-        }
-        .loader-text {
-            color: white;
-            margin-top: 15px;
-            font-family: 'Inter', sans-serif;
-            font-size: 14px;
-            font-weight: 500;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
 
-    <!-- === ЗАГРУЗЧИК === -->
-    <div id="globalLoader">
-        <div class="custom-spinner"></div>
-        <div id="loaderText" class="loader-text">Loading...</div>
-    </div>
+    <!-- === ЗАГРУЗЧИК (ДОБАВЛЕНО) === -->
+    <div id="globalLoader"><div class="custom-spinner"></div></div>
 
     <!-- Header -->
     <div class="header-nav" id="mainHeader">
@@ -107,22 +94,21 @@
     <!-- Scroll Content -->
     <div class="scroll-content">
         
-        <!-- STEP 1: Ввод данных -->
+        <!-- STEP 1 -->
         <div id="step1" style="padding: 0 16px;">
             <div class="step-header">
                 <div class="step-badge">1</div>
                 <div class="step-title-text">Token Info</div>
             </div>
 
-            <!-- Upload Avatar -->
             <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 25px;">
                 <div class="upload-circle" onclick="document.getElementById('fileInput').click()">
                     <div id="previewContainer" class="upload-placeholder">+</div>
                     <img id="finalAvatar" src="" style="display: none; width:100%; height:100%; border-radius:50%; object-fit:cover;">
                 </div>
                 <div>
-                    <div style="font-weight: 700;">Icon *</div>
-                    <div style="font-size: 12px; color: #888;">Required to continue</div>
+                    <div style="font-weight: 700;">Icon</div>
+                    <div style="font-size: 12px; color: #888;">Tap to upload</div>
                 </div>
                 <input type="file" id="fileInput" hidden accept="image/*" onchange="initCropper(this)">
             </div>
@@ -155,7 +141,7 @@
             <div style="height: 120px;"></div>
         </div>
 
-        <!-- STEP 2: Обзор и оплата -->
+        <!-- STEP 2 -->
         <div id="step2" style="padding: 0 16px; display: none;">
             <div class="step-header">
                 <div class="step-badge">2</div>
@@ -182,7 +168,7 @@
         </div>
     </div>
 
-    <!-- Bottom Buttons -->
+    <!-- Buttons -->
     <div class="fixed-bottom-bar" id="btnContainer">
         <button class="btn-white-large btn-disabled" id="continueBtn" onclick="goToStep2()">
             Continue
@@ -201,7 +187,7 @@
         </button>
     </div>
 
-    <!-- CROPPER OVERLAY (Обрезка фото) -->
+    <!-- CROPPER OVERLAY -->
     <div id="cropperOverlay" class="cropper-overlay">
         <div class="cropper-body" id="cropperBody">
             <img id="cropperImg" src="">
@@ -222,13 +208,8 @@
         tg.expand();
         tg.setHeaderColor('#000000');
         
+        // (ДОБАВЛЕНО) Ссылка на лоадер
         const loader = document.getElementById('globalLoader');
-        const loaderText = document.getElementById('loaderText');
-
-        // =================================================================
-        // ВСТАВЬ СЮДА СВОЮ ССЫЛКУ С VERCEL
-        // =================================================================
-        const VERCEL_API_URL = "СЮДА_ВСТАВЬ_СВОЮ_ССЫЛКУ_С_VERCEL"; 
 
         const CREATION_FEE = 200;
         const TOTAL_SUPPLY = 1000000000;
@@ -237,54 +218,28 @@
         let base64Image = null;
         let currentUser = null;
 
-        // Функция управления лоадером
-        function setLoader(active, text = "Loading...") {
-            if(loaderText) loaderText.innerText = text;
-            if (active) {
-                loader.classList.remove('loaded');
-            } else {
-                loader.classList.add('loaded');
-            }
-        }
-
-        // --- ПРЕДОХРАНИТЕЛЬ: Если скрипт зависнет при старте, убираем лоадер через 3 сек ---
-        setTimeout(() => {
-            if (!loader.classList.contains('loaded')) {
-                console.warn("Forcing loader hide due to timeout");
-                setLoader(false);
-            }
-        }, 3000);
-
+        // FORMATTER
         window.formatPrice = function(val) {
             if(!val || val === 0) return "0";
             return val < 0.01 ? val.toFixed(8).replace(/\.?0+$/, "") : val.toFixed(4);
         }
 
-        // ИНИЦИАЛИЗАЦИЯ
         async function init() {
-            setLoader(true, "Connecting...");
             try {
                 currentUser = await initUser();
-            } catch(e) { 
-                console.error("Init Error:", e);
-                // Не показываем алерт, чтобы не пугать, просто пишем в консоль
-            } finally {
-                // ВСЕГДА убираем лоадер, даже если ошибка
-                setLoader(false);
-            }
+            } catch(e) { console.error(e); }
+            
+            // (ДОБАВЛЕНО) Скрываем лоадер после инициализации
+            if(loader) loader.classList.add('loaded');
         }
         init();
 
-        // --- Управление вводом ---
+        // Input Logic
         window.handleInput = function(type) {
             const el = type === 'name' ? document.getElementById('tokenName') : document.getElementById('tokenTicker');
             const counter = type === 'name' ? document.getElementById('nameCount') : document.getElementById('tickerCount');
             const max = type === 'name' ? 20 : 10;
-            
-            if(type === 'ticker') {
-                el.value = el.value.replace(/[^a-zA-Z]/g, '').toUpperCase();
-            }
-            
+            if(type === 'ticker') el.value = el.value.replace(/[^a-zA-Z]/g, '').toUpperCase();
             counter.innerText = max - el.value.length;
             checkForm();
         }
@@ -293,16 +248,11 @@
             const name = document.getElementById('tokenName').value.trim();
             const ticker = document.getElementById('tokenTicker').value.trim();
             const btn = document.getElementById('continueBtn');
-            
-            // Кнопка активна ТОЛЬКО если есть Имя + Тикер + Картинка
-            if (name.length > 0 && ticker.length > 0 && base64Image !== null) {
-                btn.classList.remove('btn-disabled'); 
-            } else {
-                btn.classList.add('btn-disabled'); 
-            }
+            if (name.length > 0 && ticker.length > 0) btn.classList.remove('btn-disabled'); 
+            else btn.classList.add('btn-disabled'); 
         }
 
-        // --- ЛОГИКА ОБРЕЗКИ ФОТО (CROPPER) ---
+        // --- CROPPER WITH BOUNDARIES ---
         let cs = { x: 0, y: 0, s: 1 };
         let startDist = 0, startScale = 1;
         let startX = 0, startY = 0;
@@ -370,39 +320,29 @@
             }
             updateTransform();
         });
-        
         window.closeCropper = function() {
             document.getElementById('cropperOverlay').style.display = 'none';
             document.getElementById('fileInput').value = ''; 
             document.getElementById('btnContainer').style.display = 'block';
         }
-
         window.cropImage = function() {
             const img = document.getElementById('cropperImg');
-            const cvs = document.createElement('canvas'); 
-            cvs.width = 300; cvs.height = 300;
+            const cvs = document.createElement('canvas'); cvs.width = 300; cvs.height = 300;
             const ctx = cvs.getContext('2d');
-            
-            ctx.fillStyle = '#000'; 
-            ctx.fillRect(0,0,300,300);
+            ctx.fillStyle = '#000'; ctx.fillRect(0,0,300,300);
             ctx.translate(150, 150);
-            
             const r = 300/CROP_SIZE; 
             ctx.scale(cs.s * r, cs.s * r);
             ctx.translate(cs.x / cs.s, cs.y / cs.s);
             ctx.drawImage(img, -img.naturalWidth/2, -img.naturalHeight/2);
-            
             base64Image = cvs.toDataURL('image/jpeg', 0.8);
-            
             document.getElementById('finalAvatar').src = base64Image;
             document.getElementById('finalAvatar').style.display = 'block';
             document.getElementById('previewContainer').style.display = 'none';
-            
             closeCropper();
-            checkForm();
         }
 
-        // --- НАВИГАЦИЯ И ПРОВЕРКА AI ---
+        // --- CALCULATION LOGIC ---
         window.handleBack = function() {
             if(document.getElementById('step2').style.display === 'block') {
                 document.getElementById('step2').style.display = 'none';
@@ -412,64 +352,17 @@
             } else window.history.back();
         }
 
-        window.goToStep2 = async function() {
-            const name = document.getElementById('tokenName').value.trim();
-            const ticker = document.getElementById('tokenTicker').value.trim();
-            const desc = document.getElementById('tokenDesc').value.trim();
-
-            if(!base64Image) {
-                tg.showAlert("Please upload a token icon!");
-                return;
-            }
-
-            // Показываем лоадер с текстом
-            setLoader(true, "AI Safety Check...");
-
-            try {
-                // Проверяем, вставил ли юзер ссылку
-                if (VERCEL_API_URL.includes("СЮДА_ВСТАВЬ")) {
-                    throw new Error("Vercel URL not configured in code!");
-                }
-
-                // Отправляем POST запрос на Vercel
-                const response = await fetch(VERCEL_API_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        name: name, 
-                        ticker: ticker, 
-                        description: desc, 
-                        image: base64Image 
-                    })
-                });
-
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(`Server ${response.status}: ${errorText || 'Unknown error'}`);
-                }
-
-                const result = await response.json();
-
-                if (result.status === "APPROVED") {
-                    document.getElementById('step1').style.display = 'none';
-                    document.getElementById('step2').style.display = 'block';
-                    document.getElementById('btnContainer').style.display = 'none';
-                    document.getElementById('payPanel').style.display = 'block';
-                    window.updateCalc();
-                } else {
-                    tg.showAlert("Rejected: " + (result.reason || "Policy violation"));
-                }
-            } catch (err) {
-                console.error("AI Check Failed:", err);
-                tg.showAlert("Error: " + err.message);
-            } finally {
-                // ВСЕГДА убираем лоадер, чтобы экран не висел
-                setLoader(false);
-            }
+        window.goToStep2 = function() {
+            document.getElementById('step1').style.display = 'none';
+            document.getElementById('step2').style.display = 'block';
+            document.getElementById('btnContainer').style.display = 'none';
+            document.getElementById('payPanel').style.display = 'block';
+            window.updateCalc();
         }
 
         window.updateCalc = function() {
             const buyBlyx = parseFloat(document.getElementById('shareInput').value) || 0;
+            
             const initialMarketCap = VIRTUAL_LIQUIDITY + CREATION_FEE + buyBlyx;
             const startPrice = initialMarketCap / TOTAL_SUPPLY;
             const tokensToReceive = buyBlyx > 0 ? (buyBlyx / startPrice) : 0;
@@ -508,83 +401,66 @@
                 return;
             }
 
-            // Проверка на повторный клик или отсутствие пользователя
-            if(!currentUser) {
-                tg.showAlert("User not authorized. Restart app.");
+            const tokenRef = doc(db, "tokens", ticker);
+            if((await getDoc(tokenRef)).exists()) {
+                tg.showAlert("Ticker already exists!");
                 return;
             }
 
-            const tokenRef = doc(db, "tokens", ticker);
-            
-            setLoader(true, "Checking ticker..."); // Включаем лоадер перед запросами
-
-            try {
-                const tokenSnap = await getDoc(tokenRef);
-                if(tokenSnap.exists()) {
-                    tg.showAlert("Ticker already exists!");
-                    setLoader(false);
-                    return;
-                }
-
-                const userRef = getUserRef();
-                const userSnap = await getDoc(userRef);
-                const balance = userSnap.data().balance || 0;
-                
-                if(balance < totalCost) {
-                    tg.showAlert(`Not enough BLYX. Need ${totalCost}.`);
-                    setLoader(false);
-                    return;
-                }
-
-                setLoader(false); // Выключаем лоадер перед Confirm диалогом (иначе он перекроет всё)
-
-                tg.showConfirm(`Launch ${ticker}?`, async (ok) => {
-                    if(ok) {
-                        setLoader(true, "Launching Token...");
-                        
-                        try {
-                            await setDoc(tokenRef, {
-                                id: ticker,
-                                name: name,
-                                description: desc,
-                                image: base64Image,
-                                ownerId: currentUser.id,
-                                createdAt: new Date().toISOString(),
-                                maxSupply: TOTAL_SUPPLY,
-                                marketCap: initialMarketCap, 
-                                price: startPrice,           
-                                sold: tokensToReceive,       
-                                txCount: 1,
-                                holdersCount: 1,
-                                transactions: [
-                                    { type: 'create_buy', price: startPrice, date: new Date().toISOString() }
-                                ]
-                            });
-
-                            const updates = { balance: increment(-totalCost) };
-                            updates[`portfolio.${ticker}`] = increment(tokensToReceive);
-                            updates.transactions = arrayUnion({
-                                type: 'buy', token: ticker, amount: tokensToReceive, 
-                                cost: totalCost, price: startPrice, date: new Date().toISOString()
-                            });
-
-                            await updateDoc(userRef, updates);
-                            
-                            setLoader(false);
-                            tg.showAlert("Token Launched!");
-                            location.href = 'markets.html';
-                        } catch(e) {
-                            console.error(e);
-                            setLoader(false);
-                            tg.showAlert("Error: " + e.message);
-                        }
-                    }
-                });
-            } catch(e) {
-                console.error(e);
-                setLoader(false);
-                tg.showAlert("Error checking data: " + e.message);
+            const userRef = getUserRef();
+            const balance = (await getDoc(userRef)).data().balance || 0;
+            if(balance < totalCost) {
+                tg.showAlert(`Not enough BLYX. Need ${totalCost}.`);
+                return;
             }
+
+            tg.showConfirm(`Launch ${ticker}?`, async (ok) => {
+                if(ok) {
+                    // (ДОБАВЛЕНО) Показываем лоадер, так как началась транзакция
+                    if(loader) loader.classList.remove('loaded');
+                    
+                    try {
+                        // Создаем токен
+                        await setDoc(tokenRef, {
+                            id: ticker,
+                            name: name,
+                            description: desc,
+                            image: base64Image,
+                            ownerId: currentUser.id,
+                            createdAt: new Date().toISOString(),
+                            maxSupply: TOTAL_SUPPLY,
+                            marketCap: initialMarketCap, 
+                            price: startPrice,           
+                            sold: tokensToReceive,       
+                            txCount: 1,
+                            holdersCount: 1,
+                            transactions: [
+                                { type: 'create_buy', price: startPrice, date: new Date().toISOString() }
+                            ]
+                        });
+
+                        const updates = { balance: increment(-totalCost) };
+                        updates[`portfolio.${ticker}`] = increment(tokensToReceive);
+                        updates.transactions = arrayUnion({
+                            type: 'buy',           
+                            token: ticker,         
+                            amount: tokensToReceive, 
+                            cost: totalCost,       
+                            price: startPrice,
+                            date: new Date().toISOString()
+                        });
+
+                        await updateDoc(userRef, updates);
+                        tg.showAlert("Token Launched!");
+                        location.href = 'markets.html';
+                    } catch(e) {
+                        console.error(e);
+                        // (ДОБАВЛЕНО) Убираем лоадер если ошибка, чтобы юзер мог исправить
+                        if(loader) loader.classList.add('loaded');
+                        tg.showAlert("Error: " + e.message);
+                    }
+                }
+            });
         }
     </script>
 </body>
