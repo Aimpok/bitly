@@ -62,11 +62,11 @@
             border-top: 1px solid #222;
         }
 
-        /* === LOADER STYLES (ДОБАВЛЕНО) === */
+        /* === LOADER STYLES === */
         #globalLoader {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background-color: #000000; z-index: 99999;
-            display: flex; justify-content: center; align-items: center;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
             transition: opacity 0.3s ease, visibility 0.3s;
         }
         #globalLoader.loaded { opacity: 0; visibility: hidden; pointer-events: none; }
@@ -75,13 +75,23 @@
             border: 4px solid #333; border-top-color: #ffffff;
             animation: spin 1s linear infinite;
         }
+        .loader-text {
+            color: white;
+            margin-top: 15px;
+            font-family: 'Inter', sans-serif;
+            font-size: 14px;
+            font-weight: 500;
+        }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
 
-    <!-- === ЗАГРУЗЧИК (ДОБАВЛЕНО) === -->
-    <div id="globalLoader"><div class="custom-spinner"></div></div>
+    <!-- === ЗАГРУЗЧИК === -->
+    <div id="globalLoader">
+        <div class="custom-spinner"></div>
+        <div id="loaderText" class="loader-text">Loading...</div>
+    </div>
 
     <!-- Header -->
     <div class="header-nav" id="mainHeader">
@@ -107,8 +117,8 @@
                     <img id="finalAvatar" src="" style="display: none; width:100%; height:100%; border-radius:50%; object-fit:cover;">
                 </div>
                 <div>
-                    <div style="font-weight: 700;">Icon</div>
-                    <div style="font-size: 12px; color: #888;">Tap to upload</div>
+                    <div style="font-weight: 700;">Icon *</div>
+                    <div style="font-size: 12px; color: #888;">Tap to upload (Required)</div>
                 </div>
                 <input type="file" id="fileInput" hidden accept="image/*" onchange="initCropper(this)">
             </div>
@@ -208,8 +218,11 @@
         tg.expand();
         tg.setHeaderColor('#000000');
         
-        // (ДОБАВЛЕНО) Ссылка на лоадер
         const loader = document.getElementById('globalLoader');
+        const loaderText = document.getElementById('loaderText');
+
+        // === КОНФИГУРАЦИЯ БЭКЕНДА VERCEL ===
+        const VERCEL_API_URL = "https://a-nh3i73of4-aimoks-projects.vercel.app/api/moderate"; // ЗАМЕНИТЕ НА ВАШ URL
 
         const CREATION_FEE = 200;
         const TOTAL_SUPPLY = 1000000000;
@@ -218,6 +231,13 @@
         let base64Image = null;
         let currentUser = null;
 
+        // Помощник для управления лоадером
+        function setLoader(active, text = "Loading...") {
+            loaderText.innerText = text;
+            if(active) loader.classList.remove('loaded');
+            else loader.classList.add('loaded');
+        }
+
         // FORMATTER
         window.formatPrice = function(val) {
             if(!val || val === 0) return "0";
@@ -225,12 +245,11 @@
         }
 
         async function init() {
+            setLoader(true, "Connecting...");
             try {
                 currentUser = await initUser();
             } catch(e) { console.error(e); }
-            
-            // (ДОБАВЛЕНО) Скрываем лоадер после инициализации
-            if(loader) loader.classList.add('loaded');
+            setLoader(false);
         }
         init();
 
@@ -239,7 +258,11 @@
             const el = type === 'name' ? document.getElementById('tokenName') : document.getElementById('tokenTicker');
             const counter = type === 'name' ? document.getElementById('nameCount') : document.getElementById('tickerCount');
             const max = type === 'name' ? 20 : 10;
-            if(type === 'ticker') el.value = el.value.replace(/[^a-zA-Z]/g, '').toUpperCase();
+            
+            if(type === 'ticker') {
+                el.value = el.value.replace(/[^a-zA-Z]/g, '').toUpperCase();
+            }
+            
             counter.innerText = max - el.value.length;
             checkForm();
         }
@@ -248,8 +271,13 @@
             const name = document.getElementById('tokenName').value.trim();
             const ticker = document.getElementById('tokenTicker').value.trim();
             const btn = document.getElementById('continueBtn');
-            if (name.length > 0 && ticker.length > 0) btn.classList.remove('btn-disabled'); 
-            else btn.classList.add('btn-disabled'); 
+            
+            // Условие: Имя + Тикер + Изображение
+            if (name.length > 0 && ticker.length > 0 && base64Image !== null) {
+                btn.classList.remove('btn-disabled'); 
+            } else {
+                btn.classList.add('btn-disabled'); 
+            }
         }
 
         // --- CROPPER WITH BOUNDARIES ---
@@ -320,29 +348,40 @@
             }
             updateTransform();
         });
+        
         window.closeCropper = function() {
             document.getElementById('cropperOverlay').style.display = 'none';
             document.getElementById('fileInput').value = ''; 
             document.getElementById('btnContainer').style.display = 'block';
         }
+
         window.cropImage = function() {
             const img = document.getElementById('cropperImg');
-            const cvs = document.createElement('canvas'); cvs.width = 300; cvs.height = 300;
+            const cvs = document.createElement('canvas'); 
+            cvs.width = 300; 
+            cvs.height = 300;
             const ctx = cvs.getContext('2d');
-            ctx.fillStyle = '#000'; ctx.fillRect(0,0,300,300);
+            
+            ctx.fillStyle = '#000'; 
+            ctx.fillRect(0,0,300,300);
             ctx.translate(150, 150);
+            
             const r = 300/CROP_SIZE; 
             ctx.scale(cs.s * r, cs.s * r);
             ctx.translate(cs.x / cs.s, cs.y / cs.s);
             ctx.drawImage(img, -img.naturalWidth/2, -img.naturalHeight/2);
+            
             base64Image = cvs.toDataURL('image/jpeg', 0.8);
+            
             document.getElementById('finalAvatar').src = base64Image;
             document.getElementById('finalAvatar').style.display = 'block';
             document.getElementById('previewContainer').style.display = 'none';
+            
             closeCropper();
+            checkForm(); // Важно вызвать проверку формы после установки фото
         }
 
-        // --- CALCULATION LOGIC ---
+        // --- CALCULATION LOGIC & AI MODERATION ---
         window.handleBack = function() {
             if(document.getElementById('step2').style.display === 'block') {
                 document.getElementById('step2').style.display = 'none';
@@ -352,12 +391,50 @@
             } else window.history.back();
         }
 
-        window.goToStep2 = function() {
-            document.getElementById('step1').style.display = 'none';
-            document.getElementById('step2').style.display = 'block';
-            document.getElementById('btnContainer').style.display = 'none';
-            document.getElementById('payPanel').style.display = 'block';
-            window.updateCalc();
+        // Переход ко второму шагу с ПРОВЕРКОЙ ИИ
+        window.goToStep2 = async function() {
+            const name = document.getElementById('tokenName').value.trim();
+            const ticker = document.getElementById('tokenTicker').value.trim();
+            const desc = document.getElementById('tokenDesc').value.trim();
+
+            if(!base64Image) {
+                tg.showAlert("Please upload a token icon first.");
+                return;
+            }
+
+            setLoader(true, "AI Safety Check...");
+
+            try {
+                const response = await fetch(VERCEL_API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        name: name, 
+                        ticker: ticker, 
+                        description: desc, 
+                        image: base64Image 
+                    })
+                });
+
+                if (!response.ok) throw new Error("Server error");
+
+                const result = await response.json();
+
+                if (result.status === "APPROVED") {
+                    document.getElementById('step1').style.display = 'none';
+                    document.getElementById('step2').style.display = 'block';
+                    document.getElementById('btnContainer').style.display = 'none';
+                    document.getElementById('payPanel').style.display = 'block';
+                    window.updateCalc();
+                } else {
+                    tg.showAlert("Content Rejected: " + (result.reason || "NSFW or Bad words detected."));
+                }
+            } catch (err) {
+                console.error(err);
+                tg.showAlert("Moderation check failed. Please try again.");
+            } finally {
+                setLoader(false);
+            }
         }
 
         window.updateCalc = function() {
@@ -402,13 +479,15 @@
             }
 
             const tokenRef = doc(db, "tokens", ticker);
-            if((await getDoc(tokenRef)).exists()) {
+            const tokenSnap = await getDoc(tokenRef);
+            if(tokenSnap.exists()) {
                 tg.showAlert("Ticker already exists!");
                 return;
             }
 
             const userRef = getUserRef();
-            const balance = (await getDoc(userRef)).data().balance || 0;
+            const userSnap = await getDoc(userRef);
+            const balance = userSnap.data().balance || 0;
             if(balance < totalCost) {
                 tg.showAlert(`Not enough BLYX. Need ${totalCost}.`);
                 return;
@@ -416,8 +495,7 @@
 
             tg.showConfirm(`Launch ${ticker}?`, async (ok) => {
                 if(ok) {
-                    // (ДОБАВЛЕНО) Показываем лоадер, так как началась транзакция
-                    if(loader) loader.classList.remove('loaded');
+                    setLoader(true, "Launching Token...");
                     
                     try {
                         // Создаем токен
@@ -451,12 +529,13 @@
                         });
 
                         await updateDoc(userRef, updates);
+                        
+                        setLoader(false);
                         tg.showAlert("Token Launched!");
                         location.href = 'markets.html';
                     } catch(e) {
                         console.error(e);
-                        // (ДОБАВЛЕНО) Убираем лоадер если ошибка, чтобы юзер мог исправить
-                        if(loader) loader.classList.add('loaded');
+                        setLoader(false);
                         tg.showAlert("Error: " + e.message);
                     }
                 }
