@@ -430,12 +430,13 @@
                     tg.showAlert("Content Rejected: " + (result.reason || "NSFW or Bad words detected."));
                 }
             } catch (err) {
-                console.error(err);
-                tg.showAlert("Moderation check failed. Please try again.");
+                } catch (err) {
+                console.error("Full error:", err);
+                // Показываем реальный текст ошибки
+                tg.showAlert("Error: " + err.message);
             } finally {
                 setLoader(false);
             }
-        }
 
         window.updateCalc = function() {
             const buyBlyx = parseFloat(document.getElementById('shareInput').value) || 0;
