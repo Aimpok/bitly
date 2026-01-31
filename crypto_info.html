@@ -33,21 +33,24 @@
             cursor: crosshair;
         }
         
-        /* КНОПКА В САМОМ НИЗУ */
+        .time-btn.hidden { display: none !important; }
+
+        /* Стили для кнопки в самом низу */
         .fixed-action-container {
             position: fixed;
             bottom: 0;
             left: 0;
             right: 0;
-            padding: 16px;
-            background: linear-gradient(to top, #000 80%, transparent);
-            z-index: 100;
+            padding: 16px 20px;
+            background: linear-gradient(0deg, rgba(0,0,0,1) 0%, rgba(0,0,0,0.8) 100%);
+            backdrop-filter: blur(10px);
+            z-index: 1000;
         }
 
         .btn-buy-floating {
             width: 100%;
             height: 54px;
-            border-radius: 12px;
+            border-radius: 14px;
             border: none;
             font-size: 16px;
             font-weight: 700;
@@ -56,12 +59,8 @@
         }
         .btn-buy-floating:active { transform: scale(0.98); }
 
-        /* Отступ контента снизу, чтобы кнопка не перекрывала инфу */
-        .content-section {
-            padding-bottom: 100px; 
-        }
-
-        .time-btn.hidden { display: none !important; }
+        /* Доп. отступ контента, чтобы кнопка не перекрывала инфу */
+        .content-section { padding-bottom: 80px; }
     </style>
 </head>
 <body>
@@ -129,7 +128,7 @@
     </div>
 </div>
 
-<!-- ФИКСИРОВАННАЯ КНОПКА ВНИЗУ -->
+<!-- Фиксированная кнопка в самом низу -->
 <div class="fixed-action-container">
     <button class="btn-buy-floating" id="mainActionBtn" onclick="handleAction()">
         Loading...
@@ -464,5 +463,6 @@
 
     initPage();
 </script>
+
 </body>
 </html>
