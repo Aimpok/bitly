@@ -46,33 +46,48 @@
     tg.expand();
     tg.setHeaderColor('#000000');
 
-    // Функция открытия правил
+    // Логика кнопки (разблокировка/блокировка)
+    function toggleButton() {
+        const chk = document.getElementById('policyCheckbox');
+        const btn = document.getElementById('continueBtn');
+        
+        if (chk && btn) {
+            if (chk.checked) {
+                btn.classList.remove('btn-locked');
+            } else {
+                btn.classList.add('btn-locked');
+            }
+        }
+    }
+
+    // Открытие правил
     function openRules(e) {
         e.preventDefault(); 
         e.stopPropagation();
         location.href = 'rules.html';
     }
 
-    // Логика кнопки
-    function toggleButton() {
+    // Принятие и переход на главную
+    function acceptAndStart() {
         const chk = document.getElementById('policyCheckbox');
-        const btn = document.getElementById('continueBtn');
-        if(chk && chk.checked) {
-            btn.classList.remove('btn-locked');
-        } else if (btn) {
-            btn.classList.add('btn-locked');
+        if (chk && chk.checked) {
+            localStorage.setItem('privacy_accepted', 'true');
+            location.replace('index.html');
         }
     }
 
-    // ВЫЗЫВАЕМ ФУНКЦИЮ СРАЗУ ПРИ ЗАГРУЗКЕ
-    // Это проверит, стоит ли галочка (если пользователь вернулся назад)
-    toggleButton();
+    // ГЛАВНОЕ РЕШЕНИЕ:
+    // Событие 'pageshow' срабатывает при ПЕРВОЙ загрузке 
+    // И при возвращении назад через историю браузера.
+    window.addEventListener('pageshow', function(event) {
+        toggleButton(); // Принудительно проверяем состояние галочки
+    });
 
-    // Принятие и вход
-    function acceptAndStart() {
-        localStorage.setItem('privacy_accepted', 'true');
-        location.replace('index.html');
-    }
+    // Дополнительная проверка на всякий случай через 100мс
+    // (иногда браузеры восстанавливают форму чуть медленнее скрипта)
+    window.onload = () => {
+        setTimeout(toggleButton, 100);
+    };
 </script>
 </body>
 </html>
