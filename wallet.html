@@ -85,11 +85,17 @@
 
 <div class="actions-row">
     <div class="action-btn" onclick="location.href='deposit.html'">
-        <svg class="icon" viewBox="0 0 24 24"><path d="M12 5v14" stroke="#fff"/></svg>
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
         <span class="action-label">Deposit</span>
     </div>
     <div class="action-btn" onclick="location.href='transfer.html'">
-        <svg class="icon" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7" stroke="#fff"/></svg>
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+            <polyline points="12 5 19 12 12 19"></polyline>
+        </svg>
         <span class="action-label">Send</span>
     </div>
 </div>
@@ -101,18 +107,21 @@
 </div>
 
 <div style="padding: 0 16px;">
+    <!-- 1. PORTFOLIO -->
     <div id="tab-portfolio">
         <div class="portfolio-grid" id="portfolioGrid">
             <div style="color: #666; font-size: 14px; text-align:center; grid-column:1/-1;">Loading...</div>
         </div>
     </div>
 
+    <!-- 2. GOODS (Обновлено под стиль P2P) -->
     <div id="tab-goods" class="hidden">
         <div id="goodsList">
             <div style="color: #666; font-size: 14px; text-align: center; padding: 20px;">No active sell orders</div>
         </div>
     </div>
 
+    <!-- 3. HISTORY -->
     <div id="tab-history" class="hidden">
         <div id="historyList">
             <div style="color: #666; font-size: 14px; text-align: center; padding: 20px;">No transactions</div>
@@ -120,6 +129,7 @@
     </div>
 </div>
 
+<!-- Bottom Nav -->
 <div class="bottom-nav">
     <div class="nav-item" onclick="location.href='index.html'">
         <svg class="icon" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
@@ -164,9 +174,15 @@
     let currentMarket = [];
     let currentUserData = null;
 
+    // --- ФОРМАТИРОВАНИЕ ---
     function formatFull(num) {
         if (!num && num !== 0) return "0";
         return num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+    }
+
+    // Добавлена функция Compact как в p2p_market
+    function formatCompact(num) {
+        return Intl.NumberFormat('en-US', { notation: "compact", maximumFractionDigits: 2 }).format(num);
     }
 
     function formatPrice(val) {
@@ -240,32 +256,41 @@
         });
     }
 
+    // --- ОБНОВЛЕННЫЙ RENDER GOODS (Копия стиля P2P Market) ---
     async function renderGoods() {
         const list = document.getElementById('goodsList');
         if(!currentUserData) return;
         const q = query(collection(db, "orders"), where("sellerId", "==", currentUserData.id.toString()));
         const snap = await getDocs(q);
         list.innerHTML = snap.empty ? '<div style="text-align:center;color:#666;padding:20px;">No active sell orders</div>' : "";
+        
         snap.forEach(d => {
             const o = {id: d.id, ...d.data()};
             let avatarHtml = `<div class="oc-avatar" style="background:#333;"></div>`;
             if(o.sellerAvatar) avatarHtml = `<img src="${o.sellerAvatar}" class="oc-avatar-img">`;
+            
+            // Стиль кнопки как в p2p_market
+            const actionBtn = `<button class="oc-buy-btn" style="background:#222; color:#fff; border-color:#333;" onclick="location.href='p2p_sell.html?oid=${o.id}'">Edit</button>`;
+
             list.insertAdjacentHTML('beforeend', `
                 <div class="order-card" style="margin-bottom:12px;">
                     <div class="oc-header">
-                        <div class="oc-price">${formatFull(o.price)} <img src="Sprites/Blyx.png" style="width:16px;"></div>
-                        <button class="oc-buy-btn" style="background:#333; color:#fff;" onclick="location.href='p2p_sell.html?oid=${o.id}'">Edit</button>
+                        <div class="oc-price">${formatPrice(o.price)} <img src="Sprites/Blyx.png" style="width:16px;"></div>
+                        ${actionBtn}
                     </div>
                     <div class="oc-user-row">
                         ${avatarHtml}
                         <div>
-                            <div class="oc-username">${o.sellerName} (Me)</div>
-                            <div class="oc-stats">${o.sellerRep || 0} trades, 100%</div>
+                            <div class="oc-username">${o.sellerName} (You)</div>
+                            <div class="oc-stats">${o.sellerRep || 0} trades</div>
                         </div>
                     </div>
                     <div class="oc-limits-row">
-                        <span>Avail: <span class="oc-val">${formatFull(o.amount)} ${o.tokenId}</span></span>
-                        <span>Lim: <span class="oc-val">${formatFull(o.minLimit)}</span> <img src="Sprites/Blyx.png" style="width:10px;"></span>
+                        <span>Avail: <span class="oc-val">${formatCompact(o.amount)} ${o.tokenId}</span></span>
+                        <span style="display:flex; align-items:center; gap:2px;">
+                            Lim: <span class="oc-val">${formatCompact(o.minLimit)}</span>
+                            <img src="Sprites/Blyx.png" style="width:10px; height:10px;">
+                        </span>
                     </div>
                 </div>`);
         });
