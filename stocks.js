@@ -6,7 +6,7 @@ const stocksData = [
     {
         title: "Join our Telegram & get 5 Blyx!",
         btnText: "Join",
-        btnLink: "https://t.me/BitlyNews", 
+        btnLink: "https://t.me/blyxly", 
         bgImage: "Sprites/WaveBg.png",
         iconImage: "Sprites/news1.png"
     },
