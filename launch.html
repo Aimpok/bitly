@@ -212,7 +212,7 @@
         const loader = document.getElementById('globalLoader');
 
         // ==========================================================
-        // ВСТАВЬТЕ СЮДА СВОЙ URL ИЗ VERCEL
+        // ВАШ API URL
         const MODERATION_API_URL = "https://a-pi-beryl.vercel.app/api/moderate"; 
         // ==========================================================
 
@@ -340,7 +340,8 @@
             ctx.scale(cs.s * r, cs.s * r);
             ctx.translate(cs.x / cs.s, cs.y / cs.s);
             ctx.drawImage(img, -img.naturalWidth/2, -img.naturalHeight/2);
-            base64Image = cvs.toDataURL('image/jpeg', 0.8);
+            // UPDATED: Quality 0.5 to prevent Payload Too Large Error
+            base64Image = cvs.toDataURL('image/jpeg', 0.5);
             document.getElementById('finalAvatar').src = base64Image;
             document.getElementById('finalAvatar').style.display = 'block';
             document.getElementById('previewContainer').style.display = 'none';
@@ -357,14 +358,14 @@
             } else window.history.back();
         }
 
-        // --- ИЗМЕНЕННАЯ ФУНКЦИЯ С ПРОВЕРКОЙ ИИ ---
+        // --- ИЗМЕНЕННАЯ ФУНКЦИЯ (С РЕЖИМОМ ОТЛАДКИ) ---
         window.goToStep2 = async function() {
             // 1. Собираем данные
             const name = document.getElementById('tokenName').value.trim();
             const ticker = document.getElementById('tokenTicker').value.trim();
             const desc = document.getElementById('tokenDesc').value.trim();
 
-            // 2. Базовая проверка (заполнено ли)
+            // 2. Базовая проверка
             if(!name || !ticker) {
                 tg.showAlert("Please fill in Name and Ticker.");
                 return;
@@ -374,7 +375,7 @@
                 return;
             }
 
-            // 3. Показываем лоадер (блокируем экран)
+            // 3. Показываем лоадер
             const loader = document.getElementById('globalLoader');
             if(loader) loader.classList.remove('loaded');
 
@@ -394,7 +395,9 @@
                 });
 
                 if (!response.ok) {
-                    throw new Error("Validation Server Error");
+                    // Читаем текст ошибки от сервера для отладки
+                    const errorText = await response.text();
+                    throw new Error(`Status: ${response.status}. Msg: ${errorText}`);
                 }
 
                 // 5. Получаем ответ
@@ -405,7 +408,6 @@
 
                 if (checkResult.allowed) {
                     // === ПРОВЕРКА ПРОШЛА УСПЕШНО ===
-                    // Показываем Шаг 2
                     document.getElementById('step1').style.display = 'none';
                     document.getElementById('step2').style.display = 'block';
                     document.getElementById('btnContainer').style.display = 'none';
@@ -419,7 +421,8 @@
             } catch (e) {
                 console.error(e);
                 if(loader) loader.classList.add('loaded');
-                tg.showAlert("Server check failed. Please try again.");
+                // ПОКАЗЫВАЕМ РЕАЛЬНУЮ ОШИБКУ ПОЛЬЗОВАТЕЛЮ
+                tg.showAlert("Error: " + e.message);
             }
         }
 
