@@ -11,7 +11,7 @@
 <body>
 
     <div class="privacy-container">
-        <!-- Иконка изменена на bitlyicon.png -->
+        <!-- Иконка -->
         <img src="Sprites/bitlyicon.png" class="brand-icon" alt="Bitly" onerror="this.src='Sprites/CoinIcon.png'">
         
         <div class="welcome-title">Welcome to Bitly</div>
@@ -41,38 +41,70 @@
         </button>
     </div>
 
-    <script>
-    const tg = window.Telegram.WebApp;
-    tg.expand();
-    tg.setHeaderColor('#000000');
+    <!-- ВАЖНО: type="module" нужен для импорта из user-service.js -->
+    <script type="module">
+        import { acceptPrivacyInDB } from './user-service.js';
 
-    // Функция открытия правил
-    function openRules(e) {
-        e.preventDefault(); 
-        e.stopPropagation();
-        location.href = 'rules.html';
-    }
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        tg.setHeaderColor('#000000');
 
-    // Логика кнопки
-    function toggleButton() {
-        const chk = document.getElementById('policyCheckbox');
-        const btn = document.getElementById('continueBtn');
-        if(chk && chk.checked) {
-            btn.classList.remove('btn-locked');
-        } else if (btn) {
-            btn.classList.add('btn-locked');
+        // === 1. Функция открытия правил ===
+        // Присваиваем window, так как module имеет свою область видимости
+        window.openRules = function(e) {
+            e.preventDefault(); 
+            e.stopPropagation();
+            location.href = 'rules.html';
         }
-    }
 
-    // ВЫЗЫВАЕМ ФУНКЦИЮ СРАЗУ ПРИ ЗАГРУЗКЕ
-    // Это проверит, стоит ли галочка (если пользователь вернулся назад)
-    toggleButton();
+        // === 2. Логика чекбокса (разблокировка кнопки) ===
+        window.toggleButton = function() {
+            const chk = document.getElementById('policyCheckbox');
+            const btn = document.getElementById('continueBtn');
+            if(chk && chk.checked) {
+                btn.classList.remove('btn-locked');
+            } else if (btn) {
+                btn.classList.add('btn-locked');
+            }
+        }
 
-    // Принятие и вход
-    function acceptAndStart() {
-        localStorage.setItem('privacy_accepted', 'true');
-        location.replace('index.html');
-    }
-</script>
+        // Проверяем состояние при загрузке (на случай возврата на страницу)
+        window.toggleButton();
+
+        // === 3. ГЛАВНАЯ ФУНКЦИЯ: Принятие и запись в Firebase ===
+        window.acceptAndStart = async function() {
+            const btn = document.getElementById('continueBtn');
+            
+            // Если кнопка заблокирована - ничего не делаем
+            if (btn.classList.contains('btn-locked')) return;
+
+            // Блокируем кнопку визуально, чтобы не кликали дважды
+            const originalText = btn.innerText;
+            btn.innerHTML = 'Saving...';
+            btn.style.opacity = '0.7';
+            btn.disabled = true;
+
+            try {
+                // Асинхронно обновляем запись в базе данных
+                console.log("Saving privacy acceptance to DB...");
+                await acceptPrivacyInDB();
+                
+                // Для надежности дублируем в локальное хранилище
+                localStorage.setItem('privacy_accepted', 'true');
+                
+                // Переходим на главную
+                location.replace('index.html');
+            } catch (error) {
+                console.error("Error saving privacy status:", error);
+                
+                // Возвращаем кнопку в исходное состояние при ошибке
+                btn.innerHTML = originalText;
+                btn.style.opacity = '1';
+                btn.disabled = false;
+                
+                tg.showAlert("Connection error. Please try again.");
+            }
+        }
+    </script>
 </body>
 </html>
