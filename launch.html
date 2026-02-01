@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Launch</title>
+    <title>Launch Token</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        /* Доп стили */
+        /* Основные стили */
         .label-row {
             display: flex; 
             justify-content: space-between; 
@@ -22,6 +22,20 @@
             color: #555;
         }
         
+        /* Стили ошибок */
+        .input-error-msg {
+            color: #FF3B30;
+            font-size: 13px;
+            font-weight: 500;
+            margin-top: 6px;
+            display: none; /* Скрыто по умолчанию */
+        }
+        .input-error-msg.visible {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+
         /* CROPPER STYLES */
         .cropper-overlay {
             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
@@ -40,12 +54,6 @@
             user-select: none;
             -webkit-user-drag: none;
         }
-        .cropper-mask {
-            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-            background: radial-gradient(circle 120px at center, transparent 120px, rgba(0,0,0,0.8) 121px);
-            pointer-events: none;
-            border: 1px solid rgba(255,255,255,0.05);
-        }
         .cropper-circle-guide {
             position: absolute;
             width: 240px; height: 240px;
@@ -62,7 +70,7 @@
             border-top: 1px solid #222;
         }
 
-        /* === LOADER STYLES (ДОБАВЛЕНО) === */
+        /* === LOADER === */
         #globalLoader {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background-color: #000000; z-index: 99999;
@@ -80,7 +88,7 @@
 </head>
 <body>
 
-    <!-- === ЗАГРУЗЧИК (ДОБАВЛЕНО) === -->
+    <!-- ЗАГРУЗЧИК -->
     <div id="globalLoader"><div class="custom-spinner"></div></div>
 
     <!-- Header -->
@@ -101,14 +109,15 @@
                 <div class="step-title-text">Token Info</div>
             </div>
 
+            <!-- UPLOAD -->
             <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 25px;">
                 <div class="upload-circle" onclick="document.getElementById('fileInput').click()">
                     <div id="previewContainer" class="upload-placeholder">+</div>
                     <img id="finalAvatar" src="" style="display: none; width:100%; height:100%; border-radius:50%; object-fit:cover;">
                 </div>
                 <div>
-                    <div style="font-weight: 700;">Icon</div>
-                    <div style="font-size: 12px; color: #888;">Tap to upload</div>
+                    <div style="font-weight: 700;">Icon <span style="color:#ff3b30">*</span></div>
+                    <div style="font-size: 12px; color: #888;">Required</div>
                 </div>
                 <input type="file" id="fileInput" hidden accept="image/*" onchange="initCropper(this)">
             </div>
@@ -121,6 +130,8 @@
             <div class="launch-input-box">
                 <input type="text" id="tokenName" placeholder="Bitcoin" maxlength="20" oninput="handleInput('name')">
             </div>
+            <!-- Сюда будем выводить ошибку от ИИ -->
+            <div id="aiErrorMsg" class="input-error-msg"></div>
 
             <!-- TICKER INPUT -->
             <div class="label-row">
@@ -131,11 +142,14 @@
                 <input type="text" id="tokenTicker" placeholder="BTC" maxlength="10" oninput="handleInput('ticker')" style="text-transform: uppercase;">
             </div>
 
+            <!-- DESCRIPTION INPUT (Limit 500) -->
             <div class="label-row">
                 <label class="launch-label" style="margin:0;">Description</label>
+                <span class="char-counter" id="descCount">500</span>
             </div>
             <div class="launch-input-box">
-                <textarea id="tokenDesc" placeholder="Description..."></textarea>
+                <!-- Ограничение 500 символов -->
+                <textarea id="tokenDesc" placeholder="Describe your project..." maxlength="500" oninput="handleInput('desc')"></textarea>
             </div>
 
             <div style="height: 120px;"></div>
@@ -170,6 +184,7 @@
 
     <!-- Buttons -->
     <div class="fixed-bottom-bar" id="btnContainer">
+        <!-- Кнопка по умолчанию disabled -->
         <button class="btn-white-large btn-disabled" id="continueBtn" onclick="goToStep2()">
             Continue
         </button>
@@ -208,13 +223,10 @@
         tg.expand();
         tg.setHeaderColor('#000000');
         
-        // (ДОБАВЛЕНО) Ссылка на лоадер
         const loader = document.getElementById('globalLoader');
 
-        // ==========================================================
         // ВАШ API URL
         const MODERATION_API_URL = "https://a-pi-beryl.vercel.app/api/moderate"; 
-        // ==========================================================
 
         const CREATION_FEE = 200;
         const TOTAL_SUPPLY = 1000000000;
@@ -223,7 +235,11 @@
         let base64Image = null;
         let currentUser = null;
 
-        // FORMATTER
+        // === ПЕРЕМЕННЫЕ ДЛЯ ЗАЩИТЫ ===
+        let failAttempts = 0; // Счетчик неудач
+        let cooldownEndTime = 0; // Время окончания блокировки
+        let cooldownTimer = null;
+
         window.formatPrice = function(val) {
             if(!val || val === 0) return "0";
             return val < 0.01 ? val.toFixed(8).replace(/\.?0+$/, "") : val.toFixed(4);
@@ -233,31 +249,87 @@
             try {
                 currentUser = await initUser();
             } catch(e) { console.error(e); }
-            
-            // (ДОБАВЛЕНО) Скрываем лоадер после инициализации
             if(loader) loader.classList.add('loaded');
+            
+            // Проверка, не заблокирован ли пользователь после перезагрузки
+            const savedCooldown = localStorage.getItem('blockUntil');
+            if (savedCooldown && Date.now() < parseInt(savedCooldown)) {
+                failAttempts = 5;
+                startCooldown((parseInt(savedCooldown) - Date.now()) / 1000);
+            }
         }
         init();
 
-        // Input Logic
+        // --- ЛОГИКА ВВОДА И ВАЛИДАЦИИ ---
         window.handleInput = function(type) {
-            const el = type === 'name' ? document.getElementById('tokenName') : document.getElementById('tokenTicker');
-            const counter = type === 'name' ? document.getElementById('nameCount') : document.getElementById('tickerCount');
-            const max = type === 'name' ? 20 : 10;
-            if(type === 'ticker') el.value = el.value.replace(/[^a-zA-Z]/g, '').toUpperCase();
-            counter.innerText = max - el.value.length;
+            if (type === 'name') {
+                const el = document.getElementById('tokenName');
+                document.getElementById('nameCount').innerText = 20 - el.value.length;
+            } else if (type === 'ticker') {
+                const el = document.getElementById('tokenTicker');
+                el.value = el.value.replace(/[^a-zA-Z]/g, '').toUpperCase();
+                document.getElementById('tickerCount').innerText = 10 - el.value.length;
+            } else if (type === 'desc') {
+                const el = document.getElementById('tokenDesc');
+                document.getElementById('descCount').innerText = 500 - el.value.length;
+            }
+            
+            // Скрываем ошибку при вводе
+            document.getElementById('aiErrorMsg').classList.remove('visible');
             checkForm();
         }
 
         window.checkForm = function() {
+            // Если включен таймер - кнопка всегда выключена
+            if (cooldownTimer) return;
+
             const name = document.getElementById('tokenName').value.trim();
             const ticker = document.getElementById('tokenTicker').value.trim();
             const btn = document.getElementById('continueBtn');
-            if (name.length > 0 && ticker.length > 0) btn.classList.remove('btn-disabled'); 
-            else btn.classList.add('btn-disabled'); 
+            
+            // ПРАВИЛО: Имя + Тикер + Иконка должны быть заполнены
+            if (name.length > 0 && ticker.length > 0 && base64Image) {
+                btn.classList.remove('btn-disabled'); 
+            } else {
+                btn.classList.add('btn-disabled'); 
+            }
         }
 
-        // --- CROPPER WITH BOUNDARIES ---
+        // --- ТАЙМЕР БЛОКИРОВКИ ---
+        function startCooldown(seconds) {
+            const btn = document.getElementById('continueBtn');
+            btn.classList.add('btn-disabled');
+            
+            const endTime = Date.now() + (seconds * 1000);
+            localStorage.setItem('blockUntil', endTime);
+            
+            if (cooldownTimer) clearInterval(cooldownTimer);
+            
+            const updateTimer = () => {
+                const now = Date.now();
+                const diff = Math.ceil((endTime - now) / 1000);
+                
+                if (diff <= 0) {
+                    clearInterval(cooldownTimer);
+                    cooldownTimer = null;
+                    localStorage.removeItem('blockUntil');
+                    failAttempts = 0; // Сброс счетчика
+                    checkForm(); // Разблокируем, если формы заполнены
+                    btn.innerText = "Continue";
+                    return;
+                }
+                
+                // Формат MM:SS
+                const m = Math.floor(diff / 60);
+                const s = diff % 60;
+                btn.innerText = `Retry in ${m}:${s < 10 ? '0'+s : s}`;
+            };
+            
+            updateTimer();
+            cooldownTimer = setInterval(updateTimer, 1000);
+        }
+
+        // --- ЛОГИКА КРОППЕРА ---
         let cs = { x: 0, y: 0, s: 1 };
         let startDist = 0, startScale = 1;
         let startX = 0, startY = 0;
@@ -286,27 +358,22 @@
         function updateTransform() {
             const img = document.getElementById('cropperImg');
             if (!img.naturalWidth) return;
-            
             const minScale = Math.max(CROP_SIZE / img.naturalWidth, CROP_SIZE / img.naturalHeight);
             if (cs.s < minScale) cs.s = minScale;
-            
             const maxDistX = (img.naturalWidth * cs.s - CROP_SIZE) / 2;
             const maxDistY = (img.naturalHeight * cs.s - CROP_SIZE) / 2;
             if (cs.x > maxDistX) cs.x = maxDistX;
             if (cs.x < -maxDistX) cs.x = -maxDistX;
             if (cs.y > maxDistY) cs.y = maxDistY;
             if (cs.y < -maxDistY) cs.y = -maxDistY;
-
             img.style.transform = `translate(${cs.x}px, ${cs.y}px) scale(${cs.s})`;
         }
 
         const area = document.getElementById('cropperBody');
         area.addEventListener('touchstart', (e) => {
             if(e.touches.length === 1) {
-                startX = e.touches[0].clientX;
-                startY = e.touches[0].clientY;
-                lastX = cs.x;
-                lastY = cs.y;
+                startX = e.touches[0].clientX; startY = e.touches[0].clientY;
+                lastX = cs.x; lastY = cs.y;
             } else if(e.touches.length === 2) {
                 startDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
                 startScale = cs.s;
@@ -315,10 +382,8 @@
         area.addEventListener('touchmove', (e) => {
             e.preventDefault();
             if(e.touches.length === 1) {
-                const dx = e.touches[0].clientX - startX;
-                const dy = e.touches[0].clientY - startY;
-                cs.x = lastX + dx;
-                cs.y = lastY + dy;
+                const dx = e.touches[0].clientX - startX; const dy = e.touches[0].clientY - startY;
+                cs.x = lastX + dx; cs.y = lastY + dy;
             } else if(e.touches.length === 2) {
                 const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
                 cs.s = Math.max(0.1, startScale * (dist / startDist));
@@ -329,6 +394,7 @@
             document.getElementById('cropperOverlay').style.display = 'none';
             document.getElementById('fileInput').value = ''; 
             document.getElementById('btnContainer').style.display = 'block';
+            checkForm();
         }
         window.cropImage = function() {
             const img = document.getElementById('cropperImg');
@@ -340,15 +406,16 @@
             ctx.scale(cs.s * r, cs.s * r);
             ctx.translate(cs.x / cs.s, cs.y / cs.s);
             ctx.drawImage(img, -img.naturalWidth/2, -img.naturalHeight/2);
-            // UPDATED: Quality 0.5 to prevent Payload Too Large Error
+            // Качество 0.5 для скорости и Vercel
             base64Image = cvs.toDataURL('image/jpeg', 0.5);
             document.getElementById('finalAvatar').src = base64Image;
             document.getElementById('finalAvatar').style.display = 'block';
             document.getElementById('previewContainer').style.display = 'none';
             closeCropper();
+            checkForm(); // Проверяем форму сразу после кропа
         }
 
-        // --- CALCULATION LOGIC ---
+        // --- МОДЕРАЦИЯ И ПЕРЕХОД ---
         window.handleBack = function() {
             if(document.getElementById('step2').style.display === 'block') {
                 document.getElementById('step2').style.display = 'none';
@@ -358,77 +425,72 @@
             } else window.history.back();
         }
 
-        // --- ИЗМЕНЕННАЯ ФУНКЦИЯ (С РЕЖИМОМ ОТЛАДКИ) ---
         window.goToStep2 = async function() {
-            // 1. Собираем данные
+            if (cooldownTimer) return; // Если блокировка, выходим
+
             const name = document.getElementById('tokenName').value.trim();
             const ticker = document.getElementById('tokenTicker').value.trim();
             const desc = document.getElementById('tokenDesc').value.trim();
+            const errorBox = document.getElementById('aiErrorMsg');
 
-            // 2. Базовая проверка
-            if(!name || !ticker) {
-                tg.showAlert("Please fill in Name and Ticker.");
-                return;
-            }
-            if(!base64Image) {
-                tg.showAlert("Please upload an icon.");
-                return;
-            }
+            errorBox.classList.remove('visible'); // Сброс ошибки
 
-            // 3. Показываем лоадер
+            // Проверка на клиенте
+            if(!name || !ticker) { tg.showAlert("Please fill in Name and Ticker."); return; }
+            if(!base64Image) { tg.showAlert("Please upload an icon."); return; }
+
             const loader = document.getElementById('globalLoader');
             if(loader) loader.classList.remove('loaded');
 
             try {
-                // 4. Отправляем запрос к Vercel/AI
+                // Запрос к AI
                 const response = await fetch(MODERATION_API_URL, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        name: name,
-                        ticker: ticker,
-                        description: desc,
-                        image: base64Image 
-                    })
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, ticker, description: desc, image: base64Image })
                 });
 
                 if (!response.ok) {
-                    // Читаем текст ошибки от сервера для отладки
-                    const errorText = await response.text();
-                    throw new Error(`Status: ${response.status}. Msg: ${errorText}`);
+                    const errText = await response.text();
+                    throw new Error(`Server Error: ${errText}`);
                 }
 
-                // 5. Получаем ответ
                 const checkResult = await response.json();
-
-                // 6. Скрываем лоадер
                 if(loader) loader.classList.add('loaded');
 
                 if (checkResult.allowed) {
-                    // === ПРОВЕРКА ПРОШЛА УСПЕШНО ===
+                    // УСПЕХ: Сбрасываем счетчик неудач
+                    failAttempts = 0;
                     document.getElementById('step1').style.display = 'none';
                     document.getElementById('step2').style.display = 'block';
                     document.getElementById('btnContainer').style.display = 'none';
                     document.getElementById('payPanel').style.display = 'block';
                     window.updateCalc();
                 } else {
-                    // === ЗАПРЕЩЕНО ===
-                    tg.showAlert("Rejected: " + (checkResult.reason || "Policy violation"));
+                    // ОТКАЗ
+                    failAttempts++;
+                    tg.HapticFeedback.notificationOccurred('error');
+                    
+                    // Показываем текст ошибки ПОД полем ввода
+                    errorBox.innerText = `Content Rejected: ${checkResult.reason || "Policy violation"}`;
+                    errorBox.classList.add('visible');
+
+                    // Если 5 ошибок подряд - БАН на 3 минуты
+                    if (failAttempts >= 5) {
+                        startCooldown(180); // 180 секунд = 3 минуты
+                        tg.showAlert("Too many failed attempts. You are timed out for 3 minutes.");
+                    }
                 }
 
             } catch (e) {
                 console.error(e);
                 if(loader) loader.classList.add('loaded');
-                // ПОКАЗЫВАЕМ РЕАЛЬНУЮ ОШИБКУ ПОЛЬЗОВАТЕЛЮ
-                tg.showAlert("Error: " + e.message);
+                tg.showAlert("Connection Error. Please check internet.");
             }
         }
 
         window.updateCalc = function() {
             const buyBlyx = parseFloat(document.getElementById('shareInput').value) || 0;
-            
             const initialMarketCap = VIRTUAL_LIQUIDITY + CREATION_FEE + buyBlyx;
             const startPrice = initialMarketCap / TOTAL_SUPPLY;
             const tokensToReceive = buyBlyx > 0 ? (buyBlyx / startPrice) : 0;
@@ -482,11 +544,8 @@
 
             tg.showConfirm(`Launch ${ticker}?`, async (ok) => {
                 if(ok) {
-                    // (ДОБАВЛЕНО) Показываем лоадер, так как началась транзакция
                     if(loader) loader.classList.remove('loaded');
-                    
                     try {
-                        // Создаем токен
                         await setDoc(tokenRef, {
                             id: ticker,
                             name: name,
@@ -504,24 +563,17 @@
                                 { type: 'create_buy', price: startPrice, date: new Date().toISOString() }
                             ]
                         });
-
                         const updates = { balance: increment(-totalCost) };
                         updates[`portfolio.${ticker}`] = increment(tokensToReceive);
                         updates.transactions = arrayUnion({
-                            type: 'buy',           
-                            token: ticker,         
-                            amount: tokensToReceive, 
-                            cost: totalCost,       
-                            price: startPrice,
-                            date: new Date().toISOString()
+                            type: 'buy', token: ticker, amount: tokensToReceive, 
+                            cost: totalCost, price: startPrice, date: new Date().toISOString()
                         });
-
                         await updateDoc(userRef, updates);
                         tg.showAlert("Token Launched!");
                         location.href = 'markets.html';
                     } catch(e) {
                         console.error(e);
-                        // (ДОБАВЛЕНО) Убираем лоадер если ошибка, чтобы юзер мог исправить
                         if(loader) loader.classList.add('loaded');
                         tg.showAlert("Error: " + e.message);
                     }
