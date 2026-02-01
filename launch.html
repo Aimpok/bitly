@@ -83,7 +83,6 @@
             border: 4px solid #333; border-top-color: #ffffff;
             animation: spin 1s linear infinite;
         }
-        /* Добавил стиль для текста лоадера */
         .loader-text {
             margin-top: 15px;
             font-size: 14px;
@@ -230,7 +229,7 @@
         const loaderText = document.getElementById('loaderText');
 
         // ==========================================
-        // ВСТАВЬ СВОЮ ССЫЛКУ VERCEL НИЖЕ
+        // ВАЖНО: ПРОВЕРЬ ЭТУ ССЫЛКУ
         // ==========================================
         const VERCEL_API_URL = "https://a-pi-beryl.vercel.app/api/moderate"; 
 
@@ -251,10 +250,10 @@
             }
         }
 
-        // Предохранитель (если зависнет)
+        // Предохранитель (чтобы лоадер не висел вечно при ошибках инициализации)
         setTimeout(() => { 
             if(!loader.classList.contains('loaded')) setLoader(false); 
-        }, 5000);
+        }, 3000);
 
         // FORMATTER
         window.formatPrice = function(val) {
@@ -286,7 +285,7 @@
             const ticker = document.getElementById('tokenTicker').value.trim();
             const btn = document.getElementById('continueBtn');
             
-            // Теперь проверяем и картинку
+            // Проверяем: имя + тикер + картинка
             if (name.length > 0 && ticker.length > 0 && base64Image) {
                 btn.classList.remove('btn-disabled'); 
             } else {
@@ -382,7 +381,7 @@
             document.getElementById('finalAvatar').style.display = 'block';
             document.getElementById('previewContainer').style.display = 'none';
             closeCropper();
-            checkForm(); // Обновляем состояние кнопки после кропа
+            checkForm(); // Важно: обновляем состояние кнопки
         }
 
         // --- CALCULATION LOGIC ---
@@ -395,7 +394,7 @@
             } else window.history.back();
         }
 
-        // === МОДИФИЦИРОВАННЫЙ GO TO STEP 2 (С МОДЕРАЦИЕЙ) ===
+        // === ГЛАВНАЯ ФУНКЦИЯ С AI ПРОВЕРКОЙ ===
         window.goToStep2 = async function() {
             const name = document.getElementById('tokenName').value.trim();
             const ticker = document.getElementById('tokenTicker').value.trim();
@@ -406,16 +405,15 @@
                 return;
             }
 
-            // Включаем лоадер
+            // Включаем лоадер с текстом
             setLoader(true, "AI Checking...");
 
             try {
-                // Если забыл поменять ссылку
-                if(VERCEL_API_URL.includes("твой-проект")) {
-                    throw new Error("API URL not configured in code!");
+                // Проверяем наличие URL
+                if(VERCEL_API_URL.includes("your-project")) {
+                    throw new Error("Vercel API URL not configured!");
                 }
 
-                // Отправляем запрос
                 const response = await fetch(VERCEL_API_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -429,27 +427,27 @@
 
                 if (!response.ok) {
                     const errorText = await response.text();
-                    throw new Error("Server error: " + response.status + " " + errorText);
+                    throw new Error(`Server ${response.status}: ${errorText}`);
                 }
 
                 const result = await response.json();
 
                 if (result.status === "APPROVED") {
-                    // Все ок, идем дальше
                     document.getElementById('step1').style.display = 'none';
                     document.getElementById('step2').style.display = 'block';
                     document.getElementById('btnContainer').style.display = 'none';
                     document.getElementById('payPanel').style.display = 'block';
                     window.updateCalc();
                 } else {
-                    // Нарушение
-                    tg.showAlert("Rejected: " + (result.reason || "Content violation"));
+                    tg.showAlert("Rejected: " + (result.reason || "Content Policy Violation"));
                 }
 
             } catch (err) {
                 console.error(err);
-                tg.showAlert("Check failed: " + err.message);
+                // Показываем ошибку пользователю, чтобы понять причину
+                tg.showAlert("Error: " + err.message);
             } finally {
+                // Всегда выключаем лоадер
                 setLoader(false);
             }
         }
@@ -515,14 +513,13 @@
                     return;
                 }
                 
-                setLoader(false); // Выключаем перед конфирмом
+                setLoader(false); 
 
                 tg.showConfirm(`Launch ${ticker}?`, async (ok) => {
                     if(ok) {
                         setLoader(true, "Launching...");
                         
                         try {
-                            // Создаем токен
                             await setDoc(tokenRef, {
                                 id: ticker,
                                 name: name,
