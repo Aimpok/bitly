@@ -28,12 +28,20 @@
             font-size: 13px;
             font-weight: 500;
             margin-top: 6px;
-            display: none; /* Скрыто по умолчанию */
+            display: none;
+            line-height: 1.4;
         }
         .input-error-msg.visible {
             display: block;
             animation: fadeIn 0.3s ease;
         }
+        #err-image {
+            text-align: left;
+            margin-top: -15px;
+            margin-bottom: 15px;
+            margin-left: 80px; /* Чтобы текст был не под кружком, а правее */
+        }
+
         @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
 
         /* CROPPER STYLES */
@@ -116,11 +124,14 @@
                     <img id="finalAvatar" src="" style="display: none; width:100%; height:100%; border-radius:50%; object-fit:cover;">
                 </div>
                 <div>
-                    <div style="font-weight: 700;">Icon <span style="color:#ff3b30">*</span></div>
-                    <div style="font-size: 12px; color: #888;">Required</div>
+                    <div style="font-weight: 700;">Icon</div>
+                    <!-- Вернули старый текст -->
+                    <div style="font-size: 12px; color: #888;">Tap to upload</div>
                 </div>
                 <input type="file" id="fileInput" hidden accept="image/*" onchange="initCropper(this)">
             </div>
+            <!-- Ошибка под иконкой -->
+            <div id="err-image" class="input-error-msg"></div>
 
             <!-- NAME INPUT -->
             <div class="label-row">
@@ -130,8 +141,8 @@
             <div class="launch-input-box">
                 <input type="text" id="tokenName" placeholder="Bitcoin" maxlength="20" oninput="handleInput('name')">
             </div>
-            <!-- Сюда будем выводить ошибку от ИИ -->
-            <div id="aiErrorMsg" class="input-error-msg"></div>
+            <!-- Ошибка под именем -->
+            <div id="err-name" class="input-error-msg"></div>
 
             <!-- TICKER INPUT -->
             <div class="label-row">
@@ -141,16 +152,19 @@
             <div class="launch-input-box">
                 <input type="text" id="tokenTicker" placeholder="BTC" maxlength="10" oninput="handleInput('ticker')" style="text-transform: uppercase;">
             </div>
+            <!-- Ошибка под тикером -->
+            <div id="err-ticker" class="input-error-msg"></div>
 
-            <!-- DESCRIPTION INPUT (Limit 500) -->
+            <!-- DESCRIPTION INPUT -->
             <div class="label-row">
-                <label class="launch-label" style="margin:0;">Description</label>
+                <label class="launch-label" style="margin:0;">Description <span style="color: #666; font-weight:400; font-size: 13px;">(Optional)</span></label>
                 <span class="char-counter" id="descCount">500</span>
             </div>
             <div class="launch-input-box">
-                <!-- Ограничение 500 символов -->
                 <textarea id="tokenDesc" placeholder="Describe your project..." maxlength="500" oninput="handleInput('desc')"></textarea>
             </div>
+            <!-- Ошибка под описанием -->
+            <div id="err-desc" class="input-error-msg"></div>
 
             <div style="height: 120px;"></div>
         </div>
@@ -236,8 +250,8 @@
         let currentUser = null;
 
         // === ПЕРЕМЕННЫЕ ДЛЯ ЗАЩИТЫ ===
-        let failAttempts = 0; // Счетчик неудач
-        let cooldownEndTime = 0; // Время окончания блокировки
+        let failAttempts = 0; 
+        let cooldownEndTime = 0; 
         let cooldownTimer = null;
 
         window.formatPrice = function(val) {
@@ -251,7 +265,7 @@
             } catch(e) { console.error(e); }
             if(loader) loader.classList.add('loaded');
             
-            // Проверка, не заблокирован ли пользователь после перезагрузки
+            // Проверка, не заблокирован ли пользователь
             const savedCooldown = localStorage.getItem('blockUntil');
             if (savedCooldown && Date.now() < parseInt(savedCooldown)) {
                 failAttempts = 5;
@@ -265,29 +279,28 @@
             if (type === 'name') {
                 const el = document.getElementById('tokenName');
                 document.getElementById('nameCount').innerText = 20 - el.value.length;
+                document.getElementById('err-name').classList.remove('visible');
             } else if (type === 'ticker') {
                 const el = document.getElementById('tokenTicker');
                 el.value = el.value.replace(/[^a-zA-Z]/g, '').toUpperCase();
                 document.getElementById('tickerCount').innerText = 10 - el.value.length;
+                document.getElementById('err-ticker').classList.remove('visible');
             } else if (type === 'desc') {
                 const el = document.getElementById('tokenDesc');
                 document.getElementById('descCount').innerText = 500 - el.value.length;
+                document.getElementById('err-desc').classList.remove('visible');
             }
-            
-            // Скрываем ошибку при вводе
-            document.getElementById('aiErrorMsg').classList.remove('visible');
             checkForm();
         }
 
         window.checkForm = function() {
-            // Если включен таймер - кнопка всегда выключена
             if (cooldownTimer) return;
 
             const name = document.getElementById('tokenName').value.trim();
             const ticker = document.getElementById('tokenTicker').value.trim();
             const btn = document.getElementById('continueBtn');
             
-            // ПРАВИЛО: Имя + Тикер + Иконка должны быть заполнены
+            // Кнопка активна только если имя, тикер и фото есть
             if (name.length > 0 && ticker.length > 0 && base64Image) {
                 btn.classList.remove('btn-disabled'); 
             } else {
@@ -313,13 +326,12 @@
                     clearInterval(cooldownTimer);
                     cooldownTimer = null;
                     localStorage.removeItem('blockUntil');
-                    failAttempts = 0; // Сброс счетчика
-                    checkForm(); // Разблокируем, если формы заполнены
+                    failAttempts = 0; 
+                    checkForm();
                     btn.innerText = "Continue";
                     return;
                 }
                 
-                // Формат MM:SS
                 const m = Math.floor(diff / 60);
                 const s = diff % 60;
                 btn.innerText = `Retry in ${m}:${s < 10 ? '0'+s : s}`;
@@ -406,13 +418,13 @@
             ctx.scale(cs.s * r, cs.s * r);
             ctx.translate(cs.x / cs.s, cs.y / cs.s);
             ctx.drawImage(img, -img.naturalWidth/2, -img.naturalHeight/2);
-            // Качество 0.5 для скорости и Vercel
             base64Image = cvs.toDataURL('image/jpeg', 0.5);
             document.getElementById('finalAvatar').src = base64Image;
             document.getElementById('finalAvatar').style.display = 'block';
             document.getElementById('previewContainer').style.display = 'none';
+            document.getElementById('err-image').classList.remove('visible'); // Убираем ошибку если была
             closeCropper();
-            checkForm(); // Проверяем форму сразу после кропа
+            checkForm(); 
         }
 
         // --- МОДЕРАЦИЯ И ПЕРЕХОД ---
@@ -426,16 +438,17 @@
         }
 
         window.goToStep2 = async function() {
-            if (cooldownTimer) return; // Если блокировка, выходим
+            if (cooldownTimer) return;
 
             const name = document.getElementById('tokenName').value.trim();
             const ticker = document.getElementById('tokenTicker').value.trim();
             const desc = document.getElementById('tokenDesc').value.trim();
-            const errorBox = document.getElementById('aiErrorMsg');
+            
+            // Сброс старых ошибок
+            ['err-name', 'err-ticker', 'err-image', 'err-desc'].forEach(id => {
+                document.getElementById(id).classList.remove('visible');
+            });
 
-            errorBox.classList.remove('visible'); // Сброс ошибки
-
-            // Проверка на клиенте
             if(!name || !ticker) { tg.showAlert("Please fill in Name and Ticker."); return; }
             if(!base64Image) { tg.showAlert("Please upload an icon."); return; }
 
@@ -459,7 +472,7 @@
                 if(loader) loader.classList.add('loaded');
 
                 if (checkResult.allowed) {
-                    // УСПЕХ: Сбрасываем счетчик неудач
+                    // === УСПЕХ ===
                     failAttempts = 0;
                     document.getElementById('step1').style.display = 'none';
                     document.getElementById('step2').style.display = 'block';
@@ -467,17 +480,31 @@
                     document.getElementById('payPanel').style.display = 'block';
                     window.updateCalc();
                 } else {
-                    // ОТКАЗ
+                    // === ОТКАЗ ===
                     failAttempts++;
                     tg.HapticFeedback.notificationOccurred('error');
                     
-                    // Показываем текст ошибки ПОД полем ввода
-                    errorBox.innerText = `Content Rejected: ${checkResult.reason || "Policy violation"}`;
-                    errorBox.classList.add('visible');
+                    const reason = checkResult.reason || "Policy violation";
+                    const rLower = reason.toLowerCase();
+                    
+                    // Логика определения места ошибки по ключевым словам
+                    let errorTargetId = 'err-name'; // По умолчанию под именем
+                    
+                    if (rLower.includes('image') || rLower.includes('icon') || rLower.includes('visual') || rLower.includes('nsfw') || rLower.includes('nudity')) {
+                        errorTargetId = 'err-image';
+                    } else if (rLower.includes('ticker') || rLower.includes('symbol')) {
+                        errorTargetId = 'err-ticker';
+                    } else if (rLower.includes('description')) {
+                        errorTargetId = 'err-desc';
+                    } 
+                    // Если в тексте ошибки ничего специфичного, оставляем под именем (err-name)
 
-                    // Если 5 ошибок подряд - БАН на 3 минуты
+                    const errEl = document.getElementById(errorTargetId);
+                    errEl.innerText = reason;
+                    errEl.classList.add('visible');
+
                     if (failAttempts >= 5) {
-                        startCooldown(180); // 180 секунд = 3 минуты
+                        startCooldown(180); 
                         tg.showAlert("Too many failed attempts. You are timed out for 3 minutes.");
                     }
                 }
