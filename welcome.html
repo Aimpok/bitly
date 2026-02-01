@@ -50,26 +50,37 @@
         tg.setHeaderColor('#000000');
 
         // === 1. Функция открытия правил ===
-        // Присваиваем window, так как module имеет свою область видимости
         window.openRules = function(e) {
             e.preventDefault(); 
             e.stopPropagation();
             location.href = 'rules.html';
         }
 
-        // === 2. Логика чекбокса (разблокировка кнопки) ===
+        // === 2. Логика проверки галочки ===
         window.toggleButton = function() {
             const chk = document.getElementById('policyCheckbox');
             const btn = document.getElementById('continueBtn');
-            if(chk && chk.checked) {
+            
+            // Если элементы еще не прогрузились - выходим
+            if (!chk || !btn) return;
+
+            if(chk.checked) {
                 btn.classList.remove('btn-locked');
-            } else if (btn) {
+            } else {
                 btn.classList.add('btn-locked');
             }
         }
 
-        // Проверяем состояние при загрузке (на случай возврата на страницу)
-        window.toggleButton();
+        // === ИСПРАВЛЕНИЕ 1: Проверка при возврате назад (pageshow) ===
+        // Это событие срабатывает, когда пользователь возвращается на страницу из истории браузера
+        window.addEventListener('pageshow', () => {
+            // Небольшая задержка, чтобы браузер успел восстановить состояние чекбокса
+            setTimeout(window.toggleButton, 50);
+        });
+
+        // Также проверяем при обычной загрузке
+        window.addEventListener('load', window.toggleButton);
+        window.toggleButton(); // И сразу при парсинге скрипта
 
         // === 3. ГЛАВНАЯ ФУНКЦИЯ: Принятие и запись в Firebase ===
         window.acceptAndStart = async function() {
@@ -78,15 +89,13 @@
             // Если кнопка заблокирована - ничего не делаем
             if (btn.classList.contains('btn-locked')) return;
 
-            // Блокируем кнопку визуально, чтобы не кликали дважды
-            const originalText = btn.innerText;
-            btn.innerHTML = 'Saving...';
+            // === ИСПРАВЛЕНИЕ 2: Текст остается "Continue" ===
+            // Блокируем кнопку визуально, но не меняем текст на Saving
             btn.style.opacity = '0.7';
             btn.disabled = true;
 
             try {
                 // Асинхронно обновляем запись в базе данных
-                console.log("Saving privacy acceptance to DB...");
                 await acceptPrivacyInDB();
                 
                 // Для надежности дублируем в локальное хранилище
@@ -97,8 +106,7 @@
             } catch (error) {
                 console.error("Error saving privacy status:", error);
                 
-                // Возвращаем кнопку в исходное состояние при ошибке
-                btn.innerHTML = originalText;
+                // Если ошибка - возвращаем кнопку в активное состояние
                 btn.style.opacity = '1';
                 btn.disabled = false;
                 
