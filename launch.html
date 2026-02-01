@@ -273,7 +273,7 @@
 
         // Input Logic
         window.handleInput = function(type) {
-            const el = type === 'name' ? document.getElementById('tokenName') : document.getElementById('tokenTicker');
+            const el = document.getElementById(type === 'name' ? 'tokenName' : 'tokenTicker');
             const counter = type === 'name' ? document.getElementById('nameCount') : document.getElementById('tickerCount');
             const max = type === 'name' ? 20 : 10;
             if(type === 'ticker') el.value = el.value.replace(/[^a-zA-Z]/g, '').toUpperCase();
