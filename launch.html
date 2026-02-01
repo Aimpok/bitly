@@ -39,7 +39,7 @@
             text-align: left;
             margin-top: -15px;
             margin-bottom: 15px;
-            margin-left: 80px; /* Чтобы текст был не под кружком, а правее */
+            margin-left: 80px; /* Сдвиг вправо от кружка */
         }
 
         @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
@@ -125,7 +125,6 @@
                 </div>
                 <div>
                     <div style="font-weight: 700;">Icon</div>
-                    <!-- Вернули старый текст -->
                     <div style="font-size: 12px; color: #888;">Tap to upload</div>
                 </div>
                 <input type="file" id="fileInput" hidden accept="image/*" onchange="initCropper(this)">
@@ -158,10 +157,10 @@
             <!-- DESCRIPTION INPUT -->
             <div class="label-row">
                 <label class="launch-label" style="margin:0;">Description <span style="color: #666; font-weight:400; font-size: 13px;">(Optional)</span></label>
-                <span class="char-counter" id="descCount">500</span>
+                <span class="char-counter" id="descCount">250</span>
             </div>
             <div class="launch-input-box">
-                <textarea id="tokenDesc" placeholder="Describe your project..." maxlength="500" oninput="handleInput('desc')"></textarea>
+                <textarea id="tokenDesc" placeholder="Describe your project..." maxlength="250" oninput="handleInput('desc')"></textarea>
             </div>
             <!-- Ошибка под описанием -->
             <div id="err-desc" class="input-error-msg"></div>
@@ -287,7 +286,7 @@
                 document.getElementById('err-ticker').classList.remove('visible');
             } else if (type === 'desc') {
                 const el = document.getElementById('tokenDesc');
-                document.getElementById('descCount').innerText = 500 - el.value.length;
+                document.getElementById('descCount').innerText = 250 - el.value.length;
                 document.getElementById('err-desc').classList.remove('visible');
             }
             checkForm();
@@ -422,7 +421,7 @@
             document.getElementById('finalAvatar').src = base64Image;
             document.getElementById('finalAvatar').style.display = 'block';
             document.getElementById('previewContainer').style.display = 'none';
-            document.getElementById('err-image').classList.remove('visible'); // Убираем ошибку если была
+            document.getElementById('err-image').classList.remove('visible');
             closeCropper();
             checkForm(); 
         }
@@ -486,23 +485,42 @@
                     
                     const reason = checkResult.reason || "Policy violation";
                     const rLower = reason.toLowerCase();
-                    
-                    // Логика определения места ошибки по ключевым словам
-                    let errorTargetId = 'err-name'; // По умолчанию под именем
-                    
+                    let matched = false;
+
+                    // Логика определения множественных ошибок (Используем if вместо else if)
                     if (rLower.includes('image') || rLower.includes('icon') || rLower.includes('visual') || rLower.includes('nsfw') || rLower.includes('nudity')) {
-                        errorTargetId = 'err-image';
-                    } else if (rLower.includes('ticker') || rLower.includes('symbol')) {
-                        errorTargetId = 'err-ticker';
-                    } else if (rLower.includes('description')) {
-                        errorTargetId = 'err-desc';
+                        const err = document.getElementById('err-image');
+                        err.innerText = reason;
+                        err.classList.add('visible');
+                        matched = true;
                     } 
-                    // Если в тексте ошибки ничего специфичного, оставляем под именем (err-name)
+                    if (rLower.includes('ticker') || rLower.includes('symbol')) {
+                        const err = document.getElementById('err-ticker');
+                        err.innerText = reason;
+                        err.classList.add('visible');
+                        matched = true;
+                    } 
+                    if (rLower.includes('name') || rLower.includes('title')) {
+                        const err = document.getElementById('err-name');
+                        err.innerText = reason;
+                        err.classList.add('visible');
+                        matched = true;
+                    }
+                    if (rLower.includes('description') || rLower.includes('desc')) {
+                        const err = document.getElementById('err-desc');
+                        err.innerText = reason;
+                        err.classList.add('visible');
+                        matched = true;
+                    }
 
-                    const errEl = document.getElementById(errorTargetId);
-                    errEl.innerText = reason;
-                    errEl.classList.add('visible');
+                    // Если причина не содержит ключевых слов, выводим под именем
+                    if (!matched) {
+                        const err = document.getElementById('err-name');
+                        err.innerText = reason;
+                        err.classList.add('visible');
+                    }
 
+                    // Проверка на бан
                     if (failAttempts >= 5) {
                         startCooldown(180); 
                         tg.showAlert("Too many failed attempts. You are timed out for 3 minutes.");
