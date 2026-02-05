@@ -8,7 +8,7 @@ export const eventsData = [
         id: 1,
         title: "Auction",
         icon: "Sprites/Hymmer.png", // Make sure to add this image to your folder
-        bgImage: "Sprites/WaveBg.png",
+        bgImage: "Sprites/AuctionBg.png",
         link: "auction.html",
         // Example: Started 1 hour ago, Ends in 23 hours (Active)
         startTime: new Date(now.getTime() - (1 * 60 * 60 * 1000)).toISOString(),
@@ -59,4 +59,5 @@ export function getEventStatus(event) {
         text: "Ended",
         isActive: false
     };
+
 }
