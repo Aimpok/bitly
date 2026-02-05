@@ -25,61 +25,67 @@
         
         .filter-chip { cursor: pointer; }
 
-        /* === ПЕРЕОПРЕДЕЛЕНИЕ СТИЛЕЙ ДЛЯ БЕСКОНЕЧНОГО СЛАЙДЕРА === */
-        /* Чтобы JS мог точно считать позицию, убираем gap и padding контейнера */
-        .carousel-container {
-            display: flex;
-            overflow-x: auto;
-            scroll-snap-type: none !important; /* Отключаем CSS прилипание */
-            gap: 0 !important; 
-            padding: 0 !important;
-            margin-bottom: 12px;
-            -webkit-overflow-scrolling: touch;
-            scrollbar-width: none;
-            position: relative;
+        /* === ПАНЕЛЬ НАВИГАЦИИ (ФИКСИРОВАННАЯ) === */
+        .bottom-nav {
+            position: fixed !important;
+            bottom: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            width: 100% !important; 
+            max-width: 480px !important; 
+            margin: 0 auto !important;   
+            transform: none !important; 
+            border: none !important;     
+            border-radius: 0 !important; 
+            box-shadow: none !important; 
+            background: #000000 !important; 
+            display: grid !important;
+            grid-template-columns: repeat(5, 1fr) !important;
+            align-items: center !important;
+            justify-items: center !important;
+            height: 70px !important;
+            padding-bottom: env(safe-area-inset-bottom, 20px) !important; 
+            z-index: 9999 !important;
+            box-sizing: border-box !important;
+            border-top: 1px solid #222 !important;
         }
-        .carousel-container::-webkit-scrollbar { display: none; }
 
-        .news-card {
-            min-width: 100% !important; /* Карточка на всю ширину */
+        .nav-item {
             width: 100% !important;
+            height: 100% !important;
+            display: flex !important;
+            justify-content: center !important;
+            align-items: center !important;
+            opacity: 0.5;
+            transition: opacity 0.2s;
             margin: 0 !important;
-            border: none !important; /* Убираем обводку */
-            border-radius: 0 !important; /* Убираем скругление самого блока, чтобы стыковались */
-            /* Внутренний паддинг создает визуальный отступ контента */
-            padding: 10px 16px !important; 
-            background: transparent !important; /* Фон прозрачный, создадим внутренний контейнер */
-            box-sizing: border-box;
         }
 
-        /* Внутренняя обертка карточки для визуала (скругление и фон) */
-        .news-card-inner {
-            width: 100%;
-            height: 100%;
-            border-radius: 20px;
-            background-color: #1c1c1c;
-            position: relative;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            padding: 20px;
+        .nav-item.active { opacity: 1 !important; }
+
+        /* Центральная кнопка (белый круг) */
+        .nav-trade-circle {
+            position: static !important; 
+            width: 48px !important;
+            height: 48px !important;
+            background: #ffffff !important;
+            border-radius: 50% !important;
+            display: flex !important;
+            justify-content: center !important;
+            align-items: center !important;
+            transform: translateY(-5px) !important; 
+            margin: 0 !important;
         }
 
-        /* Квадратные точки (Индикаторы) */
-        .slider-dots-overlay {
-            display: flex;
-            justify-content: center;
-            gap: 6px;
-            margin-top: -35px; /* Поднимаем поверх слайдера */
-            position: relative;
-            z-index: 10;
-            margin-bottom: 20px;
-            pointer-events: none;
+        body {
+            padding-bottom: 100px !important;
+            background: #000;
+            color: #fff;
         }
+        
+        /* Квадратные точки для слайдера */
         .dot { 
-            width: 6px; 
-            height: 6px; 
+            width: 6px; height: 6px; 
             background: rgba(255,255,255,0.3); 
             border-radius: 1px; /* Квадрат */
             transition: 0.2s; 
@@ -88,202 +94,128 @@
             background: #fff; 
             width: 6px; 
         }
-
-        /* === НИЖНЯЯ ПАНЕЛЬ === */
-        .bottom-nav {
-            position: fixed !important; bottom: 0 !important; left: 0 !important; right: 0 !important;
-            width: 100% !important; max-width: 480px !important; margin: 0 auto !important;
-            background: #000000 !important; display: grid !important;
-            grid-template-columns: repeat(5, 1fr) !important; align-items: center !important;
-            justify-items: center !important; height: 70px !important;
-            padding-bottom: env(safe-area-inset-bottom, 20px) !important; 
-            z-index: 9999 !important; border-top: 1px solid #222 !important;
-        }
-        .nav-item { opacity: 0.5; transition: opacity 0.2s; }
-        .nav-item.active { opacity: 1 !important; }
-        .nav-trade-circle {
-            width: 48px !important; height: 48px !important; background: #ffffff !important;
-            border-radius: 50% !important; display: flex !important;
-            justify-content: center !important; align-items: center !important;
-            transform: translateY(-5px) !important; 
-        }
-        body { padding-bottom: 100px !important; background: #000; color: #fff; }
     </style>
 </head>
 <body>
 
-<!-- === ЛОАДЕР === -->
+<!-- === ЭКРАН ЗАГРУЗКИ === -->
 <div id="globalLoader"><div class="custom-spinner"></div></div>
 
-<!-- 1. Earn (Новости / Карусель) -->
+<!-- 1. Earn (Новости) -->
 <div class="section-title" style="margin-top: 20px;">Earn</div>
 <div class="carousel-container" id="newsSlider" style="min-height: 160px;"></div>
-<!-- Контейнер для точек (вставляется JS) -->
-<div id="dotsContainer" class="slider-dots-overlay"></div>
 
-<!-- 2. Events (Аукцион) -->
+<!-- 2. Events (Ивенты) -->
 <div class="section-title">Events</div>
 <div class="events-grid" id="eventsContainer">
-    <!-- JS вставит карточки -->
+    <!-- Сюда JS вставит карточки ивентов -->
 </div>
 
-<!-- 3. Баннер Launch -->
-<div class="launch-card" onclick="location.href='launch.html'">
-    <div class="launch-text">
-        <h3>Launch your token!</h3>
-        <p>Reach #1 on the leaderboard.</p>
-    </div>
-    <img src="Sprites/CoinIcon.png" class="coin-icon-3d" alt="coin">
-</div>
-
-<!-- 4. Top 100 -->
+<!-- 3. Top 100 (Баннер Launch УДАЛЕН ПОЛНОСТЬЮ) -->
 <div class="section-title">Top 100</div>
 
+<!-- Кликабельные фильтры -->
 <div class="filter-chips">
     <div class="filter-chip active" onclick="setFilter('week', this)">Week</div>
     <div class="filter-chip" onclick="setFilter('month', this)">Month</div>
     <div class="filter-chip" onclick="setFilter('year', this)">Year</div>
 </div>
 
+<!-- Список токенов -->
 <div class="token-list" id="topTokensList">
     <div style="text-align: center; color: #555; padding: 20px;">Loading...</div>
 </div>
 
-<!-- Bottom Nav -->
+<!-- Bottom Nav (Стиль Wallet) -->
 <div class="bottom-nav">
+    <!-- Wallet Icon -->
     <div class="nav-item active">
         <svg class="icon" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
     </div>
+    
+    <!-- Earn Icon -->
     <div class="nav-item" onclick="location.href='Earn.html'">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"></circle><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" font-size="10" font-weight="800" fill="currentColor" stroke="none">$</text></svg>
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="9"></circle>
+            <text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" font-size="10" font-weight="800" fill="currentColor" stroke="none">$</text>
+        </svg>
     </div>
+    
+    <!-- Trade Center Icon -->
     <div class="nav-trade-circle" onclick="location.href='markets.html'">
-        <svg class="icon" style="color:black;" viewBox="0 0 24 24"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
+        <svg class="icon" style="color:black;" viewBox="0 0 24 24">
+            <polyline points="17 1 21 5 17 9"></polyline>
+            <path d="M3 11V9a4 4 0 0 1 4-4h14"></path>
+            <polyline points="7 23 3 19 7 15"></polyline>
+            <path d="M21 13v2a4 4 0 0 1-4 4H3"></path>
+        </svg>
     </div>
+    
+    <!-- Messages Icon -->
     <div class="nav-item" onclick="location.href='messages.html'">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+        </svg>
     </div>
+    
+    <!-- Profile/Wallet Icon -->
     <div class="nav-item" onclick="location.href='wallet.html'">
-        <svg class="icon" viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+        <svg class="icon" viewBox="0 0 24 24">
+            <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
+            <line x1="1" y1="10" x2="23" y2="10"></line>
+        </svg>
     </div>
 </div>
 
 <script src="stocks.js"></script>
 
+<!-- Скрипт для Новостей (Стандартный скролл с CSS snap) -->
 <script>
     const tg = window.Telegram.WebApp;
     tg.expand();
     tg.setHeaderColor('#000000');
 
-    // === ЛОГИКА БЕСКОНЕЧНОГО СЛАЙДЕРА (EARN) ===
     const slider = document.getElementById('newsSlider');
-    const dotsContainer = document.getElementById('dotsContainer');
-    let autoScrollInterval;
-
     function renderStocks() {
-        if (!slider || typeof stocksData === 'undefined' || stocksData.length === 0) return;
-        
-        slider.innerHTML = '';
-        dotsContainer.innerHTML = '';
+        if (!slider || typeof stocksData === 'undefined') return;
+        slider.innerHTML = ''; 
+        stocksData.forEach((stock, index) => {
+            const card = document.createElement('div');
+            card.className = 'news-card';
+            
+            // Генерируем точки
+            let dotsHtml = '<div class="carousel-dots">';
+            stocksData.forEach((_, i) => dotsHtml += `<div class="dot ${i === index ? 'active' : ''}"></div>`);
+            dotsHtml += '</div>';
 
-        // 1. Создаем точки
-        stocksData.forEach((_, i) => {
-            dotsContainer.innerHTML += `<div class="dot ${i === 0 ? 'active' : ''}" id="dot-${i}"></div>`;
-        });
-
-        // 2. Создаем массив с клонами: [Last, ...Original, First]
-        const extendedData = [stocksData[stocksData.length - 1], ...stocksData, stocksData[0]];
-
-        extendedData.forEach((stock, index) => {
-            const cardWrapper = document.createElement('div');
-            cardWrapper.className = 'news-card'; // Внешняя обертка (для ширины)
-
-            // Внутренняя часть (для визуала)
-            cardWrapper.innerHTML = `
-                <div class="news-card-inner">
-                    <img src="${stock.bgImage}" class="news-bg" alt="bg">
-                    <div class="news-content">
-                        <div class="news-title">${stock.title}</div>
-                        <div class="action-btn-small" onclick="location.href='${stock.btnLink}'">${stock.btnText}</div>
-                    </div>
-                    <img src="${stock.iconImage}" class="banner-icon" alt="icon">
+            card.innerHTML = `
+                <img src="${stock.bgImage}" class="news-bg" alt="bg">
+                <div class="news-content">
+                    <div class="news-title">${stock.title}</div>
+                    <div class="action-btn-small" onclick="location.href='${stock.btnLink}'">${stock.btnText}</div>
                 </div>
+                <img src="${stock.iconImage}" class="banner-icon" alt="icon">
+                ${dotsHtml}
             `;
-            slider.appendChild(cardWrapper);
+            slider.appendChild(card);
         });
-
-        // 3. Начальная позиция (пропускаем клон последнего)
-        const cardWidth = slider.offsetWidth;
-        slider.scrollLeft = cardWidth;
-
-        // 4. Обработчик скролла (Эффект телепортации)
-        let isScrolling = false;
-        
-        slider.addEventListener('scroll', () => {
-            if (isScrolling) return;
-
-            const scrollPos = slider.scrollLeft;
-            const width = slider.offsetWidth;
-            const totalWidth = slider.scrollWidth;
-
-            // Если прокрутили влево до упора (на клон последнего)
-            if (scrollPos <= 0) {
-                slider.scrollLeft = width * stocksData.length;
-            } 
-            // Если прокрутили вправо до упора (на клон первого)
-            else if (scrollPos >= width * (extendedData.length - 1)) {
-                slider.scrollLeft = width;
-            }
-
-            // Обновляем точки
-            let activeIndex = Math.round(slider.scrollLeft / width) - 1;
-            // Коррекция индексов
-            if (activeIndex < 0) activeIndex = stocksData.length - 1;
-            if (activeIndex >= stocksData.length) activeIndex = 0;
-
-            document.querySelectorAll('.dot').forEach((d, i) => {
-                d.classList.toggle('active', i === activeIndex);
-            });
-        });
-
-        startAutoScroll();
     }
-
-    // Авто-прокрутка
-    function startAutoScroll() {
-        clearInterval(autoScrollInterval);
-        autoScrollInterval = setInterval(() => {
-            if (!slider) return;
-            const width = slider.offsetWidth;
-            slider.scrollBy({ left: width, behavior: 'smooth' });
-        }, 4000); // 4 секунды
-    }
-
-    // Пауза при касании
-    slider.addEventListener('touchstart', () => clearInterval(autoScrollInterval));
-    slider.addEventListener('touchend', startAutoScroll);
-
-    // Перерисовываем при ресайзе (чтобы не сломать скролл)
-    window.addEventListener('resize', () => {
-        renderStocks();
-    });
-
     renderStocks();
 </script>
 
 <script type="module">
     import { initUser, subscribeToMarket, initMarketDataIfNeeded } from './user-service.js';
-    import { eventsData, getEventStatus } from './Events.js';
-
+    import { eventsData, getEventStatus } from './Events.js'; // Подключаем ивенты
+    
     const loader = document.getElementById('globalLoader');
     let cachedTokens = []; 
     let currentPeriod = 'week'; 
 
-    // --- ОТРИСОВКА EVENTS ---
+    // --- ОТРИСОВКА ИВЕНТОВ ---
     function renderEvents() {
         const container = document.getElementById('eventsContainer');
         if(!container) return;
-
         container.innerHTML = '';
 
         eventsData.forEach(event => {
@@ -308,6 +240,7 @@
         });
     }
 
+    // Глобальная функция фильтра
     window.setFilter = function(period, el) {
         currentPeriod = period;
         document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
@@ -317,10 +250,12 @@
 
     async function startApp() {
         try {
-            renderEvents();
+            renderEvents(); // Рендерим ивенты сразу
 
             const user = await initUser(); 
+            
             if (user.privacyAccepted !== true) {
+                console.warn('User has not accepted privacy policy in DB. Redirecting...');
                 localStorage.removeItem('privacy_accepted'); 
                 window.location.replace('welcome.html');
                 return;
@@ -332,6 +267,7 @@
                 cachedTokens = tokens; 
                 renderTopTokens(tokens);
                 sessionStorage.setItem('app_ready', 'true');
+                
                 if(loader && !loader.classList.contains('loaded')) {
                     setTimeout(() => { loader.classList.add('loaded'); }, 300); 
                 }
