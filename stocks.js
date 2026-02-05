@@ -14,7 +14,7 @@ const stocksData = [
         title: "Find the Next Gem! Trade Tokens",
         btnText: "Trade",
         btnLink: "markets.html", 
-        bgImage: "Sprites/WaveBg.png",
+        bgImage: "Sprites/TradeBg.png",
         iconImage: "Sprites/news2.png"
     },
     {
