@@ -917,3 +917,78 @@ button { border: none; }
     box-shadow: none !important;
     opacity: 0.7;
 }
+
+/* =========================================
+   EVENTS SECTION
+========================================= */
+.events-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr; /* Две колонки */
+    gap: 12px;
+    padding: 0 16px;
+    margin-bottom: 24px;
+    width: 100%;
+}
+
+.event-card {
+    position: relative;
+    background-color: #111;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    height: 120px; /* Фиксированная высота */
+    overflow: hidden;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 12px;
+}
+
+/* Фон карточки */
+.event-bg {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    object-fit: cover;
+    opacity: 0.3; /* Затемнение фона */
+    z-index: 0;
+}
+
+/* 3D Иконка по центру */
+.event-icon-center {
+    position: absolute;
+    top: 45%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 56px; 
+    height: 56px;
+    object-fit: contain;
+    z-index: 1;
+    filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5));
+}
+
+/* Текст внизу */
+.event-content {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+}
+
+.event-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: white;
+    margin-bottom: 2px;
+    line-height: 1.2;
+}
+
+.event-timer {
+    font-size: 12px;
+    font-weight: 500;
+    color: #777;
+}
+
+/* Если событие активно, текст светлее */
+.timer-active {
+    color: #ccc; 
+}
