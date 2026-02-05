@@ -25,19 +25,18 @@
         
         .filter-chip { cursor: pointer; }
 
-        /* === КАРУСЕЛЬ (ИСПРАВЛЕННАЯ) === */
+        /* === КАРУСЕЛЬ (CSS SNAP) === */
         .carousel-container {
             display: flex;
             overflow-x: auto;
-            /* ВКЛЮЧАЕМ CSS SNAP для идеального прилипания */
-            scroll-snap-type: x mandatory; 
+            scroll-snap-type: x mandatory; /* Магия прилипания */
             gap: 0 !important; 
             padding: 0 !important;
             margin-bottom: 12px;
             -webkit-overflow-scrolling: touch;
             scrollbar-width: none;
             position: relative;
-            scroll-behavior: smooth; /* Плавный скролл */
+            scroll-behavior: smooth;
         }
         .carousel-container::-webkit-scrollbar { display: none; }
 
@@ -50,8 +49,7 @@
             padding: 10px 16px !important; 
             background: transparent !important;
             box-sizing: border-box;
-            /* Указываем, что карточка — это точка прилипания */
-            scroll-snap-align: start; 
+            scroll-snap-align: center; /* Центруем слайд */
             scroll-snap-stop: always;
             flex-shrink: 0;
         }
@@ -92,13 +90,15 @@
             width: 6px; 
         }
 
-        /* === ИВЕНТЫ (Исправлен размер иконок) === */
+        /* === ИВЕНТЫ (Обновленные иконки) === */
         .event-icon-center-lg {
             position: absolute;
-            top: 45%; left: 50%;
+            /* Поднял выше (40%), чтобы текст снизу не налезал */
+            top: 40%; 
+            left: 50%;
             transform: translate(-50%, -50%);
-            width: 90px !important; /* УВЕЛИЧЕНО ДО 90px */
-            height: 90px !important;
+            width: 100px !important; /* РАЗМЕР 100px */
+            height: 100px !important;
             object-fit: contain;
             z-index: 1;
             filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5));
@@ -166,8 +166,8 @@
 <!-- === ЛОАДЕР === -->
 <div id="globalLoader"><div class="custom-spinner"></div></div>
 
-<!-- 1. News (Бывший Earn - Бесконечная карусель) -->
-<div class="section-title" style="margin-top: 20px;">News</div>
+<!-- 1. Explore (Карусель) -->
+<div class="section-title" style="margin-top: 20px;">Explore</div>
 <div class="carousel-container" id="newsSlider" style="min-height: 160px;"></div>
 <!-- Точки индикаторы -->
 <div id="dotsContainer" class="slider-dots-overlay"></div>
@@ -199,7 +199,7 @@
     <div class="nav-item active">
         <svg class="icon" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
     </div>
-    <!-- Earn/News Page -->
+    <!-- Earn/Explore Page -->
     <div class="nav-item" onclick="location.href='Earn.html'">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"></circle><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" font-size="10" font-weight="800" fill="currentColor" stroke="none">$</text></svg>
     </div>
@@ -219,7 +219,7 @@
 
 <script src="stocks.js"></script>
 
-<!-- === СКРИПТ КАРУСЕЛИ (СТАБИЛЬНЫЙ) === -->
+<!-- === СКРИПТ КАРУСЕЛИ (БЕСКОНЕЧНОСТЬ + CSS SNAP) === -->
 <script>
     const tg = window.Telegram.WebApp;
     tg.expand();
@@ -236,13 +236,12 @@
         slider.innerHTML = '';
         dotsContainer.innerHTML = '';
 
-        // 1. Создаем точки (только для реальных слайдов)
+        // 1. Точки
         stocksData.forEach((_, i) => {
             dotsContainer.innerHTML += `<div class="dot ${i === 0 ? 'active' : ''}" id="dot-${i}"></div>`;
         });
 
-        // 2. Добавляем клоны для бесконечности: [Clone Last] + [Real Data] + [Clone First]
-        // Но для надежности CSS Snap лучше всего работает структура: [Clone Last] ... [Clone First]
+        // 2. Данные с клонами: [Clone Last] ...Originals... [Clone First]
         const extendedData = [stocksData[stocksData.length - 1], ...stocksData, stocksData[0]];
 
         extendedData.forEach((stock) => {
@@ -261,53 +260,46 @@
             slider.appendChild(cardWrapper);
         });
 
-        // 3. Сразу прыгаем на первый РЕАЛЬНЫЙ слайд (индекс 1) без анимации
+        // 3. Старт с 1-го элемента (не клона)
         setTimeout(() => {
-            const cardWidth = slider.offsetWidth;
+            const width = slider.offsetWidth;
             slider.style.scrollBehavior = 'auto';
-            slider.scrollLeft = cardWidth;
+            slider.scrollLeft = width;
             slider.style.scrollBehavior = 'smooth';
-            updateDots();
         }, 50);
 
-        // 4. Слушатели событий
-        slider.addEventListener('scroll', updateDots);
-        slider.addEventListener('scroll', checkInfiniteLoop); // Проверка телепортации
+        // 4. События
+        slider.addEventListener('scroll', () => {
+            updateDots();
+            checkInfiniteLoop();
+        });
         
-        // Пауза автоскролла при касании
-        slider.addEventListener('touchstart', () => { 
-            isTouching = true; 
-            clearInterval(autoScrollInterval); 
-        });
-        slider.addEventListener('touchend', () => { 
-            isTouching = false; 
-            startAutoScroll(); 
-        });
+        slider.addEventListener('touchstart', () => { isTouching = true; clearInterval(autoScrollInterval); });
+        slider.addEventListener('touchend', () => { isTouching = false; startAutoScroll(); });
 
         startAutoScroll();
     }
 
     let loopTimeout;
     function checkInfiniteLoop() {
-        // Используем debounce (небольшую задержку), чтобы не телепортироваться во время свайпа
         clearTimeout(loopTimeout);
         loopTimeout = setTimeout(() => {
-            if (isTouching) return; // Не телепортируем, если палец на экране
+            if (isTouching) return; 
 
             const width = slider.offsetWidth;
             const scrollPos = slider.scrollLeft;
             const totalCount = stocksData.length;
 
-            // Если мы на клоне последнего слайда (самое начало, индекс 0)
+            // Если слева (на клоне последнего)
             if (scrollPos < 10) { 
                 slider.style.scrollBehavior = 'auto';
-                slider.scrollLeft = width * totalCount; // Прыгаем в конец к оригиналу
+                slider.scrollLeft = width * totalCount; 
                 slider.style.scrollBehavior = 'smooth';
             }
-            // Если мы на клоне первого слайда (самый конец)
+            // Если справа (на клоне первого)
             else if (scrollPos >= width * (totalCount + 1) - 10) {
                 slider.style.scrollBehavior = 'auto';
-                slider.scrollLeft = width; // Прыгаем в начало к оригиналу
+                slider.scrollLeft = width; 
                 slider.style.scrollBehavior = 'smooth';
             }
         }, 100);
@@ -316,11 +308,7 @@
     function updateDots() {
         const width = slider.offsetWidth;
         if (width === 0) return;
-        
-        // Вычисляем текущий индекс (с учетом клона в начале)
         let index = Math.round(slider.scrollLeft / width) - 1;
-
-        // Корректировка индексов для клонов
         if (index < 0) index = stocksData.length - 1;
         if (index >= stocksData.length) index = 0;
 
@@ -334,13 +322,11 @@
         autoScrollInterval = setInterval(() => {
             if (isTouching) return;
             const width = slider.offsetWidth;
-            // Просто скроллим вправо, CSS Snap сам выровняет
             slider.scrollBy({ left: width, behavior: 'smooth' });
         }, 4000); 
     }
 
     window.addEventListener('resize', () => { renderStocks(); });
-    // Запускаем
     renderStocks();
 </script>
 
@@ -352,7 +338,6 @@
     let cachedTokens = []; 
     let currentPeriod = 'week'; 
 
-    // --- ОТРИСОВКА ИВЕНТОВ ---
     function renderEvents() {
         const container = document.getElementById('eventsContainer');
         if(!container) return;
@@ -360,7 +345,7 @@
 
         eventsData.forEach(event => {
             const status = getEventStatus(event);
-            // Применяем обновленный класс размера иконки
+            // Используем обновленный класс (100px и смещение вверх)
             const iconHtml = event.icon 
                 ? `<img src="${event.icon}" class="event-icon-center-lg" alt="${event.title}">` 
                 : '';
@@ -409,9 +394,7 @@
                     setTimeout(() => { loader.classList.add('loaded'); }, 300); 
                 }
             });
-        } catch (e) { 
-            console.error("Error launching app:", e); 
-        }
+        } catch (e) { console.error(e); }
     }
 
     function renderTopTokens(tokens) {
@@ -423,13 +406,12 @@
         
         sorted.forEach(token => {
             let displayChangeVal = token.change || 0;
-            if (currentPeriod === 'month') { displayChangeVal = displayChangeVal * 4.2; } 
-            else if (currentPeriod === 'year') { displayChangeVal = displayChangeVal * 12.5; }
+            if (currentPeriod === 'month') { displayChangeVal *= 4.2; } 
+            else if (currentPeriod === 'year') { displayChangeVal *= 12.5; }
 
             const isPositive = displayChangeVal >= 0;
             const changeClass = isPositive ? 'color-green' : 'color-red';
             const sign = isPositive ? '+' : '';
-            const displayChangeStr = Math.abs(displayChangeVal).toFixed(2);
             
             let iconHtml = token.image ? `<img src="${token.image}" style="width:100%; height:100%; object-fit:cover;">` : token.id[0];
             
@@ -447,7 +429,7 @@
                         ${parseFloat(token.price).toFixed(6)}
                         <img src="Sprites/Blyx.png" style="width: 16px; height: 16px; object-fit: contain;">
                     </div>
-                    <div class="t-change ${changeClass}">${sign}${displayChangeStr}%</div>
+                    <div class="t-change ${changeClass}">${sign}${Math.abs(displayChangeVal).toFixed(2)}%</div>
                 </div>
             </div>
             `;
