@@ -417,10 +417,11 @@ button { border: none; }
     color: white; 
 }
 
+/* --- CAROUSEL (EARN) --- */
 .carousel-container { 
     display: flex; 
     overflow-x: auto; 
-    /* scroll-snap-type убран для плавной бесконечной прокрутки через JS */
+    scroll-snap-type: x mandatory; /* Баннеры "прилипают" при скролле */
     gap: 20px; 
     padding: 0 16px; 
     margin-bottom: 12px; 
@@ -437,94 +438,163 @@ button { border: none; }
     border-radius: 20px; 
     background-color: #1c1c1c; 
     overflow: hidden; 
-    border: none; /* УБРАНА ОБВОДКА */
+    border: none; /* Убрана обводка */
     display: flex; 
     flex-direction: column; 
     justify-content: center; 
     padding: 20px; 
-    /* scroll-snap-align убираем, так как отключили snap в контейнере */
+    scroll-snap-align: center; /* Центровка при остановке скролла */
 }
 
-.news-bg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; opacity: 0.6; }
-.news-content { position: relative; z-index: 1; width: 65%; }
-.news-title { font-size: 20px; font-weight: 700; line-height: 1.2; margin-bottom: 15px; color: white; }
+.news-bg { 
+    position: absolute; top: 0; left: 0; 
+    width: 100%; height: 100%; 
+    object-fit: cover; z-index: 0; opacity: 0.6; 
+}
+.news-content { 
+    position: relative; z-index: 1; width: 65%; 
+}
+.news-title { 
+    font-size: 20px; font-weight: 700; 
+    line-height: 1.2; margin-bottom: 15px; color: white; 
+}
 
 .action-btn-small { 
-    background: white; 
-    color: black; 
-    border: none; 
-    padding: 10px 24px; 
-    border-radius: 24px; 
-    font-weight: 700; 
-    font-size: 14px; 
-    cursor: pointer; 
-    display: inline-flex; 
-    justify-content: center; 
-    align-items: center; 
+    background: white; color: black; border: none; 
+    padding: 10px 24px; border-radius: 24px; 
+    font-weight: 700; font-size: 14px; cursor: pointer; 
+    display: inline-flex; justify-content: center; align-items: center; 
     width: fit-content; 
 }
 
 .banner-icon { 
-    position: absolute; 
-    right: 15px; 
-    top: 50%; 
-    transform: translateY(-50%); 
-    height: 85px; 
-    width: auto; 
-    object-fit: contain; 
-    z-index: 2; 
+    position: absolute; right: 15px; top: 50%; 
+    transform: translateY(-50%); height: 85px; width: auto; 
+    object-fit: contain; z-index: 2; 
     filter: drop-shadow(0 5px 15px rgba(0,0,0,0.6)); 
 }
 
-/* Точки */
+/* Индикаторы слайдера (Квадратные точки) */
 .carousel-dots { 
-    display: flex; 
-    justify-content: center; 
-    gap: 6px; 
-    position: absolute; 
-    bottom: 10px; 
-    left: 0; 
-    right: 0; 
-    z-index: 3; 
+    display: flex; justify-content: center; gap: 6px; 
+    position: absolute; bottom: 10px; left: 0; right: 0; z-index: 3; 
 }
-
-/* КВАДРАТНЫЕ ТОЧКИ */
 .dot { 
-    width: 6px; 
-    height: 6px; 
+    width: 6px; height: 6px; 
     background: rgba(255,255,255,0.3); 
-    border-radius: 1px; /* Делает их квадратиками с чуть мягкими углами */
+    border-radius: 1px; /* Квадрат */
     transition: 0.2s; 
 }
 .dot.active { 
-    background: #fff; 
-    width: 6px; /* Оставляем квадратным (не растягиваем) */
+    background: #fff; width: 6px; 
 }
 
-/* Далее без изменений... */
-.launch-card { background: var(--surface); margin: 0 16px 20px 16px; width: calc(100% - 32px); padding: 16px 20px; border-radius: 16px; border: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
+/* --- EVENTS SECTION --- */
+.events-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    padding: 0 16px;
+    margin-bottom: 24px;
+    width: 100%;
+}
+
+.event-card {
+    position: relative;
+    background-color: #111;
+    border: none; /* Убрана обводка */
+    border-radius: 20px;
+    height: 180px; /* Уменьшенная высота */
+    overflow: hidden;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 16px;
+}
+
+.event-bg { 
+    position: absolute; top: 0; left: 0; 
+    width: 100%; height: 100%; object-fit: cover; 
+    opacity: 0.3; z-index: 0; 
+}
+.event-icon-center { 
+    position: absolute; top: 45%; left: 50%; 
+    transform: translate(-50%, -50%); 
+    width: 64px; height: 64px; object-fit: contain; 
+    z-index: 1; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5)); 
+}
+.event-content { 
+    position: relative; z-index: 2; 
+    display: flex; flex-direction: column; 
+}
+.event-title { 
+    font-size: 16px; font-weight: 700; color: white; 
+    margin-bottom: 4px; line-height: 1.2; 
+}
+.event-timer { 
+    font-size: 13px; font-weight: 500; color: #888; 
+}
+.timer-active { color: #ccc; }
+
+/* --- LAUNCH CARD (Старый баннер, стили оставляем на всякий случай) --- */
+.launch-card { 
+    background: var(--surface); margin: 0 16px 20px 16px; 
+    width: calc(100% - 32px); padding: 16px 20px; 
+    border-radius: 16px; border: 1px solid var(--border); 
+    display: flex; align-items: center; justify-content: space-between; 
+    cursor: pointer; 
+}
 .launch-text h3 { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
 .launch-text p { font-size: 12px; color: var(--text-sec); margin: 0; }
 .coin-icon-3d { width: 48px; height: 48px; object-fit: contain; }
 
-.token-list { width: 100%; padding: 0 16px 120px 16px; display: flex; flex-direction: column; gap: 8px; }
-.token-item { background: var(--surface-light); border-radius: 16px; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+/* --- TOKEN LIST --- */
+.token-list { 
+    width: 100%; padding: 0 16px 120px 16px; 
+    display: flex; flex-direction: column; gap: 8px; 
+}
+.token-item { 
+    background: var(--surface-light); border-radius: 16px; 
+    padding: 12px 16px; display: flex; 
+    justify-content: space-between; align-items: center; cursor: pointer; 
+}
 .token-left { display: flex; align-items: center; gap: 12px; }
-.token-icon-circle { width: 40px; height: 40px; background: #333; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 14px; overflow: hidden; }
+.token-icon-circle { 
+    width: 40px; height: 40px; background: #333; 
+    border-radius: 50%; display: flex; align-items: center; 
+    justify-content: center; color: white; font-weight: 600; 
+    font-size: 14px; overflow: hidden; 
+}
 .token-info-text { display: flex; flex-direction: column; }
 .t-name { font-weight: 700; font-size: 15px; color: white; }
 .t-sub { font-size: 12px; color: var(--text-sec); }
 .t-price { font-weight: 700; font-size: 15px; color: white; }
 .t-change { font-size: 12px; color: var(--accent-green); font-weight: 500; }
 
-.balance-card { width: 100%; padding: 40px 16px 20px; text-align: left; }
-.balance-label { color: var(--text-sec); font-size: 14px; margin-bottom: 5px; }
-.balance-val { font-size: 42px; font-weight: 700; letter-spacing: -1px; color: white; }
-.actions-row { display: flex; gap: 12px; width: 100%; padding: 0 16px; margin-bottom: 30px; }
-.action-btn { flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; height: 80px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; cursor: pointer; transition: background 0.2s; }
+/* --- BALANCE CARD (Wallet) --- */
+.balance-card { 
+    width: 100%; padding: 40px 16px 20px; text-align: left; 
+}
+.balance-label { 
+    color: var(--text-sec); font-size: 14px; margin-bottom: 5px; 
+}
+.balance-val { 
+    font-size: 42px; font-weight: 700; letter-spacing: -1px; color: white; 
+}
+.actions-row { 
+    display: flex; gap: 12px; width: 100%; 
+    padding: 0 16px; margin-bottom: 30px; 
+}
+.action-btn { 
+    flex: 1; background: var(--surface); 
+    border: 1px solid var(--border); border-radius: 16px; 
+    height: 80px; display: flex; flex-direction: column; 
+    align-items: center; justify-content: center; gap: 8px; 
+    cursor: pointer; transition: background 0.2s; 
+}
 .action-btn:active { background: var(--surface-light); }
 .action-label { font-size: 14px; font-weight: 600; }
-
 /* === PORTFOLIO (FIXED FOR 3 COLUMNS) === */
 .portfolio-section { width: 100%; padding: 0 16px; }
 .portfolio-title { font-size: 18px; font-weight: 700; margin-bottom: 15px; }
