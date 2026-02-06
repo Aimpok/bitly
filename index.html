@@ -135,37 +135,48 @@
             display: flex !important;
             justify-content: center !important;
             align-items: center !important;
-            opacity: 0.5; /* Полупрозрачность для неактивных */
+            opacity: 0.5;
             transition: opacity 0.2s;
             margin: 0 !important;
         }
 
-        /* Активная кнопка становится ярче, но БЕЗ фона */
         .nav-item.active { 
             opacity: 1 !important; 
             background-color: transparent !important;
         }
 
-        /* === СТИЛИ ИКОНОК (ГЛАВНОЕ ИЗМЕНЕНИЕ) === */
+        /* === СТИЛИ ИКОНОК (ИСПРАВЛЕНО) === */
         
-        /* 1. Обычное состояние (Контур) */
+        /* 1. Общие настройки для SVG (контуры) */
         .nav-item svg {
             width: 24px;
             height: 24px;
-            stroke: #ffffff !important;  /* Белая обводка */
+            stroke: #ffffff !important;  
             stroke-width: 2px !important;
-            fill: none !important;       /* Внутри пусто (черный фон страницы) */
+            fill: none !important;       
             transition: fill 0.2s ease-in-out;
         }
 
-        /* 2. Активное состояние (Заливка) */
-        /* Цвет #666666 - это серый, как на вашем примере, внутри белого контура */
+        /* 2. Активное состояние: Светлая заливка */
         .nav-item.active svg {
-            fill: #666666 !important;    /* СЕРАЯ ЗАЛИВКА */
-            stroke: #ffffff !important;  /* Обводка остается белой */
+            fill: #cccccc !important;    /* ЯРКАЯ ЗАЛИВКА (Серебро) */
+            stroke: #ffffff !important;  
         }
 
-        /* Центральная кнопка Trade (не меняется) */
+        /* 3. ИСПРАВЛЕНИЕ ДЛЯ ДОЛЛАРА (ТЕКСТА) */
+        /* Текст внутри SVG не должен иметь обводку, но должен иметь заливку */
+        .nav-item svg text {
+            stroke: none !important;     /* Убираем обводку у буквы */
+            fill: #ffffff !important;    /* Делаем букву белой */
+            font-weight: bold !important;
+        }
+
+        /* 4. Активный доллар */
+        /* Если иконка залита светло-серым, доллар делаем черным для контраста */
+        .nav-item.active svg text {
+            fill: #000000 !important;    
+        }
+
         .nav-trade-circle {
             position: static !important; 
             width: 48px !important;
@@ -220,18 +231,18 @@
 <!-- Bottom Nav -->
 
 <div class="bottom-nav">
-    <!-- Wallet (Active) -->
-    <!-- Здесь SVG будет залит серым, так как класс active -->
+    <!-- Wallet (Active для теста, чтобы вы увидели заливку) -->
     <div class="nav-item active">
         <svg class="icon" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
     </div>
     
     <!-- Earn -->
     <div class="nav-item" onclick="location.href='Earn.html'">
-        <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" font-size="10" font-weight="800" fill="currentColor" stroke="none">$</text></svg>
+        <!-- Убрал fill="currentColor" из HTML, так как теперь управляется через CSS -->
+        <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><text x="50%" y="57%" dominant-baseline="middle" text-anchor="middle" font-size="14" font-weight="bold">$</text></svg>
     </div>
     
-    <!-- Trade Center (Center Circle) -->
+    <!-- Trade Center -->
     <div class="nav-trade-circle" onclick="location.href='markets.html'">
         <svg class="icon" style="color:black; width: 24px; height: 24px; stroke: black; stroke-width: 2; fill: none;" viewBox="0 0 24 24"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
     </div>
