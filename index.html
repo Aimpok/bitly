@@ -31,7 +31,7 @@
         .carousel-container {
             display: flex;
             overflow-x: auto;
-            scroll-snap-type: x mandatory; /* Магия прилипания */
+            scroll-snap-type: x mandatory;
             gap: 0 !important; 
             padding: 0 !important;
             margin-bottom: 12px;
@@ -51,7 +51,7 @@
             padding: 10px 16px !important; 
             background: transparent !important;
             box-sizing: border-box;
-            scroll-snap-align: center; /* Центруем слайд */
+            scroll-snap-align: center;
             scroll-snap-stop: always;
             flex-shrink: 0;
         }
@@ -92,7 +92,7 @@
             width: 6px; 
         }
 
-        /* === ИВЕНТЫ (Обновленные иконки) === */
+        /* === ИВЕНТЫ === */
         .event-icon-center-lg {
             position: absolute;
             top: 40%; 
@@ -129,24 +129,43 @@
             box-sizing: border-box !important;
         }
 
-        /* ИЗМЕНЕНИЯ ЗДЕСЬ ДЛЯ ЗАЛИВКИ */
         .nav-item {
-            width: 54px !important; /* Фиксированная ширина для "кнопки" */
-            height: 44px !important; /* Фиксированная высота */
+            width: 100% !important;
+            height: 100% !important;
             display: flex !important;
             justify-content: center !important;
             align-items: center !important;
-            opacity: 0.5;
-            transition: all 0.2s; /* Плавный переход цвета и прозрачности */
+            opacity: 0.5; /* Полупрозрачность для неактивных */
+            transition: opacity 0.2s;
             margin: 0 !important;
-            border-radius: 12px; /* Скругление углов для фона */
         }
 
+        /* Активная кнопка становится ярче, но БЕЗ фона */
         .nav-item.active { 
             opacity: 1 !important; 
-            background-color: #333333 !important; /* СЕРАЯ ЗАЛИВКА ВНУТРИ */
+            background-color: transparent !important;
         }
 
+        /* === СТИЛИ ИКОНОК (ГЛАВНОЕ ИЗМЕНЕНИЕ) === */
+        
+        /* 1. Обычное состояние (Контур) */
+        .nav-item svg {
+            width: 24px;
+            height: 24px;
+            stroke: #ffffff !important;  /* Белая обводка */
+            stroke-width: 2px !important;
+            fill: none !important;       /* Внутри пусто (черный фон страницы) */
+            transition: fill 0.2s ease-in-out;
+        }
+
+        /* 2. Активное состояние (Заливка) */
+        /* Цвет #666666 - это серый, как на вашем примере, внутри белого контура */
+        .nav-item.active svg {
+            fill: #666666 !important;    /* СЕРАЯ ЗАЛИВКА */
+            stroke: #ffffff !important;  /* Обводка остается белой */
+        }
+
+        /* Центральная кнопка Trade (не меняется) */
         .nav-trade-circle {
             position: static !important; 
             width: 48px !important;
@@ -160,17 +179,10 @@
             margin: 0 !important;
         }
 
-        /* Общие стили */
         body {
             padding-bottom: 100px !important;
             background: #000;
             color: #fff;
-        }
-        
-        /* Убедимся, что иконки имеют правильный размер внутри плашек */
-        .nav-item svg {
-            width: 24px;
-            height: 24px;
         }
     </style>
 </head>
@@ -180,33 +192,26 @@
 
 <div id="globalLoader"><div class="custom-spinner"></div></div>
 
-<!-- 1. Explore (Карусель) -->
+<!-- 1. Explore -->
 
 <div class="section-title" style="margin-top: 20px;">Explore</div>
 <div class="carousel-container" id="newsSlider" style="min-height: 160px;"></div>
-<!-- Точки индикаторы -->
 <div id="dotsContainer" class="slider-dots-overlay"></div>
 
-<!-- 2. Events (Ивенты) -->
+<!-- 2. Events -->
 
 <div class="section-title">Events</div>
-<div class="events-grid" id="eventsContainer">
-    <!-- Сюда JS вставит карточки -->
-</div>
+<div class="events-grid" id="eventsContainer"></div>
 
-<!-- 3. Список лидеров -->
+<!-- 3. Leaders -->
 
 <div class="section-title">Market Leaders</div>
-
-<!-- Фильтры -->
 
 <div class="filter-chips">
     <div class="filter-chip active" onclick="setFilter('week', this)">Week</div>
     <div class="filter-chip" onclick="setFilter('month', this)">Month</div>
     <div class="filter-chip" onclick="setFilter('year', this)">Year</div>
 </div>
-
-<!-- Список токенов -->
 
 <div class="token-list" id="topTokensList">
     <div style="text-align: center; color: #555; padding: 20px;">Loading...</div>
@@ -215,22 +220,27 @@
 <!-- Bottom Nav -->
 
 <div class="bottom-nav">
-    <!-- Wallet -->
+    <!-- Wallet (Active) -->
+    <!-- Здесь SVG будет залит серым, так как класс active -->
     <div class="nav-item active">
         <svg class="icon" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
     </div>
-    <!-- Earn/Explore Page -->
+    
+    <!-- Earn -->
     <div class="nav-item" onclick="location.href='Earn.html'">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"></circle><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" font-size="10" font-weight="800" fill="currentColor" stroke="none">$</text></svg>
+        <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" font-size="10" font-weight="800" fill="currentColor" stroke="none">$</text></svg>
     </div>
-    <!-- Trade Center -->
+    
+    <!-- Trade Center (Center Circle) -->
     <div class="nav-trade-circle" onclick="location.href='markets.html'">
-        <svg class="icon" style="color:black;" viewBox="0 0 24 24"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
+        <svg class="icon" style="color:black; width: 24px; height: 24px; stroke: black; stroke-width: 2; fill: none;" viewBox="0 0 24 24"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
     </div>
+    
     <!-- Messages -->
     <div class="nav-item" onclick="location.href='messages.html'">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+        <svg class="icon" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
     </div>
+    
     <!-- Profile -->
     <div class="nav-item" onclick="location.href='wallet.html'">
         <svg class="icon" viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
@@ -239,8 +249,7 @@
 
 <script src="stocks.js"></script>
 
-<!-- === СКРИПТ КАРУСЕЛИ (БЕСКОНЕЧНОСТЬ + CSS SNAP) === -->
-
+<!-- === СКРИПТ КАРУСЕЛИ === -->
 <script>
     const tg = window.Telegram.WebApp;
     tg.expand();
@@ -257,12 +266,10 @@
         slider.innerHTML = '';
         dotsContainer.innerHTML = '';
 
-        // 1. Точки
         stocksData.forEach((_, i) => {
             dotsContainer.innerHTML += `<div class="dot ${i === 0 ? 'active' : ''}" id="dot-${i}"></div>`;
         });
 
-        // 2. Данные с клонами: [Clone Last] ...Originals... [Clone First]
         const extendedData = [stocksData[stocksData.length - 1], ...stocksData, stocksData[0]];
 
         extendedData.forEach((stock) => {
@@ -281,7 +288,6 @@
             slider.appendChild(cardWrapper);
         });
 
-        // 3. Старт с 1-го элемента (не клона)
         setTimeout(() => {
             const width = slider.offsetWidth;
             slider.style.scrollBehavior = 'auto';
@@ -289,7 +295,6 @@
             slider.style.scrollBehavior = 'smooth';
         }, 50);
 
-        // 4. События
         slider.addEventListener('scroll', () => {
             updateDots();
             checkInfiniteLoop();
@@ -306,18 +311,14 @@
         clearTimeout(loopTimeout);
         loopTimeout = setTimeout(() => {
             if (isTouching) return; 
-
             const width = slider.offsetWidth;
             const scrollPos = slider.scrollLeft;
             const totalCount = stocksData.length;
-
-            // Если слева (на клоне последнего)
             if (scrollPos < 10) { 
                 slider.style.scrollBehavior = 'auto';
                 slider.scrollLeft = width * totalCount; 
                 slider.style.scrollBehavior = 'smooth';
             }
-            // Если справа (на клоне первого)
             else if (scrollPos >= width * (totalCount + 1) - 10) {
                 slider.style.scrollBehavior = 'auto';
                 slider.scrollLeft = width; 
