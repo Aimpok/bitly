@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Home</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
@@ -177,7 +177,7 @@
             justify-content: flex-end;
             gap: 6px;
             font-size: 15px;
-            font-weight: 600;
+            font-weight: 700; /* Жирный шрифт для цены */
             color: #ffffff;
             line-height: 1.2;
         }
@@ -185,13 +185,12 @@
         .market-change {
             font-size: 13px;
             margin-top: 4px;
-            font-weight: 500;
+            font-weight: 700; /* Вернул жирность как на скрине */
             line-height: 1.2;
         }
         
-        .color-green { color: #4ade80 !important; }
-        .color-red { color: #ef4444 !important; }
-
+        /* Я удалил принудительные цвета .color-green и .color-red отсюда, 
+           чтобы они брались из вашего style.css */
 
         /* === ПАНЕЛЬ НАВИГАЦИИ === */
         .bottom-nav {
@@ -278,7 +277,7 @@
     <div class="filter-chip" onclick="setFilter('year', this)">Year</div>
 </div>
 
-<!-- Список токенов (Теперь выглядит как Markets) -->
+<!-- Список токенов (Теперь выглядит как Markets с правильными цветами) -->
 <div class="market-list" id="topTokensList">
     <div style="text-align: center; color: #555; padding: 20px;">Loading...</div>
 </div>
@@ -483,8 +482,8 @@
         container.innerHTML = '';
         
         sorted.forEach(token => {
-            // Математика фильтров Week/Month/Year осталась
             let displayChangeVal = token.change || 0;
+            // Фильтры визуально меняют значение, но стиль остается стандартным
             if (currentPeriod === 'month') { displayChangeVal *= 4.2; } 
             else if (currentPeriod === 'year') { displayChangeVal *= 12.5; }
 
@@ -492,7 +491,7 @@
             const changeClass = isPositive ? 'color-green' : 'color-red';
             const sign = isPositive ? '+' : '';
             
-            // Логика иконки как в Markets
+            // Логика иконки
             let iconHtml = '';
             if (token.image) {
                 iconHtml = `<img src="${token.image}" class="coin-img" alt="${token.id}">`;
@@ -501,14 +500,12 @@
                 iconHtml = `<span class="coin-letter">${iconLetter}</span>`;
             }
             
-            // HTML Структура как в Markets
             const itemHtml = `
             <div class="market-item" onclick="location.href='crypto_info.html?id=${token.id}'">
                 <div class="market-left">
                     <div class="coin-avatar">${iconHtml}</div>
                     <div class="market-info">
                         <div class="market-pair">${token.id}</div>
-                        <!-- Подпись: Имя токена или "Week vol" по желанию, здесь оставил имя как в Markets -->
                         <div class="t-sub">${token.name || (currentPeriod + ' vol')}</div>
                     </div>
                 </div>
