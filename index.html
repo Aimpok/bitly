@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
@@ -24,7 +23,6 @@
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* === ФИЛЬТРЫ === */
         .filter-chip { cursor: pointer; }
 
         /* === КАРУСЕЛЬ (CSS SNAP) === */
@@ -32,7 +30,7 @@
             display: flex;
             overflow-x: auto;
             scroll-snap-type: x mandatory;
-            gap: 0 !important; 
+            gap: 0 !important;
             padding: 0 !important;
             margin-bottom: 12px;
             -webkit-overflow-scrolling: touch;
@@ -48,7 +46,7 @@
             margin: 0 !important;
             border: none !important;
             border-radius: 0 !important;
-            padding: 10px 16px !important; 
+            padding: 10px 16px !important;
             background: transparent !important;
             box-sizing: border-box;
             scroll-snap-align: center;
@@ -80,30 +78,120 @@
             margin-bottom: 20px;
             pointer-events: none;
         }
-        .dot { 
-            width: 6px; 
-            height: 6px; 
-            background: rgba(255,255,255,0.3); 
-            border-radius: 1px; 
-            transition: 0.2s; 
+        .dot {
+            width: 6px;
+            height: 6px;
+            background: rgba(255,255,255,0.3);
+            border-radius: 1px;
+            transition: 0.2s;
         }
-        .dot.active { 
-            background: #fff; 
-            width: 6px; 
+        .dot.active {
+            background: #fff;
+            width: 6px;
         }
 
         /* === ИВЕНТЫ === */
         .event-icon-center-lg {
             position: absolute;
-            top: 40%; 
+            top: 40%;
             left: 50%;
             transform: translate(-50%, -50%);
-            width: 100px !important; 
+            width: 100px !important;
             height: 100px !important;
             object-fit: contain;
             z-index: 1;
             filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5));
         }
+
+        /* === СТИЛИ СПИСКА ТОКЕНОВ (КАК В MARKETS) === */
+        .market-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            border-bottom: 1px solid #222;
+            cursor: pointer;
+            background: transparent;
+        }
+        
+        .market-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .coin-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            overflow: hidden;
+            background-color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-shrink: 0;
+        }
+        
+        .coin-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .coin-letter {
+            font-size: 18px;
+            font-weight: 700;
+            color: #fff;
+        }
+        
+        .market-info {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        
+        .market-pair {
+            font-size: 16px;
+            font-weight: 600;
+            color: #ffffff;
+            line-height: 1.2;
+        }
+        
+        .t-sub {
+            font-size: 13px;
+            color: #888;
+            margin-top: 2px;
+            line-height: 1.2;
+        }
+        
+        .market-right {
+            text-align: right;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        
+        .market-price-row {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 6px;
+            font-size: 15px;
+            font-weight: 600;
+            color: #ffffff;
+            line-height: 1.2;
+        }
+        
+        .market-change {
+            font-size: 13px;
+            margin-top: 4px;
+            font-weight: 500;
+            line-height: 1.2;
+        }
+        
+        .color-green { color: #4ade80 !important; }
+        .color-red { color: #ef4444 !important; }
+
 
         /* === ПАНЕЛЬ НАВИГАЦИИ === */
         .bottom-nav {
@@ -111,20 +199,20 @@
             bottom: 0 !important;
             left: 0 !important;
             right: 0 !important;
-            width: 100% !important; 
-            max-width: 480px !important; 
-            margin: 0 auto !important;   
-            transform: none !important; 
-            border: none !important;     
-            border-radius: 0 !important; 
-            box-shadow: none !important; 
-            background: #000000 !important; 
+            width: 100% !important;
+            max-width: 480px !important;
+            margin: 0 auto !important;
+            transform: none !important;
+            border: none !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
+            background: #000000 !important;
             display: grid !important;
             grid-template-columns: repeat(5, 1fr) !important;
             align-items: center !important;
             justify-items: center !important;
             height: 70px !important;
-            padding-bottom: env(safe-area-inset-bottom, 20px) !important; 
+            padding-bottom: env(safe-area-inset-bottom, 20px) !important;
             z-index: 9999 !important;
             box-sizing: border-box !important;
         }
@@ -140,45 +228,10 @@
             margin: 0 !important;
         }
 
-        .nav-item.active { 
-            opacity: 1 !important; 
-            background-color: transparent !important;
-        }
-
-        /* === СТИЛИ ИКОНОК (ИСПРАВЛЕНО) === */
-        
-        /* 1. Общие настройки для SVG (контуры) */
-        .nav-item svg {
-            width: 24px;
-            height: 24px;
-            stroke: #ffffff !important;  
-            stroke-width: 2px !important;
-            fill: none !important;       
-            transition: fill 0.2s ease-in-out;
-        }
-
-        /* 2. Активное состояние: Светлая заливка */
-        .nav-item.active svg {
-            fill: #cccccc !important;    /* ЯРКАЯ ЗАЛИВКА (Серебро) */
-            stroke: #ffffff !important;  
-        }
-
-        /* 3. ИСПРАВЛЕНИЕ ДЛЯ ДОЛЛАРА (ТЕКСТА) */
-        /* Текст внутри SVG не должен иметь обводку, но должен иметь заливку */
-        .nav-item svg text {
-            stroke: none !important;     /* Убираем обводку у буквы */
-            fill: #ffffff !important;    /* Делаем букву белой */
-            font-weight: bold !important;
-        }
-
-        /* 4. Активный доллар */
-        /* Если иконка залита светло-серым, доллар делаем черным для контраста */
-        .nav-item.active svg text {
-            fill: #000000 !important;    
-        }
+        .nav-item.active { opacity: 1 !important; }
 
         .nav-trade-circle {
-            position: static !important; 
+            position: static !important;
             width: 48px !important;
             height: 48px !important;
             background: #ffffff !important;
@@ -186,7 +239,7 @@
             display: flex !important;
             justify-content: center !important;
             align-items: center !important;
-            transform: translateY(-5px) !important; 
+            transform: translateY(-5px) !important;
             margin: 0 !important;
         }
 
@@ -194,67 +247,63 @@
             padding-bottom: 100px !important;
             background: #000;
             color: #fff;
+            font-family: 'Inter', sans-serif;
+            margin: 0;
         }
     </style>
+
 </head>
 <body>
 
 <!-- === ЛОАДЕР === -->
-
 <div id="globalLoader"><div class="custom-spinner"></div></div>
 
-<!-- 1. Explore -->
-
-<div class="section-title" style="margin-top: 20px;">Explore</div>
+<!-- 1. Explore (Карусель) -->
+<div class="section-title" style="margin-top: 20px; padding: 0 16px;">Explore</div>
 <div class="carousel-container" id="newsSlider" style="min-height: 160px;"></div>
+<!-- Точки индикаторы -->
 <div id="dotsContainer" class="slider-dots-overlay"></div>
 
-<!-- 2. Events -->
-
-<div class="section-title">Events</div>
+<!-- 2. Events (Ивенты) -->
+<div class="section-title" style="padding: 0 16px;">Events</div>
 <div class="events-grid" id="eventsContainer"></div>
 
-<!-- 3. Leaders -->
+<!-- 3. Список лидеров -->
+<div class="section-title" style="padding: 0 16px;">Market Leaders</div>
 
-<div class="section-title">Market Leaders</div>
-
+<!-- Фильтры -->
 <div class="filter-chips">
     <div class="filter-chip active" onclick="setFilter('week', this)">Week</div>
     <div class="filter-chip" onclick="setFilter('month', this)">Month</div>
     <div class="filter-chip" onclick="setFilter('year', this)">Year</div>
 </div>
 
-<div class="token-list" id="topTokensList">
+<!-- Список токенов (Теперь выглядит как Markets) -->
+<div class="market-list" id="topTokensList">
     <div style="text-align: center; color: #555; padding: 20px;">Loading...</div>
 </div>
 
 <!-- Bottom Nav -->
-
 <div class="bottom-nav">
-    <!-- Wallet (Active для теста, чтобы вы увидели заливку) -->
+    <!-- Wallet -->
     <div class="nav-item active">
-        <svg class="icon" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+        <svg class="icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
     </div>
-    
-    <!-- Earn -->
+    <!-- Earn/Explore Page -->
     <div class="nav-item" onclick="location.href='Earn.html'">
-        <!-- Убрал fill="currentColor" из HTML, так как теперь управляется через CSS -->
-        <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><text x="50%" y="57%" dominant-baseline="middle" text-anchor="middle" font-size="14" font-weight="bold">$</text></svg>
+        <svg class="icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"></circle><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" font-size="10" font-weight="800" fill="currentColor" stroke="none">$</text></svg>
     </div>
-    
     <!-- Trade Center -->
     <div class="nav-trade-circle" onclick="location.href='markets.html'">
-        <svg class="icon" style="color:black; width: 24px; height: 24px; stroke: black; stroke-width: 2; fill: none;" viewBox="0 0 24 24"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
+        <svg class="icon" width="24" height="24" style="color:black;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
     </div>
-    
     <!-- Messages -->
     <div class="nav-item" onclick="location.href='messages.html'">
-        <svg class="icon" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+        <svg class="icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
     </div>
-    
     <!-- Profile -->
     <div class="nav-item" onclick="location.href='wallet.html'">
-        <svg class="icon" viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+        <svg class="icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
     </div>
 </div>
 
@@ -272,7 +321,7 @@
     let isTouching = false;
 
     function renderStocks() {
-        if (!slider || typeof stocksData === 'undefined' || stocksData.length === 0) return;
+        if (!slider || typeof stocksData === 'undefined' || !stocksData || stocksData.length === 0) return;
         
         slider.innerHTML = '';
         dotsContainer.innerHTML = '';
@@ -288,12 +337,12 @@
             cardWrapper.className = 'news-card'; 
             cardWrapper.innerHTML = `
                 <div class="news-card-inner">
-                    <img src="${stock.bgImage}" class="news-bg" alt="bg">
-                    <div class="news-content">
-                        <div class="news-title">${stock.title}</div>
-                        <div class="action-btn-small" onclick="location.href='${stock.btnLink}'">${stock.btnText}</div>
+                    <img src="${stock.bgImage}" class="news-bg" alt="bg" style="position:absolute; top:0; left:0; width:100%; height:100%; object-fit:cover; z-index:0;">
+                    <div class="news-content" style="position:relative; z-index:2;">
+                        <div class="news-title" style="margin-bottom:10px;">${stock.title}</div>
+                        <div class="action-btn-small" onclick="location.href='${stock.btnLink}'" style="display:inline-block; padding:8px 16px; background:#fff; color:#000; border-radius:20px; font-weight:600;">${stock.btnText}</div>
                     </div>
-                    <img src="${stock.iconImage}" class="banner-icon" alt="icon">
+                    <img src="${stock.iconImage}" class="banner-icon" alt="icon" style="position:absolute; right:20px; bottom:20px; width:60px; height:60px; z-index:1;">
                 </div>
             `;
             slider.appendChild(cardWrapper);
@@ -303,17 +352,12 @@
             const width = slider.offsetWidth;
             slider.style.scrollBehavior = 'auto';
             slider.scrollLeft = width;
-            slider.style.scrollBehavior = 'smooth';
+            requestAnimationFrame(() => { slider.style.scrollBehavior = 'smooth'; });
         }, 50);
 
-        slider.addEventListener('scroll', () => {
-            updateDots();
-            checkInfiniteLoop();
-        });
-        
+        slider.addEventListener('scroll', () => { updateDots(); checkInfiniteLoop(); });
         slider.addEventListener('touchstart', () => { isTouching = true; clearInterval(autoScrollInterval); });
         slider.addEventListener('touchend', () => { isTouching = false; startAutoScroll(); });
-
         startAutoScroll();
     }
 
@@ -328,12 +372,12 @@
             if (scrollPos < 10) { 
                 slider.style.scrollBehavior = 'auto';
                 slider.scrollLeft = width * totalCount; 
-                slider.style.scrollBehavior = 'smooth';
+                setTimeout(() => { slider.style.scrollBehavior = 'smooth'; }, 50);
             }
             else if (scrollPos >= width * (totalCount + 1) - 10) {
                 slider.style.scrollBehavior = 'auto';
                 slider.scrollLeft = width; 
-                slider.style.scrollBehavior = 'smooth';
+                setTimeout(() => { slider.style.scrollBehavior = 'smooth'; }, 50);
             }
         }, 100);
     }
@@ -344,10 +388,7 @@
         let index = Math.round(slider.scrollLeft / width) - 1;
         if (index < 0) index = stocksData.length - 1;
         if (index >= stocksData.length) index = 0;
-
-        document.querySelectorAll('.dot').forEach((d, i) => {
-            d.classList.toggle('active', i === index);
-        });
+        document.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('active', i === index));
     }
 
     function startAutoScroll() {
@@ -363,6 +404,7 @@
     renderStocks();
 </script>
 
+<!-- === ОСНОВНОЙ СКРИПТ (Events + Tokens) === -->
 <script type="module">
     import { initUser, subscribeToMarket, initMarketDataIfNeeded } from './user-service.js';
     import { eventsData, getEventStatus } from './Events.js';
@@ -376,26 +418,28 @@
         if(!container) return;
         container.innerHTML = '';
 
-        eventsData.forEach(event => {
-            const status = getEventStatus(event);
-            const iconHtml = event.icon 
-                ? `<img src="${event.icon}" class="event-icon-center-lg" alt="${event.title}">` 
-                : '';
+        if (typeof eventsData !== 'undefined') {
+            eventsData.forEach(event => {
+                const status = getEventStatus(event);
+                const iconHtml = event.icon 
+                    ? `<img src="${event.icon}" class="event-icon-center-lg" alt="${event.title}">` 
+                    : '';
 
-            const eventHtml = `
-            <div class="event-card" onclick="location.href='${event.link}'">
-                <img src="${event.bgImage}" class="event-bg" alt="bg">
-                ${iconHtml}
-                <div class="event-content">
-                    <div class="event-title">${event.title}</div>
-                    <div class="event-timer ${status.isActive ? 'timer-active' : ''}">
-                        ${status.text}
+                const eventHtml = `
+                <div class="event-card" onclick="location.href='${event.link}'" style="position:relative; overflow:hidden; border-radius:12px; margin-bottom:12px; height:120px;">
+                    <img src="${event.bgImage}" class="event-bg" alt="bg" style="width:100%; height:100%; object-fit:cover;">
+                    ${iconHtml}
+                    <div class="event-content" style="position:absolute; bottom:10px; left:10px;">
+                        <div class="event-title" style="font-weight:bold; margin-bottom:4px;">${event.title}</div>
+                        <div class="event-timer ${status.isActive ? 'timer-active' : ''}" style="font-size:12px; opacity:0.8;">
+                            ${status.text}
+                        </div>
                     </div>
                 </div>
-            </div>
-            `;
-            container.innerHTML += eventHtml;
-        });
+                `;
+                container.innerHTML += eventHtml;
+            });
+        }
     }
 
     window.setFilter = function(period, el) {
@@ -408,14 +452,12 @@
     async function startApp() {
         try {
             renderEvents();
-
             const user = await initUser(); 
-            if (user.privacyAccepted !== true) {
+            if (user && user.privacyAccepted !== true) {
                 localStorage.removeItem('privacy_accepted'); 
                 window.location.replace('welcome.html');
                 return;
             }
-
             await initMarketDataIfNeeded();
 
             subscribeToMarket((tokens) => {
@@ -426,17 +468,22 @@
                     setTimeout(() => { loader.classList.add('loaded'); }, 300); 
                 }
             });
-        } catch (e) { console.error(e); }
+        } catch (e) { 
+            console.error("App Init Error:", e);
+            if(loader) loader.classList.add('loaded');
+        }
     }
 
     function renderTopTokens(tokens) {
         const container = document.getElementById('topTokensList');
         if(!container) return;
         
+        // Сортируем по цене, берем топ-100
         const sorted = tokens.sort((a,b) => b.price - a.price).slice(0, 100);
         container.innerHTML = '';
         
         sorted.forEach(token => {
+            // Математика фильтров Week/Month/Year осталась
             let displayChangeVal = token.change || 0;
             if (currentPeriod === 'month') { displayChangeVal *= 4.2; } 
             else if (currentPeriod === 'year') { displayChangeVal *= 12.5; }
@@ -445,23 +492,32 @@
             const changeClass = isPositive ? 'color-green' : 'color-red';
             const sign = isPositive ? '+' : '';
             
-            let iconHtml = token.image ? `<img src="${token.image}" style="width:100%; height:100%; object-fit:cover;">` : token.id[0];
+            // Логика иконки как в Markets
+            let iconHtml = '';
+            if (token.image) {
+                iconHtml = `<img src="${token.image}" class="coin-img" alt="${token.id}">`;
+            } else {
+                const iconLetter = token.id.charAt(0).toUpperCase();
+                iconHtml = `<span class="coin-letter">${iconLetter}</span>`;
+            }
             
+            // HTML Структура как в Markets
             const itemHtml = `
-            <div class="token-item" onclick="location.href='crypto_info.html?id=${token.id}'">
-                <div class="token-left">
-                    <div class="token-icon-circle">${iconHtml}</div>
-                    <div class="token-info-text">
-                        <span class="t-name">${token.id}</span>
-                        <span class="t-sub" style="font-size:10px;">${currentPeriod.charAt(0).toUpperCase() + currentPeriod.slice(1)} vol</span>
+            <div class="market-item" onclick="location.href='crypto_info.html?id=${token.id}'">
+                <div class="market-left">
+                    <div class="coin-avatar">${iconHtml}</div>
+                    <div class="market-info">
+                        <div class="market-pair">${token.id}</div>
+                        <!-- Подпись: Имя токена или "Week vol" по желанию, здесь оставил имя как в Markets -->
+                        <div class="t-sub">${token.name || (currentPeriod + ' vol')}</div>
                     </div>
                 </div>
-                <div class="token-right">
-                    <div class="t-price" style="display: flex; align-items: center; justify-content: flex-end; gap: 4px;">
+                <div class="market-right">
+                    <div class="market-price-row">
                         ${parseFloat(token.price).toFixed(6)}
-                        <img src="Sprites/Blyx.png" style="width: 16px; height: 16px; object-fit: contain;">
+                        <img src="Sprites/Blyx.png" style="width: 14px; height: 14px; object-fit: contain;">
                     </div>
-                    <div class="t-change ${changeClass}">${sign}${Math.abs(displayChangeVal).toFixed(2)}%</div>
+                    <div class="market-change ${changeClass}">${sign}${Math.abs(displayChangeVal).toFixed(2)}%</div>
                 </div>
             </div>
             `;
