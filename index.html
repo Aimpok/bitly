@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Home</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
@@ -25,11 +25,11 @@
 
         .filter-chip { cursor: pointer; }
 
-        /* === КАРУСЕЛЬ (ИСПРАВЛЕННЫЙ КОММЕНТАРИЙ) === */
+        /* === КАРУСЕЛЬ (CSS SNAP) === */
         .carousel-container {
             display: flex;
             overflow-x: auto;
-            scroll-snap-type: x mandatory; /* Магия прилипания */
+            scroll-snap-type: x mandatory;
             gap: 0 !important;
             padding: 0 !important;
             margin-bottom: 12px;
@@ -49,7 +49,7 @@
             padding: 10px 16px !important;
             background: transparent !important;
             box-sizing: border-box;
-            scroll-snap-align: center; /* Центруем слайд */
+            scroll-snap-align: center;
             scroll-snap-stop: always;
             flex-shrink: 0;
         }
@@ -90,50 +90,17 @@
             width: 6px;
         }
 
-        /* === ИВЕНТЫ (ИСПРАВЛЕННЫЙ КОММЕНТАРИЙ) === */
+        /* === ИВЕНТЫ === */
         .event-icon-center-lg {
             position: absolute;
-            /* Поднял выше (40%), чтобы текст снизу не налезал */
             top: 40%;
             left: 50%;
             transform: translate(-50%, -50%);
-            width: 100px !important; /* РАЗМЕР 100px */
+            width: 100px !important;
             height: 100px !important;
             object-fit: contain;
             z-index: 1;
             filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5));
-        }
-
-        /* === СТИЛИ ДЛЯ СПИСКА ТОКЕНОВ (КАК В MARKETS) === */
-        .market-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 12px 16px; /* Отступы как в маркетс */
-            border-bottom: 1px solid #222;
-            cursor: pointer;
-        }
-        .market-left { display: flex; align-items: center; gap: 12px; }
-        
-        .coin-avatar {
-            width: 40px; height: 40px; border-radius: 50%;
-            overflow: hidden; background: #333;
-            display: flex; justify-content: center; align-items: center;
-        }
-        .coin-img { width: 100%; height: 100%; object-fit: cover; }
-        .coin-letter { font-size: 18px; font-weight: 700; color: #fff; }
-
-        .market-info { display: flex; flex-direction: column; justify-content: center; }
-        .market-pair { font-size: 16px; font-weight: 600; color: #fff; line-height: 1.2; }
-        .t-sub { font-size: 13px; color: #888; margin-top: 2px; line-height: 1.2; }
-
-        .market-right { text-align: right; }
-        .market-price-row {
-            display: flex; align-items: center; justify-content: flex-end; gap: 6px;
-            font-size: 15px; font-weight: 700; color: #fff;
-        }
-        .market-change {
-            font-size: 13px; margin-top: 4px; font-weight: 700; /* Жирный шрифт как просил */
         }
 
         /* === ПАНЕЛЬ НАВИГАЦИИ === */
@@ -192,7 +159,6 @@
             color: #fff;
         }
     </style>
-
 </head>
 <body>
 
@@ -226,19 +192,20 @@
     <div class="filter-chip" onclick="setFilter('year', this)">Year</div>
 </div>
 
-<!-- Список токенов (ТЕПЕРЬ КАК В MARKETS) -->
-<div class="token-list" id="topTokensList">
+<!-- Список токенов (Теперь стиль как в Markets) -->
+
+<div class="market-list" id="topTokensList">
     <div style="text-align: center; color: #555; padding: 20px;">Loading...</div>
 </div>
 
 <!-- Bottom Nav -->
 
 <div class="bottom-nav">
-    <!-- Wallet -->
+    <!-- Wallet (Active Home) -->
     <div class="nav-item active">
         <svg class="icon" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
     </div>
-    <!-- Earn/Explore Page -->
+    <!-- Earn -->
     <div class="nav-item" onclick="location.href='Earn.html'">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"></circle><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" font-size="10" font-weight="800" fill="currentColor" stroke="none">$</text></svg>
     </div>
@@ -258,7 +225,7 @@
 
 <script src="stocks.js"></script>
 
-<!-- === СКРИПТ КАРУСЕЛИ (СТАРЫЙ) === -->
+<!-- === СКРИПТ КАРУСЕЛИ === -->
 
 <script>
     const tg = window.Telegram.WebApp;
@@ -276,12 +243,10 @@
         slider.innerHTML = '';
         dotsContainer.innerHTML = '';
 
-        // 1. Точки
         stocksData.forEach((_, i) => {
             dotsContainer.innerHTML += `<div class="dot ${i === 0 ? 'active' : ''}" id="dot-${i}"></div>`;
         });
 
-        // 2. Данные с клонами
         const extendedData = [stocksData[stocksData.length - 1], ...stocksData, stocksData[0]];
 
         extendedData.forEach((stock) => {
@@ -432,44 +397,53 @@
         } catch (e) { console.error(e); }
     }
 
+    // Вспомогательная функция для форматирования цены, как в Markets
+    function formatPrice(val) {
+        if(!val || val === 0) return "0";
+        return val < 0.01 ? val.toFixed(8).replace(/\.?0+$/, "") : val.toFixed(4);
+    }
+
     function renderTopTokens(tokens) {
         const container = document.getElementById('topTokensList');
         if(!container) return;
         
+        // Сортировка по цене для примера лидеров
         const sorted = tokens.sort((a,b) => b.price - a.price).slice(0, 100);
         container.innerHTML = '';
         
         sorted.forEach(token => {
+            // Логика изменения процента в зависимости от фильтра
             let displayChangeVal = token.change || 0;
             if (currentPeriod === 'month') { displayChangeVal *= 4.2; } 
             else if (currentPeriod === 'year') { displayChangeVal *= 12.5; }
 
             const isPositive = displayChangeVal >= 0;
-            // Убрал принудительные цвета, оставил классы чтобы тянулись из style.css
             const changeClass = isPositive ? 'color-green' : 'color-red';
             const sign = isPositive ? '+' : '';
             
-            // ЛОГИКА ОТОБРАЖЕНИЯ КАК В MARKETS
+            // Иконка (как в Markets)
             let iconHtml = '';
             if (token.image) {
                 iconHtml = `<img src="${token.image}" class="coin-img" alt="${token.id}">`;
             } else {
-                const iconLetter = token.id.charAt(0).toUpperCase();
-                iconHtml = `<span class="coin-letter">${iconLetter}</span>`;
+                iconHtml = `<span class="coin-letter">${token.id.charAt(0).toUpperCase()}</span>`;
             }
-            
+
+            const formattedPrice = formatPrice(parseFloat(token.price));
+
+            // === HTML ТОЧНО КАК В MARKETS ===
             const itemHtml = `
             <div class="market-item" onclick="location.href='crypto_info.html?id=${token.id}'">
                 <div class="market-left">
                     <div class="coin-avatar">${iconHtml}</div>
                     <div class="market-info">
                         <div class="market-pair">${token.id}</div>
-                        <div class="t-sub">${token.name || (currentPeriod + ' vol')}</div>
+                        <div class="t-sub" style="font-size:12px; opacity:0.7">${currentPeriod.charAt(0).toUpperCase() + currentPeriod.slice(1)} vol</div>
                     </div>
                 </div>
                 <div class="market-right">
                     <div class="market-price-row">
-                        ${parseFloat(token.price).toFixed(6)}
+                        ${formattedPrice}
                         <img src="Sprites/Blyx.png" style="width: 14px; height: 14px; object-fit: contain;">
                     </div>
                     <div class="market-change ${changeClass}">${sign}${Math.abs(displayChangeVal).toFixed(2)}%</div>
